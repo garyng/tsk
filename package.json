@@ -19,6 +19,55 @@
     "activationEvents": [
         "onLanguage:tsk"
     ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "tsk",
+                "extensions": [
+                    ".tsk"
+                ],
+                "aliases": [
+                    "Tsk"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "tsk.rebuildCache",
+                "title": "Rebuild Cache",
+                "category": "Tsk"
+            }
+        ],
+        "configuration": {
+            "title": "Tsk",
+            "properties": {
+                "tsk.cache.path": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk-cache.db",
+                    "description": "Path to the on-disk SQLite cache. Supports ${workspaceFolder} substitution. When no workspace folder is open, falls back to in-memory."
+                },
+                "tsk.log.level": {
+                    "type": "string",
+                    "enum": [
+                        "debug",
+                        "info",
+                        "warn",
+                        "error"
+                    ],
+                    "default": "info",
+                    "description": "Verbosity of the tsk Output channel."
+                },
+                "tsk.decorations.priority.opacity": {
+                    "type": "number",
+                    "default": 0.15,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Background opacity of priority line decorations (0 = invisible, 1 = full)."
+                }
+            }
+        }
+    },
     "scripts": {
         "build:host": "vite build -c vite.config.host.ts",
         "build": "npm run build:host",
@@ -26,7 +75,7 @@
         "typecheck": "tsc",
         "compile:tests": "tsc -p tsconfig.test.json",
         "test": "vitest run",
-        "pretest:e2e": "npm run compile:tests",
+        "pretest:e2e": "npm run compile:tests && npm run build:host",
         "test:e2e": "bash scripts/run-e2e.sh",
         "lint": "biome check .",
         "format": "biome format --write .",
