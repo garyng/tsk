@@ -73,7 +73,7 @@
         "build": "npm run build:host",
         "dev:host": "vite build -c vite.config.host.ts --watch",
         "typecheck": "tsc",
-        "compile:tests": "tsc -p tsconfig.test.json",
+        "compile:tests": "tsc -p tests/tsconfig.json",
         "test": "vitest run",
         "pretest:e2e": "npm run compile:tests && npm run build:host",
         "test:e2e": "bash scripts/run-e2e.sh",

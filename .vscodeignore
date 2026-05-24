@@ -13,7 +13,6 @@ scripts/**
 vite.config.host.ts
 vitest.config.ts
 tsconfig.json
-tsconfig.test.json
 biome.json
 CLAUDE.md
 **/*.test.ts

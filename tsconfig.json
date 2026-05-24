@@ -4,6 +4,7 @@
         "module": "CommonJS",
         "lib": ["ES2022"],
         "outDir": "out",
+        "rootDir": "src",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
@@ -14,8 +15,8 @@
         "declaration": false,
         "resolveJsonModule": true,
         "noEmit": true,
-        "types": ["mocha", "node"]
+        "types": ["node"]
     },
-    "include": ["src/**/*", "tests/**/*"],
-    "exclude": ["node_modules", "dist", "out", "out-test"]
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "dist", "out", "out-test", "tests"]
 }
