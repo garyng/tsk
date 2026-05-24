@@ -54,7 +54,7 @@ Metadata lives inside an HTML comment after the task content. Each `@key:value`
 pair is scoped separately so themes can highlight the key, the separator, and
 the value.
 
-- [x] write the grammar <!-- @id:k3w8t9rx @created:2026-05-24T15:00 @completed:2026-05-24T17:30 -->
+- [x] write the grammar <!-- @id:k3w8t9rx @created:2026-05-24T15:00:00+08:00 @completed:2026-05-24T17:30:42+08:00 -->
 - [/] try a value-less flag <!-- @id:m2x7v4qy @starred -->
 
 ## Tags
@@ -69,4 +69,4 @@ with `# ` followed by a space) are *not* matched as tags.
 
 A real task usually has a marker, content, tags, and metadata together:
 
-- [/] integrate `node:sqlite` cache layer #project/tsk #milestone/M3 <!-- @id:p4f8c2dh @created:2026-05-24T17:45 @started:2026-05-25T09:00 -->
+- [/] integrate `node:sqlite` cache layer #project/tsk #milestone/M3 <!-- @id:p4f8c2dh @created:2026-05-24T17:45:11+08:00 @started:2026-05-25T09:00:00+08:00 -->
