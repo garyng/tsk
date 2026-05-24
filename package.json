@@ -27,7 +27,7 @@
         "compile:tests": "tsc -p tsconfig.test.json",
         "test": "vitest run",
         "pretest:e2e": "npm run compile:tests",
-        "test:e2e": "vscode-test",
+        "test:e2e": "bash scripts/run-e2e.sh",
         "lint": "biome check .",
         "format": "biome format --write .",
         "package": "vsce package"
