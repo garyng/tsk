@@ -13,8 +13,9 @@
         "noImplicitOverride": true,
         "sourceMap": true,
         "declaration": false,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "noEmit": true
     },
     "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist", "out", "tests"]
+    "exclude": ["node_modules", "dist", "out", "out-test", "tests"]
 }
