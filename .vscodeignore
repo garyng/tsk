@@ -1,0 +1,16 @@
+.vscode/**
+.vscode-test/**
+src/**
+tests/**
+out/**
+node_modules/**
+coverage/**
+.gitignore
+.vscodeignore
+.vscode-test.mjs
+vite.config.host.ts
+vitest.config.ts
+tsconfig.json
+biome.json
+**/*.test.ts
+**/*.map
