@@ -1,1 +1,72 @@
-<!-- demo file — populated by subsequent milestones -->
+<!-- demo file — every milestone updates this to exercise its features end-to-end -->
+
+# tsk demo
+
+This file is the living showcase of every implemented feature. Open it in the
+Extension Development Host (`F5` from this folder) to see grammar highlighting,
+decorations, code lenses, and commands in action.
+
+## Markdown still works
+
+Headings, **bold**, *italic*, `inline code`, and links all render via the embedded
+markdown grammar.
+
+```ts
+// Fenced code blocks are highlighted by the embedded TypeScript grammar.
+function hello(name: string): string {
+    return `hi ${name}`;
+}
+```
+
+```sh
+echo "shell blocks too"
+```
+
+> Block quotes also work — markdown features are not lost.
+
+## Task markers
+
+Every marker character is scoped distinctly, so themes can color them per-marker.
+Decorations on top of these scopes arrive in M4.
+
+- [ ] todo — the default empty marker
+- [/] in progress — work has started
+- [x] completed — done
+- [>] moved — relocated somewhere else
+- [!] cancelled — abandoned
+- [n] notes — informational sub-item
+
+Case tolerance: `[X]` and `[N]` are also accepted on read.
+
+- [X] also completed
+- [N] also a note
+
+Indented tasks (nesting) work too:
+
+- [ ] parent task
+    - [/] indented child
+        - [x] deeply nested
+- [ ] sibling
+
+## Inline metadata
+
+Metadata lives inside an HTML comment after the task content. Each `@key:value`
+pair is scoped separately so themes can highlight the key, the separator, and
+the value.
+
+- [x] write the grammar <!-- @id:k3w8t9rx @created:2026-05-24T15:00 @completed:2026-05-24T17:30 -->
+- [/] try a value-less flag <!-- @id:m2x7v4qy @starred -->
+
+## Tags
+
+Tags use `#word` and support `/` for hierarchy. Markdown headings (which start
+with `# ` followed by a space) are *not* matched as tags.
+
+- [ ] ship the M1 milestone #project/tsk #JIRAID-123
+- [ ] wire up the homelab #inventory/homelab/nas1
+
+## Combined example
+
+A real task usually has a marker, content, tags, and metadata together:
+
+- [/] integrate `node:sqlite` cache layer #project/tsk #milestone/M3 <!-- @id:p4f8c2dh @created:2026-05-24T17:45 @started:2026-05-25T09:00 -->

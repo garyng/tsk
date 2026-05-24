@@ -32,6 +32,13 @@
                 "configuration": "./language-configuration.json"
             }
         ],
+        "grammars": [
+            {
+                "language": "tsk",
+                "scopeName": "text.html.markdown.tsk",
+                "path": "./syntaxes/tsk.tmLanguage.json"
+            }
+        ],
         "commands": [
             {
                 "command": "tsk.rebuildCache",
@@ -92,7 +99,9 @@
         "@vscode/vsce": "^3.9.1",
         "typescript": "^6.0.3",
         "vite": "^8.0.14",
-        "vitest": "^4.1.7"
+        "vitest": "^4.1.7",
+        "vscode-oniguruma": "^2.0.1",
+        "vscode-textmate": "^9.3.2"
     },
     "dependencies": {
         "nanoid": "^5.1.11",
