@@ -24,6 +24,11 @@ export interface ParsedTask {
     tags: string[];
 }
 
+export interface Task extends ParsedTask {
+    /** Zero-indexed line number in the source document (matches VSCode's API). */
+    line: number;
+}
+
 const TASK_LINE_RE = /^(\s*)[-*+]\s+\[([ /xX>!nN])\]\s*(.*)$/;
 const COMMENT_RE = /<!--([\s\S]*?)-->/g;
 const METADATA_ENTRY_RE = /@([A-Za-z][A-Za-z0-9_]*)(?::((?:(?!-->)\S)*))?/g;
@@ -34,7 +39,9 @@ const TAG_RE = /(?:^|\s)#([A-Za-z][A-Za-z0-9_/-]*)/g;
  * Pure — no I/O, no side effects.
  */
 export function parseLine(line: string): ParsedTask | null {
-    const match = TASK_LINE_RE.exec(line);
+    // Tolerate a trailing `\r` if the caller passed a CRLF-split line.
+    const normalized = line.endsWith('\r') ? line.slice(0, -1) : line;
+    const match = TASK_LINE_RE.exec(normalized);
     if (!match) return null;
 
     const [, indent, markerChar, rest] = match;
@@ -59,6 +66,23 @@ export function parseLine(line: string): ParsedTask | null {
     }
 
     return { marker, indent: indent as string, content, metadata, tags };
+}
+
+/**
+ * Parse a whole document. Splits on `\n` (CRLF tolerated via `parseLine`'s
+ * trim) and returns one `Task` per line that parses successfully, each
+ * tagged with its zero-indexed line number. Pure.
+ */
+export function parseDocument(text: string): Task[] {
+    const lines = text.split(/\r?\n/);
+    const tasks: Task[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        const parsed = parseLine(lines[i] as string);
+        if (parsed) {
+            tasks.push({ ...parsed, line: i });
+        }
+    }
+    return tasks;
 }
 
 function canonicalMarker(ch: string): Marker | null {
