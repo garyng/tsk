@@ -24,6 +24,12 @@ export interface ParsedTask {
     metadata: Map<string, string | null>;
     /** Tag names without the `#` prefix, in appearance order in `content`. */
     tags: string[];
+    /**
+     * The original line text, byte-for-byte (minus a trailing `\r` if the
+     * caller passed a CRLF-split line). Lets downstream consumers (cache,
+     * codelens, `replaceMetadata`) operate on the source without re-fetching it.
+     */
+    raw: string;
 }
 
 export interface Task extends ParsedTask {
@@ -56,7 +62,7 @@ export function parseLine(line: string): ParsedTask | null {
         tags.push(tagMatch[1] as string);
     }
 
-    return { marker, indent: indent as string, content, metadata, tags };
+    return { marker, indent: indent as string, content, metadata, tags, raw: normalized };
 }
 
 /**
