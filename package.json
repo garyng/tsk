@@ -17,7 +17,8 @@
     },
     "main": "./dist/extension.cjs",
     "activationEvents": [
-        "onLanguage:tsk"
+        "onLanguage:tsk",
+        "workspaceContains:**/*.tsk"
     ],
     "contributes": {
         "languages": [

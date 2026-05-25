@@ -1,8 +1,22 @@
 import * as vscode from 'vscode';
 import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
-import { Db } from './lib/db';
+import { type CacheCounts, Db, type TaskRecord } from './lib/db';
 import { Logger, type LogLevel } from './lib/logger';
+
+/**
+ * Stable surface returned from `activate()`. End-to-end tests acquire this
+ * via `extensions.getExtension('garyng.tsk').activate()` to introspect the
+ * cache without driving commands through VSCode UI.
+ *
+ * Keep this minimal — every export is a public contract that test suites
+ * and downstream tools may rely on.
+ */
+export interface TskExtensionApi {
+    counts(): CacheCounts;
+    findTaskById(id: string): TaskRecord | undefined;
+    listAllTags(): string[];
+}
 
 /**
  * Per the **Warnings convention**: every `CacheWarning` surfaces both as a
@@ -28,7 +42,7 @@ interface ActivationState {
     changeTimers: Map<string, NodeJS.Timeout>;
 }
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export async function activate(context: vscode.ExtensionContext): Promise<TskExtensionApi> {
     const channel = vscode.window.createOutputChannel('tsk');
     context.subscriptions.push(channel);
 
@@ -102,6 +116,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 
     logger.info('tsk extension activated.');
+
+    return {
+        counts: () => cache.counts(),
+        findTaskById: (id) => cache.lookupById(id),
+        listAllTags: () => cache.listAllTags(),
+    };
 }
 
 export function deactivate(): void {

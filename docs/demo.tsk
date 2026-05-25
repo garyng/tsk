@@ -6,6 +6,27 @@ This file is the living showcase of every implemented feature. Open it in the
 Extension Development Host (`F5` from this folder) to see grammar highlighting,
 decorations, code lenses, and commands in action.
 
+## Cache (M3)
+
+On activation, the extension scans every `**/*.tsk` file in the workspace
+(excluding `**/node_modules/**`) and indexes tasks, metadata, and tags into
+a SQLite cache at `${workspaceFolder}/.vscode/tsk-cache.db` (configurable
+via `tsk.cache.path`; opens in-memory when no workspace folder is open).
+The `tsk` Output channel logs a `initial scan: N scanned, … tasks indexed,
+… tags, …ms` line at completion.
+
+Two surfaces report problems at scan time, per the **Warnings convention**:
+
+- The Output channel — chronological log, click any `file:line` to navigate.
+- The Problems panel — `Warning` diagnostics squiggle the offending line.
+
+Today's warning categories: duplicate `@id` across the workspace, and tasks
+with no `@id` at all. Both prevent the offending task from participating in
+codelens / tag-find / graph lookups.
+
+Open the Command Palette and run **Tsk: Rebuild Cache** to wipe and rescan
+(useful after editing files outside VSCode, or if anything ever drifts).
+
 ## Markdown still works
 
 Headings, **bold**, *italic*, `inline code`, and links all render via the embedded

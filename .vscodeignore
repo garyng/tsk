@@ -1,4 +1,4 @@
-.vscode/**
+**/.vscode/**
 .vscode-test/**
 src/**
 tests/**
@@ -7,7 +7,7 @@ out-test/**
 node_modules/**
 coverage/**
 scripts/**
-.gitignore
+**/.gitignore
 .vscodeignore
 .vscode-test.mjs
 vite.config.host.ts

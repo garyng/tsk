@@ -2,7 +2,7 @@
 
 A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching markdown task lists with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.
 
-Currently in **early development (M0 complete)** — the extension activates and registers stub commands, but features land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
+Currently in **early development (M0–M3 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, and surfaces scan-time warnings as both Output channel logs and editor diagnostics. Toggle commands, codelens, and the rest land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
 
 ## Development
 
@@ -41,13 +41,35 @@ npm run package        # builds, then runs @vscode/vsce → produces tsk-<versio
 
 ```
 src/
-  extension.ts          # activate/deactivate, output channel, command registration
-  lib/                  # pure logic (parser, cache, graph, logger) — unit-tested
+  extension.ts          # activate/deactivate, cache wire-up, command + watcher registration
+  lib/                  # pure logic — unit-tested
+    parser.ts           # parseLine, parseDocument, Marker, ParsedTask, Task
+    metadata.ts         # extractMetadata, serializeMetadata, replaceMetadata
+    cache.ts            # CacheService — orchestrates parser + db with warnings
+    db.ts               # node:sqlite wrapper with schema, prepared statements
+    cache-path.ts       # ${workspaceFolder} resolver + in-memory fallback
+    ids.ts              # nanoid + seedable PRNG for @id generation
+    time.ts             # ISO-local timestamp helper
+    logger.ts           # leveled Output channel logger
+syntaxes/
+  tsk.tmLanguage.json   # grammar that includes text.html.markdown
 tests/
   e2e/                  # @vscode/test-cli suites — run inside a real VSCode host
+    fixtures/           # workspace fixtures opened by the e2e runner
 docs/
   demo.tsk              # living end-to-end showcase, grown by each milestone
 ```
+
+## Cache layer (M3)
+
+On activation, the extension scans `**/*.tsk` (excluding `**/node_modules/**`) and indexes tasks into a SQLite cache:
+
+- Default location: `${workspaceFolder}/.vscode/tsk-cache.db`. Configurable via `tsk.cache.path`. Falls back to in-memory when no workspace folder is open.
+- WAL mode + relaxed `synchronous` + foreign-key cascades. Schema is `IF NOT EXISTS`, so reopening preserves data.
+- File events (FileSystemWatcher, doc save, debounced doc change) trigger per-file rescans inside a `Db` transaction.
+- Run **Tsk: Rebuild Cache** to purge and rerun the initial scan.
+
+**Warnings convention.** Every user-facing warning (today: duplicate `@id`, task without `@id`) surfaces in *both* the `tsk` Output channel and in editor diagnostics (`Warning` severity, listed in the Problems panel). The same convention applies to every future warning category.
 
 ## Conventions
 
