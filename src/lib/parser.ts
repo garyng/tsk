@@ -1,3 +1,5 @@
+import { extractMetadata } from './metadata';
+
 /**
  * Canonical task-marker names. Lowercase by convention; the parser accepts
  * both cases on read (`[x]` / `[X]`) but always returns the lowercase form.
@@ -30,8 +32,6 @@ export interface Task extends ParsedTask {
 }
 
 const TASK_LINE_RE = /^(\s*)[-*+]\s+\[([ /xX>!nN])\]\s*(.*)$/;
-const COMMENT_RE = /<!--([\s\S]*?)-->/g;
-const METADATA_ENTRY_RE = /@([A-Za-z][A-Za-z0-9_]*)(?::((?:(?!-->)\S)*))?/g;
 const TAG_RE = /(?:^|\s)#([A-Za-z][A-Za-z0-9_/-]*)/g;
 
 /**
@@ -48,17 +48,8 @@ export function parseLine(line: string): ParsedTask | null {
     const marker = canonicalMarker(markerChar as string);
     if (!marker) return null;
 
-    const metadata = new Map<string, string | null>();
-    const content = (rest as string)
-        .replace(COMMENT_RE, (_, inner: string) => {
-            for (const entry of inner.matchAll(METADATA_ENTRY_RE)) {
-                const key = entry[1] as string;
-                const value = entry[2] ?? null;
-                metadata.set(key, value);
-            }
-            return '';
-        })
-        .trim();
+    const { metadata, stripped } = extractMetadata(rest as string);
+    const content = stripped.trim();
 
     const tags: string[] = [];
     for (const tagMatch of content.matchAll(TAG_RE)) {
