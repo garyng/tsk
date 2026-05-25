@@ -70,3 +70,31 @@ with `# ` followed by a space) are *not* matched as tags.
 A real task usually has a marker, content, tags, and metadata together:
 
 - [/] integrate `node:sqlite` cache layer #project/tsk #milestone/M3 <!-- @id:p4f8c2dh @created:2026-05-24T17:45:11+08:00 @started:2026-05-25T09:00:00+08:00 -->
+
+## Parser model (M2)
+
+The parser reads every line above into a `Task` record exposing `marker`,
+`indent`, `content`, an insertion-ordered `metadata` Map, a `tags` array, and
+a zero-indexed `line`. Nothing visible yet — M3 plugs this into a SQLite cache
+and surfaces it via commands — but the model is exercised by these examples.
+
+### Full lifecycle
+
+A task that has run through every status from creation to completion:
+
+- [x] ship M2 parser #project/tsk #milestone/M2 <!-- @id:r7p3v2qm @created:2026-05-24T09:00:00+08:00 @started:2026-05-24T11:00:00+08:00 @completed:2026-05-24T18:30:00+08:00 -->
+
+### Relationship metadata
+
+Relationships are inline `@key:<task-id>` references. Codelens wiring lands in
+M9; the parser already extracts these into the metadata Map.
+
+- [ ] design caching schema #project/tsk <!-- @id:s8m4d2tr @parent:p4f8c2dh @relatedTo:r7p3v2qm -->
+- [ ] write migration runner #project/tsk <!-- @id:t9n5e3us @dependsOn:s8m4d2tr -->
+- [>] explore alt SQLite bindings <!-- @id:u1o6f4vt @movedTo:s8m4d2tr @moved:2026-05-24T20:00:00+08:00 -->
+
+### Edge cases the parser must handle
+
+- [x] a task whose value-less flag survives round-trip <!-- @id:v2p7g5wu @flag -->
+- [x] a task whose empty-value entry survives round-trip <!-- @id:w3q8h6xv @flag: -->
+- [x] **bold** and *italic* and `code` inside content render via the embedded markdown grammar <!-- @id:x4r9i7yw -->
