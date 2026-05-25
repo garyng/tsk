@@ -3,7 +3,7 @@
     "compilerOptions": {
         "noEmit": false,
         "outDir": "../out-test",
-        "rootDir": ".",
+        "rootDir": "..",
         "types": ["mocha", "node"]
     },
     "include": ["**/*.ts"],

@@ -1,30 +1,8 @@
 import * as assert from 'node:assert';
 import * as vscode from 'vscode';
+import type { TskExtensionApi } from '../../src/extension';
 
 const EXTENSION_ID = 'garyng.tsk';
-
-/**
- * Local mirror of `TskExtensionApi` from `src/extension.ts`. Defined here
- * to keep `tests/` and `src/` in separate `tsc` rootDirs — pulling the
- * type across the rootDir boundary would force the compiler to emit
- * compiled `src/` files into `out-test/` (noise + breaks the test runner
- * glob). Any drift between this shape and the source is caught at runtime
- * by the assertions below.
- */
-interface TskExtensionApi {
-    counts(): { files: number; tasks: number; tags: number };
-    findTaskById(id: string):
-        | {
-              id: string;
-              fileUri: string;
-              line: number;
-              marker: string;
-              content: string;
-              raw: string;
-          }
-        | undefined;
-    listAllTags(): string[];
-}
 
 /**
  * The fixture workspace is mounted via `.vscode-test.mjs`'s `workspaceFolder`,
