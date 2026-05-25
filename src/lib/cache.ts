@@ -134,6 +134,12 @@ export class CacheService {
         return this.db.findTaskById(id);
     }
 
+    /** mtime of a cached file, or `undefined` if not cached. Used to skip
+     * unchanged files during initial scan. */
+    getFileMtime(uri: string): number | undefined {
+        return this.db.getFile(uri)?.mtime;
+    }
+
     listAllTags(): string[] {
         return this.db.listAllTags();
     }
