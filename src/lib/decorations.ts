@@ -1,4 +1,5 @@
-import type { Marker, Task } from './parser';
+import { MARKERS, type Marker } from './markers';
+import type { Task } from './parser';
 
 /**
  * Structural range tuple. Kept vscode-runtime-free so this module is
@@ -15,30 +16,21 @@ export interface RangeLike {
 }
 
 /**
- * Marker → `contributes.colors` id. `todo` is intentionally undefined: we
- * don't override the editor's default foreground for in-flight tasks. The
- * other five resolve to the entries declared in `package.json`'s
- * `contributes.colors`.
+ * Marker → `contributes.colors` id, derived from the registry. `todo` resolves
+ * to `undefined` (no color override → editor default foreground wins); the
+ * other five resolve to their declared `contributes.colors` id.
  */
-export const MARKER_THEME_COLOR_IDS: Record<Marker, string | undefined> = {
-    todo: undefined,
-    inprogress: 'tsk.marker.inprogress',
-    completed: 'tsk.marker.completed',
-    moved: 'tsk.marker.moved',
-    cancelled: 'tsk.marker.cancelled',
-    notes: 'tsk.marker.notes',
-};
+export const MARKER_THEME_COLOR_IDS: Record<Marker, string | undefined> = Object.fromEntries(
+    MARKERS.map((m) => [m.name, m.color?.id]),
+) as Record<Marker, string | undefined>;
 
 /**
- * Markers that visually strike through their marker triplet. Only the two
- * fully-terminal "this task is over and gone" states. `moved` is terminal
- * too but stays legible — the orange color signals relocation, the link to
- * the new task is the more important visual cue.
+ * Markers that visually strike through their marker triplet, derived from
+ * the registry's `strikethrough` flag.
  */
-export const MARKER_STRIKETHROUGH: ReadonlySet<Marker> = new Set<Marker>([
-    'completed',
-    'cancelled',
-]);
+export const MARKER_STRIKETHROUGH: ReadonlySet<Marker> = new Set(
+    MARKERS.filter((m) => m.strikethrough).map((m) => m.name),
+);
 
 /**
  * Bucket parsed tasks into ranges to decorate, keyed by marker. Each range

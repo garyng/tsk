@@ -1,10 +1,11 @@
+import { MARKER_SYMBOL_CHAR_CLASS, type Marker, markerForSymbol } from './markers';
 import { extractMetadata } from './metadata';
 
 /**
- * Canonical task-marker names. Lowercase by convention; the parser accepts
- * both cases on read (`[x]` / `[X]`) but always returns the lowercase form.
+ * Canonical task-marker names. Re-exported here so downstream code can
+ * continue to import from `./parser`; the source of truth is `./markers`.
  */
-export type Marker = 'todo' | 'inprogress' | 'completed' | 'moved' | 'cancelled' | 'notes';
+export type { Marker };
 
 export interface ParsedTask {
     /** Canonical marker name. */
@@ -37,7 +38,7 @@ export interface Task extends ParsedTask {
     line: number;
 }
 
-const TASK_LINE_RE = /^(\s*)[-*+]\s+\[([ /xX>!nN])\]\s*(.*)$/;
+const TASK_LINE_RE = new RegExp(`^(\\s*)[-*+]\\s+\\[([${MARKER_SYMBOL_CHAR_CLASS}])\\]\\s*(.*)$`);
 const TAG_RE = /(?:^|\s)#([A-Za-z][A-Za-z0-9_/-]*)/g;
 
 /**
@@ -51,7 +52,7 @@ export function parseLine(line: string): ParsedTask | null {
     if (!match) return null;
 
     const [, indent, markerChar, rest] = match;
-    const marker = canonicalMarker(markerChar as string);
+    const marker = markerForSymbol(markerChar as string);
     if (!marker) return null;
 
     const { metadata, stripped } = extractMetadata(rest as string);
@@ -80,25 +81,4 @@ export function parseDocument(text: string): Task[] {
         }
     }
     return tasks;
-}
-
-function canonicalMarker(ch: string): Marker | null {
-    switch (ch) {
-        case ' ':
-            return 'todo';
-        case '/':
-            return 'inprogress';
-        case 'x':
-        case 'X':
-            return 'completed';
-        case '>':
-            return 'moved';
-        case '!':
-            return 'cancelled';
-        case 'n':
-        case 'N':
-            return 'notes';
-        default:
-            return null;
-    }
 }

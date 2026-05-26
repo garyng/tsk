@@ -5,7 +5,8 @@ import {
     MARKER_THEME_COLOR_IDS,
     type RangeLike,
 } from './decorations';
-import type { Marker, Task } from './parser';
+import { MARKERS } from './markers';
+import type { Task } from './parser';
 
 /**
  * Build a `Task` with only the fields decorations actually read; the rest
@@ -20,7 +21,7 @@ function task(fields: Pick<Task, 'marker' | 'raw' | 'line' | 'indent'>): Task {
     };
 }
 
-const ALL_MARKERS: Marker[] = ['todo', 'inprogress', 'completed', 'moved', 'cancelled', 'notes'];
+const ALL_MARKERS = MARKERS.map((m) => m.name);
 
 describe('MARKER_THEME_COLOR_IDS', () => {
     it('has an entry for every marker (the map is total)', () => {
