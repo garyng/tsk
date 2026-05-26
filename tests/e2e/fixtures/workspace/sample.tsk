@@ -1,9 +1,9 @@
 # e2e fixture
 
-Deterministic content for the e2e cache tests. Don't edit the `@id`s — the
-test suite asserts specific values.
+Deterministic content for the e2e tests. Don't edit the `@id` or `@priority`
+values — the test suite asserts specific bindings.
 
-- [ ] write the cache layer <!-- @id:m3task1 @created:2026-05-25T10:00:00+08:00 -->
-- [/] wire up the activation #project/tsk <!-- @id:m3task2 -->
-- [x] document the rebuild command #project/tsk #milestone/M3 <!-- @id:m3task3 -->
+- [ ] write the cache layer <!-- @id:m3task1 @priority:1 @created:2026-05-25T10:00:00+08:00 -->
+- [/] wire up the activation #project/tsk <!-- @id:m3task2 @priority:2 -->
+- [x] document the rebuild command #project/tsk #milestone/M3 <!-- @id:m3task3 @priority:3 -->
 - [ ] orphan tag exerciser #only-here <!-- @id:m3task4 -->

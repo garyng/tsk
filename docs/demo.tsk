@@ -27,6 +27,40 @@ codelens / tag-find / graph lookups.
 Open the Command Palette and run **Tsk: Rebuild Cache** to wipe and rescan
 (useful after editing files outside VSCode, or if anything ever drifts).
 
+## Decorations (M4)
+
+Two decoration layers on `.tsk` documents:
+
+- **Marker triplet color** — each `[X]` lights up per-marker via the
+  `tsk.marker.{inprogress,completed,moved,cancelled,notes}` theme colors
+  contributed in `package.json`. `todo` (`[ ]`) deliberately uses the
+  editor's default foreground; the other five get distinct hues. `completed`
+  and `cancelled` also strike through their triplet to read as "done /
+  abandoned" at a glance. Override colors per workspace via
+  `workbench.colorCustomizations` if the defaults clash with your theme.
+- **Priority line background** — `@priority:1` paints the whole line red,
+  `:2` yellow, `:3` blue. Opacity is settable via
+  `tsk.decorations.priority.opacity` (default `0.15`); flipping it triggers
+  a live rebuild of the decoration types — no reload needed.
+
+Decorations apply on editor focus, on save, and on a 300 ms debounce after
+text changes; the timer is independent of the cache rescan debounce.
+
+### Priority examples
+
+- [ ] urgent — fix the data corruption #project/tsk <!-- @id:d4p1 @priority:1 -->
+- [ ] important — investigate the slow query #project/tsk <!-- @id:d4p2 @priority:2 -->
+- [ ] background — tidy up the readme #project/tsk <!-- @id:d4p3 @priority:3 -->
+- [ ] no priority — a normal task <!-- @id:d4none -->
+
+Try editing the opacity in `settings.json` while these are visible:
+
+```json
+{ "tsk.decorations.priority.opacity": 0.4 }
+```
+
+The line backgrounds intensify (or fade) immediately.
+
 ## Markdown still works
 
 Headings, **bold**, *italic*, `inline code`, and links all render via the embedded
