@@ -1,5 +1,6 @@
 import { MARKERS, type Marker } from './markers';
 import type { Task } from './parser';
+import { type PriorityLevel, priorityForLevel } from './priorities';
 
 /**
  * Structural range tuple. Kept vscode-runtime-free so this module is
@@ -61,6 +62,64 @@ export function computeMarkerRanges(tasks: readonly Task[]): Map<Marker, RangeLi
         if (!bucket) {
             bucket = [];
             out.set(task.marker, bucket);
+        }
+        bucket.push(range);
+    }
+    return out;
+}
+
+/**
+ * Compose an `rgba(r, g, b, opacity)` string for the priority `level`. RGB
+ * lives in the `PRIORITIES` registry; only the opacity is user-settable via
+ * `tsk.decorations.priority.opacity`.
+ *
+ * The `PriorityLevel` parameter is a type-checked union of legal levels —
+ * the runtime guard exists only to catch `as`-bypassed callers.
+ */
+export function priorityBackgroundColor(level: PriorityLevel, opacity: number): string {
+    const def = priorityForLevel(level);
+    if (!def) throw new Error(`unknown priority level: ${level}`);
+    const [r, g, b] = def.rgb;
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+/** Matches a string that is exactly `1`, `2`, or `3` — the only legal levels. */
+const PRIORITY_VALUE_RE = /^[1-3]$/;
+
+/**
+ * Bucket parsed tasks into whole-line ranges to decorate, keyed by priority.
+ *
+ * A task qualifies only when its `@priority` metadata value is exactly `'1'`,
+ * `'2'`, or `'3'`. Anything else — no metadata, flag-form `@priority` (value
+ * `null`), empty `@priority:` (value `''`), `@priority:0` / `:4` / `:high` —
+ * is dropped silently. Decoration code should never produce noisy stale
+ * highlights; warnings for malformed priority values land with the broader
+ * metadata-key dispatch work in M5+.
+ *
+ * The range is whole-line (start col 0 → end col = `raw.length`). The
+ * activation layer applies `isWholeLine: true` on the decoration type, so
+ * the columns are illustrative — VSCode extends the background to the
+ * editor's right edge regardless.
+ *
+ * Pure — no `vscode` import.
+ */
+export function computePriorityRanges(tasks: readonly Task[]): Map<PriorityLevel, RangeLike[]> {
+    const out = new Map<PriorityLevel, RangeLike[]>();
+    for (const task of tasks) {
+        const value = task.metadata.get('priority');
+        if (typeof value !== 'string') continue;
+        if (!PRIORITY_VALUE_RE.test(value)) continue;
+        const level = Number.parseInt(value, 10) as PriorityLevel;
+        const range: RangeLike = {
+            startLine: task.line,
+            startCol: 0,
+            endLine: task.line,
+            endCol: task.raw.length,
+        };
+        let bucket = out.get(level);
+        if (!bucket) {
+            bucket = [];
+            out.set(level, bucket);
         }
         bucket.push(range);
     }
