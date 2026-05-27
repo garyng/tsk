@@ -25,8 +25,10 @@ suite('cache', () => {
 
     test('initial scan indexes the fixture workspace', () => {
         const counts = api.counts();
-        assert.strictEqual(counts.files, 1, 'expected exactly one file scanned');
-        assert.strictEqual(counts.tasks, 4, 'expected four tasks indexed');
+        // sample.tsk (4 tasks) + dup.tsk (4 tasks, but one is a duplicate-id
+        // that the cache skips → 3 inserted). Tags only come from sample.tsk.
+        assert.strictEqual(counts.files, 2, 'expected two fixture files scanned');
+        assert.strictEqual(counts.tasks, 7, 'expected seven tasks indexed');
         assert.ok(counts.tags >= 3, `expected at least three tags, got ${counts.tags}`);
     });
 

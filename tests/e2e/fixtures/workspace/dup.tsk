@@ -1,0 +1,11 @@
+# e2e fixture for the graph layer
+
+Deterministic content for `tests/e2e/graph.test.ts`. Two tasks form a
+parent-child edge; two more share the same `@id` so the dup-id
+diagnostic + canonical-winner rule can be exercised end-to-end. Don't
+edit the ids or line ordering — the test suite pins specific values.
+
+- [ ] dup occurrence A <!-- @id:e2e-dup -->
+- [x] dup occurrence B <!-- @id:e2e-dup -->
+- [ ] parent task <!-- @id:e2e-graph-parent -->
+- [ ] child task <!-- @id:e2e-graph-child @parent:e2e-graph-parent -->

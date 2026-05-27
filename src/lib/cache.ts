@@ -1,4 +1,5 @@
 import type { CacheCounts, Db, TaskRecord } from './db';
+import type { TaskRelationshipInput } from './graph';
 import { parseDocument } from './parser';
 
 /**
@@ -28,6 +29,14 @@ export interface RescanResult {
     skipped: number;
     /** Warnings to surface. */
     warnings: CacheWarning[];
+    /**
+     * Projection of every id'd task in the file into the shape the graph
+     * layer needs. Includes tasks that the cache subsequently skipped due
+     * to a duplicate-id (the graph maintains its own occurrences index and
+     * applies the lex-lowest canonical-winner rule independently of the
+     * cache's first-insert-wins).
+     */
+    relationships: TaskRelationshipInput[];
 }
 
 /**
@@ -58,6 +67,7 @@ export class CacheService {
             this.db.upsertFile(uri, mtime);
 
             const warnings: CacheWarning[] = [];
+            const relationships: TaskRelationshipInput[] = [];
             let inserted = 0;
             let skipped = 0;
 
@@ -76,6 +86,20 @@ export class CacheService {
                     skipped++;
                     continue;
                 }
+
+                // Record the graph projection BEFORE the cache's
+                // INSERT OR IGNORE — so even tasks the cache skips for
+                // duplicate-id reasons still feed the graph's per-id
+                // occurrences index (the graph applies its own
+                // canonical-winner rule downstream).
+                relationships.push({
+                    id,
+                    fileUri: uri,
+                    line: task.line,
+                    parent: task.metadata.get('parent') ?? undefined,
+                    dependsOn: task.metadata.get('dependsOn') ?? undefined,
+                    relatedTo: task.metadata.get('relatedTo') ?? undefined,
+                });
 
                 const ok = this.db.insertTask({
                     id,
@@ -116,7 +140,7 @@ export class CacheService {
                 }
             }
 
-            return { inserted, skipped, warnings };
+            return { inserted, skipped, warnings, relationships };
         });
     }
 

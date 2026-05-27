@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { DiagnosticsManager } from './diagnostics-manager';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
@@ -10,6 +11,8 @@ import {
     priorityBackgroundColor,
     type RangeLike,
 } from './lib/decorations';
+import type { GraphNode } from './lib/graph';
+import { GraphService } from './lib/graph-service';
 import { Logger, type LogLevel } from './lib/logger';
 import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
@@ -54,6 +57,12 @@ export interface TskExtensionApi {
      * safe to call at any time.
      */
     reloadTags(): Promise<void>;
+    /**
+     * Look up a graph node by `@id`. Returns `undefined` when no canonical
+     * occurrence exists. M9/B introduces this so e2e tests can assert
+     * forward / inverse edge state without driving the codelens UI.
+     */
+    lookupGraph(id: string): GraphNode | undefined;
 }
 
 export interface DecorationSnapshot {
@@ -86,8 +95,10 @@ let state: ActivationState | undefined;
 interface ActivationState {
     db: Db;
     cache: CacheService;
+    graph: GraphService;
     logger: Logger;
     diagnostics: vscode.DiagnosticCollection;
+    diagnosticsManager: DiagnosticsManager;
     /** Per-URI debounce timers for cache rescan on doc change. */
     changeTimers: Map<string, NodeJS.Timeout>;
     /**
@@ -156,11 +167,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     });
     context.subscriptions.push(metadataDecorationType);
 
+    const graph = new GraphService();
+    const diagnosticsManager = new DiagnosticsManager(diagnostics);
+
     state = {
         db,
         cache,
+        graph,
         logger,
         diagnostics,
+        diagnosticsManager,
         changeTimers: new Map(),
         decorationTimers: new Map(),
         markerDecorationTypes,
@@ -197,9 +213,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         watcher.onDidCreate((uri) => void rescanFromFs(uri)),
         watcher.onDidChange((uri) => void rescanFromFs(uri)),
         watcher.onDidDelete((uri) => {
-            state?.cache.removeFile(uri.toString());
-            state?.diagnostics.delete(uri);
-            state?.decorationSnapshots.delete(uri.toString());
+            if (!state) return;
+            const key = uri.toString();
+            state.cache.removeFile(key);
+            state.graph.removeFile(key);
+            state.diagnosticsManager.deleteFile(key);
+            state.diagnosticsManager.setGraphDuplicates(state.graph.getDuplicates());
+            state.decorationSnapshots.delete(key);
         }),
     );
 
@@ -249,8 +269,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         vscode.commands.registerCommand('tsk.rebuildCache', async () => {
             if (!state) return;
             state.logger.info('tsk.rebuildCache invoked.');
-            state.diagnostics.clear();
+            state.diagnosticsManager.clear();
             state.cache.purge();
+            state.graph.purge();
             await runInitialScan();
             void vscode.window.showInformationMessage('Tsk: cache rebuilt.');
         }),
@@ -265,6 +286,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         getDecorations: (uri) => state?.decorationSnapshots.get(uri),
         getTags: () => tagsLoader.getTags(),
         reloadTags: () => tagsLoader.reload(),
+        lookupGraph: (id) => graph.getNode(id),
     };
 }
 
@@ -322,13 +344,15 @@ async function runInitialScan(): Promise<void> {
 
 async function rescanFromFs(uri: vscode.Uri): Promise<void> {
     if (!state) return;
-    const { cache, logger } = state;
+    const { cache, graph, logger, diagnosticsManager } = state;
     try {
         const stat = await vscode.workspace.fs.stat(uri);
         const bytes = await vscode.workspace.fs.readFile(uri);
         const text = new TextDecoder().decode(bytes);
         const result = cache.rescanFile(uri.toString(), text, stat.mtime);
+        graph.applyFileTasks(uri.toString(), result.relationships);
         applyWarnings(uri, result.warnings);
+        diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
     } catch (err) {
         logger.error(`rescan failed for ${uri}: ${(err as Error).message}`);
     }
@@ -336,11 +360,14 @@ async function rescanFromFs(uri: vscode.Uri): Promise<void> {
 
 function rescanFromDoc(doc: vscode.TextDocument): void {
     if (!state) return;
+    const { cache, graph, diagnosticsManager } = state;
     // In-memory edits don't have a meaningful disk mtime; use `Date.now()`
     // so this rescan supersedes any future on-disk mtime read (mtimes are
     // milliseconds since epoch, so wall-clock time is always >= disk mtime).
-    const result = state.cache.rescanFile(doc.uri.toString(), doc.getText(), Date.now());
+    const result = cache.rescanFile(doc.uri.toString(), doc.getText(), Date.now());
+    graph.applyFileTasks(doc.uri.toString(), result.relationships);
     applyWarnings(doc.uri, result.warnings);
+    diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
 }
 
 function scheduleDebouncedRescan(doc: vscode.TextDocument): void {
@@ -357,24 +384,21 @@ function scheduleDebouncedRescan(doc: vscode.TextDocument): void {
 
 function applyWarnings(uri: vscode.Uri, warnings: CacheWarning[]): void {
     if (!state) return;
-    const { logger, diagnostics } = state;
-    // Log every warning so the chronological record is complete.
+    const { logger, diagnosticsManager } = state;
+    // Log every warning so the chronological record is complete. Note:
+    // duplicate-id warnings still log here (cache-internal signal); the
+    // diagnostics-side dedup that hides them from the Problems panel
+    // happens inside DiagnosticsManager.setScanWarnings so the Output
+    // channel keeps its full trace while the Problems panel stays free
+    // of the soon-to-be-superseded "graph-owned" copy.
     for (const warning of warnings) {
         logger.warn(`${warning.fileUri}:${warning.line + 1}: ${warning.message}`);
     }
-    // Replace this file's diagnostics with the warnings keyed to it.
     const uriString = uri.toString();
-    const fileDiagnostics = warnings
-        .filter((w) => w.fileUri === uriString)
-        .map(
-            (w) =>
-                new vscode.Diagnostic(
-                    new vscode.Range(w.line, 0, w.line, w.columnEnd),
-                    w.message,
-                    vscode.DiagnosticSeverity.Warning,
-                ),
-        );
-    diagnostics.set(uri, fileDiagnostics);
+    diagnosticsManager.setScanWarnings(
+        uriString,
+        warnings.filter((w) => w.fileUri === uriString),
+    );
 }
 
 function readPriorityOpacity(): number {

@@ -20,7 +20,19 @@ const URI_B = 'file:///workspace/b.tsk';
 describe('CacheService — rescanFile happy path', () => {
     it('inserts a single task with @id', () => {
         const result = cache.rescanFile(URI_A, '- [ ] do thing <!-- @id:abc12345 -->', 100);
-        expect(result).toEqual({ inserted: 1, skipped: 0, warnings: [] });
+        expect(result.inserted).toBe(1);
+        expect(result.skipped).toBe(0);
+        expect(result.warnings).toEqual([]);
+        expect(result.relationships).toEqual([
+            {
+                id: 'abc12345',
+                fileUri: URI_A,
+                line: 0,
+                parent: undefined,
+                dependsOn: undefined,
+                relatedTo: undefined,
+            },
+        ]);
         const task = cache.lookupById('abc12345');
         expect(task?.fileUri).toBe(URI_A);
         expect(task?.line).toBe(0);
