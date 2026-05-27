@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { type CodelensHandle, registerCodelens } from './codelens';
 import { DiagnosticsManager } from './diagnostics-manager';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { CacheService, type CacheWarning } from './lib/cache';
@@ -96,6 +97,7 @@ interface ActivationState {
     db: Db;
     cache: CacheService;
     graph: GraphService;
+    codelens: CodelensHandle;
     logger: Logger;
     diagnostics: vscode.DiagnosticCollection;
     diagnosticsManager: DiagnosticsManager;
@@ -169,11 +171,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
 
     const graph = new GraphService();
     const diagnosticsManager = new DiagnosticsManager(diagnostics);
+    const codelens = registerCodelens(context, graph, logger);
 
     state = {
         db,
         cache,
         graph,
+        codelens,
         logger,
         diagnostics,
         diagnosticsManager,
@@ -219,6 +223,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
             state.graph.removeFile(key);
             state.diagnosticsManager.deleteFile(key);
             state.diagnosticsManager.setGraphDuplicates(state.graph.getDuplicates());
+            state.codelens.refresh();
             state.decorationSnapshots.delete(key);
         }),
     );
@@ -273,6 +278,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
             state.cache.purge();
             state.graph.purge();
             await runInitialScan();
+            state.codelens.refresh();
             void vscode.window.showInformationMessage('Tsk: cache rebuilt.');
         }),
     );
@@ -344,7 +350,7 @@ async function runInitialScan(): Promise<void> {
 
 async function rescanFromFs(uri: vscode.Uri): Promise<void> {
     if (!state) return;
-    const { cache, graph, logger, diagnosticsManager } = state;
+    const { cache, graph, codelens, logger, diagnosticsManager } = state;
     try {
         const stat = await vscode.workspace.fs.stat(uri);
         const bytes = await vscode.workspace.fs.readFile(uri);
@@ -353,6 +359,7 @@ async function rescanFromFs(uri: vscode.Uri): Promise<void> {
         graph.applyFileTasks(uri.toString(), result.relationships);
         applyWarnings(uri, result.warnings);
         diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
+        codelens.refresh();
     } catch (err) {
         logger.error(`rescan failed for ${uri}: ${(err as Error).message}`);
     }
@@ -360,7 +367,7 @@ async function rescanFromFs(uri: vscode.Uri): Promise<void> {
 
 function rescanFromDoc(doc: vscode.TextDocument): void {
     if (!state) return;
-    const { cache, graph, diagnosticsManager } = state;
+    const { cache, graph, codelens, diagnosticsManager } = state;
     // In-memory edits don't have a meaningful disk mtime; use `Date.now()`
     // so this rescan supersedes any future on-disk mtime read (mtimes are
     // milliseconds since epoch, so wall-clock time is always >= disk mtime).
@@ -368,6 +375,7 @@ function rescanFromDoc(doc: vscode.TextDocument): void {
     graph.applyFileTasks(doc.uri.toString(), result.relationships);
     applyWarnings(doc.uri, result.warnings);
     diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
+    codelens.refresh();
 }
 
 function scheduleDebouncedRescan(doc: vscode.TextDocument): void {
