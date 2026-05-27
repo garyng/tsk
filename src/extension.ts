@@ -13,7 +13,10 @@ import { Logger, type LogLevel } from './lib/logger';
 import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
+import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
+import { registerTagsCompletionProvider } from './tags-completion';
+import { createTagsLoader } from './tags-loader';
 import {
     registerCopyTaskIdCommand,
     registerRelationshipCommands,
@@ -39,6 +42,17 @@ export interface TskExtensionApi {
      * make stable `deepStrictEqual` assertions.
      */
     getDecorations(uri: string): DecorationSnapshot | undefined;
+    /**
+     * Current snapshot of the parsed `tags.yml` state. Empty when no
+     * workspace is open or the file is missing.
+     */
+    getTags(): ReadonlyMap<string, TagDef>;
+    /**
+     * Re-read `tags.yml` and replace the in-memory state. Exposed for
+     * deterministic e2e testing (config change → reload → assert), but
+     * safe to call at any time.
+     */
+    reloadTags(): Promise<void>;
 }
 
 export interface DecorationSnapshot {
@@ -221,10 +235,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         }),
     );
 
+    const tagsLoader = await createTagsLoader(context, logger);
+
     registerToggleCommands(context, logger);
     registerCopyTaskIdCommand(context, logger);
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
+    registerTagsCompletionProvider(context, cache, tagsLoader);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tsk.rebuildCache', async () => {
@@ -244,6 +261,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         findTaskById: (id) => cache.lookupById(id),
         listAllTags: () => cache.listAllTags(),
         getDecorations: (uri) => state?.decorationSnapshots.get(uri),
+        getTags: () => tagsLoader.getTags(),
+        reloadTags: () => tagsLoader.reload(),
     };
 }
 

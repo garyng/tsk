@@ -267,6 +267,11 @@
                     "default": "${workspaceFolder}/.vscode/tsk/cache.db",
                     "description": "Path to the on-disk SQLite cache. Supports ${workspaceFolder} substitution. When no workspace folder is open, falls back to in-memory."
                 },
+                "tsk.tags.path": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk/tags.yml",
+                    "description": "Path to the workspace tags.yml. Supports ${workspaceFolder} substitution. When blank or no workspace folder is open, no tags.yml is loaded (completion still surfaces tags discovered in .tsk files)."
+                },
                 "tsk.log.level": {
                     "type": "string",
                     "enum": [
