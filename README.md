@@ -27,8 +27,15 @@ After a fresh `npm run build:host`, the existing dev host process is still runni
 ```sh
 npm test               # vitest unit tests (src/**/*.test.ts)
 npm run test -- --coverage   # with v8 coverage report; fails under 80% on src/lib/**
-npm run test:e2e       # @vscode/test-cli — compiles tests, builds host, launches VSCode
+npm run test:e2e       # @vscode/test-cli — runs against `stable` VSCode (latest)
+npm run test:e2e:floor # @vscode/test-cli — runs against the engine floor (1.112)
+npm run test:e2e:all   # both labels in sequence
 ```
+
+`.vscode-test.mjs` defines two labeled configurations:
+
+- **`stable`** — downloads whatever the latest VS Code release is at run time. Catches the "newest still works" signal.
+- **`floor`** — pinned to VS Code `1.112.0` (the engine floor). Catches the "minimum supported still works" signal. Together with the strict-subset `@types/vscode@~1.110` typecheck, this is the second of two layers that hold us to the floor. The floor config carries a more generous mocha timeout (60s) — extension-host startup and config-change propagation are measurably slower on the 1.112 host in our devcontainer.
 
 The e2e runner auto-wraps in `xvfb-run` when available (devcontainer/CI) and otherwise relies on a real display (macOS, WSL2 host, etc.). The coverage gate is opt-in (instrumentation slows iteration) — bare `npm test` skips it; the `-- --coverage` invocation enforces.
 

@@ -318,8 +318,10 @@
         "typecheck": "tsc",
         "compile:tests": "tsc -p tests/tsconfig.json",
         "test": "vitest run",
-        "pretest:e2e": "npm run compile:tests && npm run build:host",
-        "test:e2e": "bash scripts/run-e2e.sh",
+        "prepare:e2e": "npm run compile:tests && npm run build:host",
+        "test:e2e": "npm run prepare:e2e && bash scripts/run-e2e.sh --label stable",
+        "test:e2e:floor": "npm run prepare:e2e && bash scripts/run-e2e.sh --label floor",
+        "test:e2e:all": "npm run prepare:e2e && bash scripts/run-e2e.sh",
         "lint": "biome check .",
         "format": "biome format --write .",
         "package": "vsce package --out artifacts/"

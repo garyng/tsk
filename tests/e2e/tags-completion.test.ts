@@ -102,7 +102,12 @@ suite('tags completion', () => {
         await vscode.workspace.applyEdit(undo);
     });
 
-    test('changing tsk.tags.path picks up the new state', async () => {
+    test('changing tsk.tags.path picks up the new state', async function () {
+        // Devcontainer + headless-vscode config-update propagation through
+        // file-watcher + onDidChangeConfiguration is slow enough to brush
+        // the 20s default. The test itself isn't asserting timing — it just
+        // needs head-room.
+        this.timeout(60000);
         const config = () => vscode.workspace.getConfiguration('tsk');
         const original = config().inspect<string>(TAGS_PATH_KEY)?.workspaceValue;
         try {
