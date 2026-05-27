@@ -47,6 +47,11 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.findAllTasksByTag",
+                "title": "Find All Tasks by Tag",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.toggleTodo",
                 "title": "Toggle Todo",
                 "category": "Tsk"
@@ -128,6 +133,11 @@
             }
         ],
         "keybindings": [
+            {
+                "command": "tsk.findAllTasksByTag",
+                "key": "alt+t",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
             {
                 "command": "tsk.toggleTodo",
                 "key": "alt+a",

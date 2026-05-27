@@ -14,6 +14,7 @@ import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
 import type { TagDef } from './lib/tags-config';
+import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerListEditCommands } from './list-edit-commands';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader } from './tags-loader';
@@ -242,6 +243,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
+    registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tsk.rebuildCache', async () => {
