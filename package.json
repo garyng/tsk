@@ -45,6 +45,58 @@
                 "command": "tsk.rebuildCache",
                 "title": "Rebuild Cache",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleTodo",
+                "title": "Toggle Todo",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleInprogress",
+                "title": "Toggle In Progress",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleCompleted",
+                "title": "Toggle Completed",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleCancelled",
+                "title": "Toggle Cancelled",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleNote",
+                "title": "Toggle Note",
+                "category": "Tsk"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "tsk.toggleTodo",
+                "key": "alt+a",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleInprogress",
+                "key": "alt+s",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleCompleted",
+                "key": "alt+c",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleCancelled",
+                "key": "alt+x",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleNote",
+                "key": "alt+n",
+                "when": "editorLangId == 'tsk'"
             }
         ],
         "colors": [

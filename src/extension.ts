@@ -13,6 +13,7 @@ import { Logger, type LogLevel } from './lib/logger';
 import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
+import { registerToggleCommands } from './toggle-commands';
 
 /**
  * Stable surface returned from `activate()`. End-to-end tests acquire this
@@ -185,7 +186,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument((doc) => {
             if (doc.languageId !== TSK_LANGUAGE_ID) return;
-            rescanFromDoc(doc);
+            // Untitled docs aren't workspace files — decorate them, but don't
+            // pollute the workspace cache. The cache is the "what tasks exist
+            // on disk" view; codelens / find-by-tag etc. should only resolve
+            // through it. M8/M9 can revisit if untitled-doc participation
+            // becomes desired.
+            if (!doc.isUntitled) rescanFromDoc(doc);
             applyDecorationsForDoc(doc);
         }),
     );
@@ -193,7 +199,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     context.subscriptions.push(
         vscode.workspace.onDidChangeTextDocument((event) => {
             if (event.document.languageId !== TSK_LANGUAGE_ID) return;
-            scheduleDebouncedRescan(event.document);
+            if (!event.document.isUntitled) scheduleDebouncedRescan(event.document);
             scheduleDebouncedDecorate(event.document);
         }),
     );
@@ -209,6 +215,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
             for (const editor of editors) applyDecorationsToEditor(editor);
         }),
     );
+
+    registerToggleCommands(context, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tsk.rebuildCache', async () => {
