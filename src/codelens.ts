@@ -3,6 +3,7 @@ import { computeLensesForTask } from './lib/codelens-logic';
 import type { GraphService } from './lib/graph-service';
 import type { Logger } from './lib/logger';
 import { parseDocument } from './lib/parser';
+import type { NavigationHighlight } from './navigation-highlight';
 
 const TSK_LANGUAGE_ID = 'tsk';
 
@@ -73,6 +74,7 @@ export interface CodelensHandle {
 export function registerCodelens(
     context: vscode.ExtensionContext,
     graph: GraphService,
+    navigationHighlight: NavigationHighlight,
     logger: Logger,
 ): CodelensHandle {
     const provider = new TskCodeLensProvider(graph);
@@ -96,6 +98,7 @@ export function registerCodelens(
         const targetRange = new vscode.Range(node.line, 0, node.line, 0);
         editor.selection = new vscode.Selection(targetRange.start, targetRange.end);
         editor.revealRange(targetRange, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+        navigationHighlight.set(editor, node.line);
     }
 
     async function peek(

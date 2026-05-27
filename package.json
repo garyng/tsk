@@ -267,6 +267,14 @@
                     "light": "#5c5c5cb0",
                     "dark": "#969696b0"
                 }
+            },
+            {
+                "id": "tsk.navigation.highlight",
+                "description": "Background tint applied to the target line after a tsk.goTo* navigate. Persists until the next navigate, a user-initiated cursor move, or the editor moves off the highlighted target.",
+                "defaults": {
+                    "light": "#fff59d50",
+                    "dark": "#ffe57f30"
+                }
             }
         ],
         "configuration": {

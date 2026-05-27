@@ -20,6 +20,7 @@ import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
+import { NavigationHighlight } from './navigation-highlight';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader } from './tags-loader';
 import {
@@ -64,6 +65,12 @@ export interface TskExtensionApi {
      * forward / inverse edge state without driving the codelens UI.
      */
     lookupGraph(id: string): GraphNode | undefined;
+    /**
+     * Snapshot of the active navigation highlight (M10/A). `undefined`
+     * when no highlight is rendered. Exposed for e2e introspection
+     * since VSCode doesn't expose decoration state directly.
+     */
+    getNavigationHighlight(): { uri: string; line: number } | undefined;
 }
 
 export interface DecorationSnapshot {
@@ -171,7 +178,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
 
     const graph = new GraphService();
     const diagnosticsManager = new DiagnosticsManager(diagnostics);
-    const codelens = registerCodelens(context, graph, logger);
+    const navigationHighlight = new NavigationHighlight();
+    context.subscriptions.push(navigationHighlight);
+    const codelens = registerCodelens(context, graph, navigationHighlight, logger);
 
     state = {
         db,
@@ -293,6 +302,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         getTags: () => tagsLoader.getTags(),
         reloadTags: () => tagsLoader.reload(),
         lookupGraph: (id) => graph.getNode(id),
+        getNavigationHighlight: () => navigationHighlight.getCurrent(),
     };
 }
 
