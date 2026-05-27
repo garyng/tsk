@@ -47,21 +47,44 @@ export function parseTagsYaml(text: string): Map<string, TagDef> {
     return out;
 }
 
+/**
+ * Decode one tags.yml entry value into a `TagDef`, or `null` if the
+ * value's shape isn't recognised (array, number, boolean, etc.). The
+ * three accepted shapes are split into dedicated helpers below so each
+ * rule is named and composable; adding a new `TagDef` field is a single
+ * line in {@link parseObjectForm}.
+ */
 function coerceTagDef(raw: unknown): TagDef | null {
     if (raw === null || raw === undefined) return {};
-    if (typeof raw === 'string') {
-        return raw === '' ? {} : { description: raw };
-    }
+    if (typeof raw === 'string') return parseStringShorthand(raw);
     if (typeof raw !== 'object' || Array.isArray(raw)) return null;
-    const obj = raw as Record<string, unknown>;
+    return parseObjectForm(raw as Record<string, unknown>);
+}
+
+/** `<tag>: <description>` form. Empty string promotes to a bare def. */
+function parseStringShorthand(s: string): TagDef {
+    return s === '' ? {} : { description: s };
+}
+
+/** `<tag>: { description?, parent? }` form. Unknown / wrong-typed fields are dropped. */
+function parseObjectForm(obj: Record<string, unknown>): TagDef {
     const def: TagDef = {};
-    if (typeof obj.description === 'string' && obj.description !== '') {
-        def.description = obj.description;
-    }
-    if (typeof obj.parent === 'string' && obj.parent !== '') {
-        def.parent = obj.parent;
-    }
+    const description = asNonEmptyString(obj.description);
+    if (description !== undefined) def.description = description;
+    const parent = asNonEmptyString(obj.parent);
+    if (parent !== undefined) def.parent = parent;
     return def;
+}
+
+/**
+ * Type guard + non-empty filter on one field value. The "non-empty"
+ * part matters because yaml `field: ""` parses to an empty string, and
+ * an empty description / parent has the same effect as omitting the
+ * field — collapse the two to the omitted case so the resulting
+ * `TagDef` stays clean.
+ */
+function asNonEmptyString(value: unknown): string | undefined {
+    return typeof value === 'string' && value !== '' ? value : undefined;
 }
 
 /**
