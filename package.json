@@ -322,7 +322,7 @@
         "test:e2e": "bash scripts/run-e2e.sh",
         "lint": "biome check .",
         "format": "biome format --write .",
-        "package": "vsce package"
+        "package": "vsce package --out artifacts/"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.15",

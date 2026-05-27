@@ -7,6 +7,7 @@ out-test/**
 node_modules/**
 coverage/**
 scripts/**
+artifacts/**
 **/.gitignore
 .vscodeignore
 .vscode-test.mjs

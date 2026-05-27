@@ -4,5 +4,9 @@ out/
 out-test/
 .vscode-test/
 coverage/
+# Track the artifacts/ directory itself (so build scripts can write into it
+# without a prior mkdir) but ignore the .vsix outputs it accumulates.
+artifacts/*
+!artifacts/.gitkeep
 *.vsix
 *.log
