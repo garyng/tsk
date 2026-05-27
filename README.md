@@ -2,7 +2,7 @@
 
 A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching markdown task lists with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.
 
-Currently in **early development (M0–M8 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits, and offers tag autocompletion + find-all-tasks-by-tag driven by a workspace-local `tags.yml`. Codelens and navigation highlights land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
+Currently in **early development (M0–M9 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits, offers tag autocompletion + find-all-tasks-by-tag driven by a workspace-local `tags.yml`, and renders relationship code lenses (parent/children/dependsOn/dependents/relatedTo/related) on every canonical task with navigate + peek commands. Navigation highlights land in M10. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
 
 ## Development
 
@@ -48,6 +48,8 @@ src/
   tags-loader.ts              # createTagsLoader — reads tags.yml, wires FileSystemWatcher + config listener
   tags-completion.ts          # registerTagsCompletionProvider — #-triggered CompletionItemProvider
   find-tasks-by-tag.ts        # registerFindAllTasksByTagCommand — QuickPick → workbench.action.findInFiles
+  codelens.ts                 # registerCodelens — TskCodeLensProvider + 7 navigate/peek/missing commands
+  diagnostics-manager.ts      # DiagnosticsManager — merges cache scan warnings + graph dup reports per-file
   lib/                        # pure logic — unit-tested
     markers.ts                # MARKERS registry — single source of truth for marker name/symbols/color/scope
     priorities.ts             # PRIORITIES registry — level/rgb/label
@@ -65,6 +67,9 @@ src/
     tags-path.ts              # resolveTagsPath — ${workspaceFolder} substitution for tsk.tags.path
     tags-completion-logic.ts  # findTagPrefixContext — pure #-trigger context detector
     tags-find-logic.ts        # tagsToPickItems, buildFindInFilesArgs
+    graph.ts                  # buildGraph, GraphNode, DuplicateIdReport — pure relationship graph + dup detection
+    graph-service.ts          # GraphService — scoped invalidation over the pure builder + occurrences index
+    codelens-logic.ts         # computeLensesForTask — pure lens descriptors (forward, inverse, dangling)
     ids.ts                    # nanoid + seedable PRNG for @id generation
     time.ts                   # ISO-local timestamp helper
     logger.ts                 # leveled Output channel logger
@@ -159,6 +164,28 @@ Empty / missing / malformed `tags.yml` is tolerated — the loader returns an em
 **Keybinding caveats** (Alt+T joins the existing list):
 - Third-party extensions with an equally specific `when` clause (`editorLangId == 'tsk' && editorTextFocus`) could shadow Alt+T inside `.tsk` files; the toggle bindings face the same constraint.
 - Some EU keyboard layouts treat `Alt+letter` as a typed-character chord and may need a rebind via the Keyboard Shortcuts editor.
+
+## Codelens (M9)
+
+Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N`). Pure lens computation lives in `src/lib/codelens-logic.ts`; the activation handlers and provider in `src/codelens.ts`. The graph itself is owned by `GraphService` (`src/lib/graph-service.ts`), which keeps a per-id occurrences index + per-file id index and rebuilds the snapshot from the pure `buildGraph` builder on every cache change.
+
+| Lens title              | Command                  | Behavior |
+|-------------------------|--------------------------|----------|
+| `parent: <id>`          | `tsk.goToParent`         | Open the parent's file at the parent's line. |
+| `children: N`           | `tsk.findAllChildren`    | Peek view of every task pointing at this one via `@parent`. |
+| `dependsOn: <id>`       | `tsk.goToDependsOn`      | Open the depended-on task's location. |
+| `dependents: N`         | `tsk.findAllDependents`  | Peek view of every task `@dependsOn`-pointing here. |
+| `relatedTo: <id>`       | `tsk.goToRelated`        | Open the related task's location. |
+| `related: N`            | `tsk.findAllRelated`     | Peek view of every task `@relatedTo`-pointing here. |
+| `<key>: <id> (missing)` | `tsk.codelens.missing`   | Pop an info toast — the referenced `@id` isn't in the workspace. |
+
+**Canonical-occurrence gating.** Lenses only render on the canonical occurrence of an `@id` (the lex-lowest `(fileUri, line)` in the workspace). Duplicate-`@id` losers get a diagnostic squiggle pointing at the canonical winner instead of a (potentially misleading) lens.
+
+**Duplicate-`@id` warnings.** The graph's `DuplicateIdReport`s flow through `DiagnosticsManager` (`src/diagnostics-manager.ts`), which merges them with the cache's per-file scan warnings before writing to the `DiagnosticCollection`. Every occurrence gets its own diagnostic — one "canonical occurrence" marker, the rest "takes precedence" deferrals. The `tsk` Output channel keeps the full chronological log via the cache's existing dup-id `CacheWarning` (filtered out of the Problems panel to avoid double-display).
+
+**Commands are not contributed to `contributes.commands`** — they're invoked exclusively by lens clicks. No palette entries, no keybindings; the lens IS the invocation. They are registered (`vscode.commands.getCommands` reports them) so other extensions can compose if needed.
+
+**Codelens font caveat.** `editor.codeLensFontFamily` controls the rendered font; in practice it doesn't always match the editor font even when the option doc implies it should. We don't customize per-lens fonts — only the global setting helps.
 
 ## Conventions
 
