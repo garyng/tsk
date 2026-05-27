@@ -66,6 +66,23 @@ suite('toggle marker commands', () => {
         assert.match(first ?? '', /^- \[n\] aside <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
     });
 
+    test('toggleTodo on a blank line lands the cursor between the two spacer columns', async () => {
+        // Alt+A on a blank line emits `- [ ]  <!-- @id:… -->` with two
+        // spaces between marker and metadata. The cursor should sit between
+        // them (column 6) so a follow-up keystroke produces a well-spaced
+        // `- [ ] foo <!-- … -->`.
+        const doc = await vscode.workspace.openTextDocument({ content: '', language: 'tsk' });
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selections = [new vscode.Selection(0, 0, 0, 0)];
+        await new Promise((resolve) => setImmediate(resolve));
+        await vscode.commands.executeCommand('tsk.toggleTodo');
+        const text = doc.lineAt(0).text;
+        assert.match(text, /^- \[ \] {2}<!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
+        const cursor = editor.selection.active;
+        assert.strictEqual(cursor.line, 0);
+        assert.strictEqual(cursor.character, 6);
+    });
+
     test('toggleInprogress flips todo to in-progress with @started', async () => {
         const [first] = await runToggle('- [ ] thing', 'tsk.toggleInprogress', [0]);
         assert.match(first ?? '', /^- \[\/\] thing <!-- @started:[\d\-T:+]+ -->$/);

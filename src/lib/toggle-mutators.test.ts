@@ -23,9 +23,9 @@ describe('toggleTodoMutator', () => {
         );
     });
 
-    it('wraps an empty line as an empty todo', () => {
+    it('wraps an empty line as an empty todo with the cursor-spacer', () => {
         expect(toggleTodoMutator('', FIXED_DEPS)).toBe(
-            '- [ ] <!-- @id:idfix123 @created:2026-05-27T10:00:00+08:00 -->',
+            '- [ ]  <!-- @id:idfix123 @created:2026-05-27T10:00:00+08:00 -->',
         );
     });
 

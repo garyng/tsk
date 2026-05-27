@@ -42,11 +42,12 @@ suite('list-edit (Enter / Tab / Shift+Tab)', () => {
     test('Enter at end-before-metadata creates an empty continuation with metadata pinned', async () => {
         // `- [ ] foo <!-- @id:x -->`, cursor at col 9 (the space before `<--`).
         // contentEnd = 9, so cursor ≥ contentEnd → empty continuation; line 1
-        // stays byte-for-byte, line 2 is a fresh empty task.
+        // stays byte-for-byte, line 2 is a fresh empty task with the
+        // two-space cursor-spacer between marker and metadata.
         const result = await runKey('- [ ] foo <!-- @id:x -->', 'tsk.handleEnter', 0, 9);
         const lines = result.text.split('\n');
         assert.strictEqual(lines[0], '- [ ] foo <!-- @id:x -->');
-        assert.match(lines[1] ?? '', /^- \[ \] <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
+        assert.match(lines[1] ?? '', /^- \[ \] {2}<!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
         assert.strictEqual(result.cursorLine, 1);
         assert.strictEqual(result.cursorCol, 6);
     });

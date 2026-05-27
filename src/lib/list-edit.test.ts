@@ -66,10 +66,12 @@ describe('computeEnterEdit', () => {
 
     it('creates an empty continuation when cursor is at end of content (no metadata)', () => {
         // `- [ ] foo`, cursor at col 9 (end of line). content="foo", contentEnd=9.
+        // Continuation line uses TWO spaces between marker and metadata so the
+        // cursor lands between them — first keystroke produces well-spaced output.
         expect(computeEnterEdit('- [ ] foo', 9, SPACE_OPTS, FIXED_DEPS)).toEqual({
             kind: 'split-line',
             firstText: '- [ ] foo',
-            secondText: `- [ ] ${NEW_META}`,
+            secondText: `- [ ]  ${NEW_META}`,
             cursorCol: 6,
         });
     });
@@ -80,7 +82,7 @@ describe('computeEnterEdit', () => {
         expect(computeEnterEdit('- [ ] foo <!-- @id:x -->', 9, SPACE_OPTS, FIXED_DEPS)).toEqual({
             kind: 'split-line',
             firstText: '- [ ] foo <!-- @id:x -->',
-            secondText: `- [ ] ${NEW_META}`,
+            secondText: `- [ ]  ${NEW_META}`,
             cursorCol: 6,
         });
     });
@@ -90,7 +92,7 @@ describe('computeEnterEdit', () => {
         expect(computeEnterEdit(line, line.length, SPACE_OPTS, FIXED_DEPS)).toEqual({
             kind: 'split-line',
             firstText: line,
-            secondText: `- [ ] ${NEW_META}`,
+            secondText: `- [ ]  ${NEW_META}`,
             cursorCol: 6,
         });
     });
@@ -129,7 +131,7 @@ describe('computeEnterEdit', () => {
         expect(computeEnterEdit('    - [ ] foo', 13, SPACE_OPTS, FIXED_DEPS)).toEqual({
             kind: 'split-line',
             firstText: '    - [ ] foo',
-            secondText: `    - [ ] ${NEW_META}`,
+            secondText: `    - [ ]  ${NEW_META}`,
             cursorCol: 10,
         });
     });
@@ -138,7 +140,7 @@ describe('computeEnterEdit', () => {
         expect(computeEnterEdit('- [x] done', 10, SPACE_OPTS, FIXED_DEPS)).toEqual({
             kind: 'split-line',
             firstText: '- [x] done',
-            secondText: `- [ ] ${NEW_META}`,
+            secondText: `- [ ]  ${NEW_META}`,
             cursorCol: 6,
         });
     });

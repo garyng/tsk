@@ -38,8 +38,14 @@ export interface WrapOpts {
 /**
  * Convert a non-task line into a task with `@id` + `@created` metadata.
  *
- * - Empty line (possibly whitespace-only) → `- [m] <!-- @id:… @created:… -->`
- *   with the existing leading whitespace preserved as indent.
+ * - Empty line (possibly whitespace-only) → `- [m]  <!-- @id:… @created:… -->`
+ *   with the existing leading whitespace preserved as indent. The **two**
+ *   spaces between marker and metadata are intentional: paired with the
+ *   cursor-positioning logic in `toggle-commands.ts:applyEdit`, the cursor
+ *   lands between the two spaces so the user's first keystroke produces
+ *   `- [m] foo <!-- ... -->` — well-spaced — instead of `- [m] foo<!--...`.
+ *   The Enter-continuation path in `list-edit.ts:computeEnterEdit` emits the
+ *   same shape for the same reason.
  * - Non-empty plain line → `- [m] <content> <!-- … -->` with the original
  *   content preserved verbatim (trimmed only on the right) and the line's
  *   leading whitespace preserved as indent.
@@ -56,7 +62,7 @@ export function wrapAsTask(line: string, marker: Marker, opts: WrapOpts): string
     const metadataComment = `<!-- @id:${opts.id} @created:${opts.timestamp} -->`;
     const prefix = `${indent}- [${CANONICAL_SYMBOL[marker]}]`;
     return content === ''
-        ? `${prefix} ${metadataComment}`
+        ? `${prefix}  ${metadataComment}`
         : `${prefix} ${content} ${metadataComment}`;
 }
 

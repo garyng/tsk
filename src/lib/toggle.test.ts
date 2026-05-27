@@ -48,9 +48,9 @@ describe('wrapAsTask', () => {
         );
     });
 
-    it('wraps an empty line into an empty todo', () => {
+    it('wraps an empty line into an empty todo with the cursor-spacer (two spaces before metadata)', () => {
         expect(wrapAsTask('', 'todo', FIXED_OPTS)).toBe(
-            '- [ ] <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
+            '- [ ]  <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
         );
     });
 
@@ -62,7 +62,7 @@ describe('wrapAsTask', () => {
 
     it('treats a whitespace-only line as an indented empty todo', () => {
         expect(wrapAsTask('      ', 'todo', FIXED_OPTS)).toBe(
-            '      - [ ] <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
+            '      - [ ]  <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
         );
     });
 

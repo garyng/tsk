@@ -92,11 +92,14 @@ export function computeEnterEdit(
     const newMetadata = `<!-- @id:${deps.generateId()} @created:${deps.now()} -->`;
 
     if (cursorCol >= contentEnd) {
-        // Empty continuation. Line 1 stays as-is; line 2 is fresh empty task.
+        // Empty continuation. Line 1 stays as-is; line 2 is a fresh empty
+        // task with **two** spaces between the marker and the metadata
+        // (matches `wrapAsTask`'s empty-content shape). cursorCol lands
+        // between the two spaces so the next keystroke is well-spaced.
         return {
             kind: 'split-line',
             firstText: parsed.raw,
-            secondText: `${continuationPrefix} ${newMetadata}`,
+            secondText: `${continuationPrefix}  ${newMetadata}`,
             cursorCol: continuationPrefix.length + 1,
         };
     }

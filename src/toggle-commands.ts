@@ -31,6 +31,15 @@ type LineMutator = (line: string) => string;
  * doesn't double-apply and cancel itself. Cursors whose mutator returns
  * the unchanged line are skipped + logged at debug.
  *
+ * **Cursor positioning on freshly-created empty tasks.** When a mutator
+ * turns a non-task line into an empty-content task (the wrap path in
+ * `wrapAsTask`), the output is `- [m]··<!-- @id:… -->` with two spaces
+ * between marker and metadata. Post-edit, every cursor on such a line is
+ * moved to column `prefix.length + 1` — between the two spaces — so the
+ * next keystroke produces a well-spaced `- [m] foo <!-- … -->`. Cursors
+ * on other lines (including same-line cursors when applying to multiple
+ * cursors at once) are unaffected.
+ *
  * Returns the number of line replacements applied (0 = no edits, useful
  * for callers that want to know whether the action was a complete no-op).
  */
@@ -49,6 +58,8 @@ export async function applyEdit(
         uniqueLines.add(selection.active.line);
     }
     const edit = new vscode.WorkspaceEdit();
+    /** Lines where the mutator just *created* a fresh empty task. */
+    const newlyEmptyTaskCursor = new Map<number, number>();
     let applied = 0;
     for (const lineNumber of uniqueLines) {
         const lineText = doc.lineAt(lineNumber).text;
@@ -57,11 +68,32 @@ export async function applyEdit(
             logger?.debug(`applyEdit: line ${lineNumber + 1} no-op (mutator returned unchanged)`);
             continue;
         }
+        // Detect the "wrap to empty task" transition — line wasn't a task
+        // before, is now a parsed empty-content task. Capture the
+        // between-spaces cursor column so we can move selections after the
+        // edit lands. Promote-on-existing-task (M19/A) doesn't trip this
+        // because the pre-edit line already parses as a task.
+        if (parseLine(lineText) === null) {
+            const nextParsed = parseLine(next);
+            if (nextParsed && nextParsed.content === '') {
+                const bracketEnd = next.indexOf(']', nextParsed.indent.length);
+                // After `]` + 1 space → cursor between the two spaces.
+                newlyEmptyTaskCursor.set(lineNumber, bracketEnd + 2);
+            }
+        }
         edit.replace(doc.uri, new vscode.Range(lineNumber, 0, lineNumber, lineText.length), next);
         applied++;
     }
     if (applied === 0) return 0;
     await vscode.workspace.applyEdit(edit);
+    if (newlyEmptyTaskCursor.size > 0) {
+        editor.selections = editor.selections.map((sel) => {
+            const col = newlyEmptyTaskCursor.get(sel.active.line);
+            if (col === undefined) return sel;
+            const pos = new vscode.Position(sel.active.line, col);
+            return new vscode.Selection(pos, pos);
+        });
+    }
     return applied;
 }
 
