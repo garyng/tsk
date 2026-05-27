@@ -139,11 +139,11 @@ Multi-cursor works too; the toggle applies once per unique line.
 
 | Keybinding   | Command                                       | Behavior |
 |--------------|-----------------------------------------------|----------|
-| `Alt+A`      | `tsk.toggleTodo`                              | Wrap a plain/empty line as `[ ]` with `@id` + `@created`; unwrap an empty todo back to its indent. |
+| `Alt+A`      | `tsk.toggleTodo`                              | Wrap a plain/empty line as `[ ]` with `@id` + `@created`; unwrap an empty todo back to its indent; **or** promote a markered-but-no-`@id` todo by filling in the missing metadata. |
 | `Alt+S`      | `tsk.toggleInprogress`                        | Swap marker to `[/]` + `@started`; toggling again reverts to `[ ]`. |
 | `Alt+C`      | `tsk.toggleCompleted`                         | Same shape with `[x]` + `@completed`. |
 | `Alt+X`      | `tsk.toggleCancelled`                         | Same shape with `[!]` + `@cancelled`. |
-| `Alt+N`      | `tsk.toggleNote`                              | Wrap/unwrap as `[n]`, like `toggleTodo`. |
+| `Alt+N`      | `tsk.toggleNote`                              | Wrap/unwrap as `[n]`, like `toggleTodo`; promotes a markered-but-no-`@id` note the same way. |
 | `Alt+M`      | `tsk.toggleMoved`                             | Picker → `[>]` + `@movedTo` + `@moved`. Empty submission writes only `@moved` ("moved elsewhere, no target"). |
 | `Alt+R`      | `tsk.toggleRelatedTo`                         | Absent → picker → write; present → silently remove. |
 | `Alt+D`      | `tsk.toggleDependsOn`                         | Same shape with `@dependsOn`. |
@@ -164,6 +164,8 @@ Cursor on any of the lines below and try the matching keybinding:
 - [ ] add a parent with Alt+P <!-- @id:d5try9 -->
 - [ ] toggle me to P1 with Alt+1, then to P2 with Alt+2 (overwrite) <!-- @id:d5try10 -->
 - [ ] copy my `@id` with `` Alt+` `` <!-- @id:d5try11 -->
+- [ ] promote me with Alt+A — I have no `@id` yet
+- [n] promote me with Alt+N — I have no `@id` yet
 
 **Keybinding caveats.** `Alt+1/2/3` are globally bound to "Focus N-th Editor
 Group"; the `when: editorLangId == 'tsk'` clause makes our binding win inside

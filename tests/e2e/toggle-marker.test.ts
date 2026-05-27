@@ -47,10 +47,23 @@ suite('toggle marker commands', () => {
         assert.strictEqual(first, '');
     });
 
-    test('toggleTodo no-ops on a todo that already has content', async () => {
+    test('toggleTodo no-ops on a todo that already has @id', async () => {
         const before = '- [ ] still doing this <!-- @id:abc -->';
         const [first] = await runToggle(before, 'tsk.toggleTodo', [0]);
         assert.strictEqual(first, before);
+    });
+
+    test('toggleTodo promotes a markered-but-no-id todo by adding @id + @created', async () => {
+        // User hand-typed `- [ ] needs id` or imported it from elsewhere.
+        // Alt+A fills in the missing metadata so the line becomes a
+        // first-class workspace task (graph-visible, lens-able, etc).
+        const [first] = await runToggle('- [ ] needs id', 'tsk.toggleTodo', [0]);
+        assert.match(first ?? '', /^- \[ \] needs id <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
+    });
+
+    test('toggleNote promotes a markered-but-no-id note by adding @id + @created', async () => {
+        const [first] = await runToggle('- [n] aside', 'tsk.toggleNote', [0]);
+        assert.match(first ?? '', /^- \[n\] aside <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
     });
 
     test('toggleInprogress flips todo to in-progress with @started', async () => {

@@ -31,10 +31,16 @@ export const defaultToggleDeps: ToggleDeps = {
 };
 
 /**
- * `toggleTodo` / `toggleNote` share the same lifecycle pattern: wrap a
- * non-task line into a fresh task, unwrap an empty same-marker task back
- * to a blank line, otherwise no-op (don't blow away user content; don't
- * change a different marker's state).
+ * `toggleTodo` / `toggleNote` share the same lifecycle pattern:
+ *
+ *   - Non-task line → wrap into a fresh task with `@id` + `@created`.
+ *   - Same-marker empty task → unwrap back to a blank line.
+ *   - Same-marker non-empty task missing `@id` → promote to a "proper
+ *     todo" by filling in `@id` (always) and `@created` (if also
+ *     missing). Mirrors `wrapAsTask`'s shape so a hand-typed task
+ *     becomes indistinguishable from one Alt+A produced from scratch.
+ *   - Otherwise → no-op (don't blow away content; don't disturb a
+ *     different marker's state; don't re-stamp an already-proper task).
  */
 function makeCreationToggle(targetMarker: Marker) {
     return (line: string, deps: ToggleDeps): string => {
@@ -47,6 +53,13 @@ function makeCreationToggle(targetMarker: Marker) {
         }
         if (parsed.marker === targetMarker && parsed.content === '') {
             return unwrapTask(line);
+        }
+        if (parsed.marker === targetMarker && !parsed.metadata.has('id')) {
+            let next = setMetadataEntry(line, 'id', deps.generateId());
+            if (!parsed.metadata.has('created')) {
+                next = setMetadataEntry(next, 'created', deps.now());
+            }
+            return next;
         }
         return line;
     };
