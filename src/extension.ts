@@ -13,6 +13,7 @@ import { Logger, type LogLevel } from './lib/logger';
 import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
+import { registerListEditCommands } from './list-edit-commands';
 import {
     registerCopyTaskIdCommand,
     registerRelationshipCommands,
@@ -223,6 +224,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     registerToggleCommands(context, logger);
     registerCopyTaskIdCommand(context, logger);
     registerRelationshipCommands(context, logger, cache);
+    registerListEditCommands(context, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tsk.rebuildCache', async () => {

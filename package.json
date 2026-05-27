@@ -110,6 +110,21 @@
                 "command": "tsk.toggleParent",
                 "title": "Toggle Parent",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.handleEnter",
+                "title": "Handle Enter (list continuation / outdent / remove)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.handleTab",
+                "title": "Handle Tab (indent empty task)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.handleShiftTab",
+                "title": "Handle Shift+Tab (outdent task)",
+                "category": "Tsk"
             }
         ],
         "keybindings": [
@@ -177,6 +192,21 @@
                 "command": "tsk.toggleParent",
                 "key": "alt+p",
                 "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.handleEnter",
+                "key": "enter",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.handleTab",
+                "key": "tab",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.handleShiftTab",
+                "key": "shift+tab",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
             }
         ],
         "colors": [
