@@ -58,12 +58,18 @@ suite('codelens', () => {
         assert.ok(lenses, 'codelens provider returned lenses');
         const byTitle = new Map(lenses.map((l) => [l.command?.title, l]));
 
-        const childrenLens = byTitle.get('children: 1');
-        assert.ok(childrenLens, 'parent task should expose `children: 1`');
+        const childrenLens = byTitle.get('$(arrow-down) children: 1');
+        assert.ok(
+            childrenLens,
+            'parent task should expose `children: 1` (with arrow-down codicon)',
+        );
         assert.strictEqual(childrenLens.command?.command, 'tsk.findAllChildren');
 
-        const parentLens = byTitle.get('parent: e2e-graph-parent');
-        assert.ok(parentLens, 'child task should expose `parent: e2e-graph-parent`');
+        const parentLens = byTitle.get('$(arrow-up) parent: e2e-graph-parent');
+        assert.ok(
+            parentLens,
+            'child task should expose `parent: e2e-graph-parent` (with arrow-up codicon)',
+        );
         assert.strictEqual(parentLens.command?.command, 'tsk.goToParent');
         assert.deepStrictEqual(parentLens.command?.arguments, ['e2e-graph-parent']);
     });

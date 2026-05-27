@@ -30,6 +30,35 @@ export interface LensDescriptor {
 /** A canonical-node lookup, parameterised so tests can use stubs. */
 export type GraphLookup = (id: string) => GraphNode | undefined;
 
+/**
+ * Codicon names prepended to each lens title. VSCode renders these as
+ * inline glyphs in code lenses via the `$(codicon-name)` syntax. Hard-
+ * coded — users can theme via VSCode's icon settings if they want
+ * something different, but the *choice* of glyph is a UX decision tied
+ * to the relationship semantics:
+ *
+ *   - `parent` / `children` — vertical hierarchy → arrow-up / arrow-down.
+ *   - `dependsOn` / `dependents` — temporal order → arrow-right (this
+ *     points at what it needs) / arrow-left (these point at us from
+ *     the dependent side).
+ *   - `relatedTo` / `related` — symmetric link → `link` for the forward
+ *     side, `references` for the "show me everyone who points here" side.
+ *   - dangling forward edge → `warning`, since the target id can't be
+ *     resolved and a click pops an info toast rather than navigating.
+ */
+const CODICONS = {
+    parent: 'arrow-up',
+    children: 'arrow-down',
+    dependsOn: 'arrow-right',
+    dependents: 'arrow-left',
+    relatedTo: 'link',
+    related: 'references',
+    missing: 'warning',
+} as const;
+
+type ForwardLabel = 'parent' | 'dependsOn' | 'relatedTo';
+type InverseLabel = 'children' | 'dependents' | 'related';
+
 /** The minimum projection of a parsed task the lens computer needs. */
 export interface TaskForLenses {
     line: number;
@@ -119,7 +148,7 @@ export function computeLensesForTask(
 
 function forwardLens(
     line: number,
-    label: string,
+    label: ForwardLabel,
     targetId: string,
     command: string,
     lookup: GraphLookup,
@@ -128,14 +157,14 @@ function forwardLens(
     if (target === undefined) {
         return {
             line,
-            title: `${label}: ${targetId} (missing)`,
+            title: `$(${CODICONS.missing}) ${label}: ${targetId} (missing)`,
             command: 'tsk.codelens.missing',
             args: [targetId, label],
         };
     }
     return {
         line,
-        title: `${label}: ${targetId}`,
+        title: `$(${CODICONS[label]}) ${label}: ${targetId}`,
         command,
         args: [targetId],
     };
@@ -143,14 +172,14 @@ function forwardLens(
 
 function inverseLens(
     line: number,
-    label: string,
+    label: InverseLabel,
     ids: readonly string[],
     command: string,
     sourceUri: string,
 ): LensDescriptor {
     return {
         line,
-        title: `${label}: ${ids.length}`,
+        title: `$(${CODICONS[label]}) ${label}: ${ids.length}`,
         command,
         args: [sourceUri, line, [...ids]],
     };

@@ -169,15 +169,19 @@ Empty / missing / malformed `tags.yml` is tolerated — the loader returns an em
 
 Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N`). Pure lens computation lives in `src/lib/codelens-logic.ts`; the activation handlers and provider in `src/codelens.ts`. The graph itself is owned by `GraphService` (`src/lib/graph-service.ts`), which keeps a per-id occurrences index + per-file id index and rebuilds the snapshot from the pure `buildGraph` builder on every cache change.
 
-| Lens title              | Command                  | Behavior |
-|-------------------------|--------------------------|----------|
-| `parent: <id>`          | `tsk.goToParent`         | Open the parent's file at the parent's line. |
-| `children: N`           | `tsk.findAllChildren`    | Peek view of every task pointing at this one via `@parent`. |
-| `dependsOn: <id>`       | `tsk.goToDependsOn`      | Open the depended-on task's location. |
-| `dependents: N`         | `tsk.findAllDependents`  | Peek view of every task `@dependsOn`-pointing here. |
-| `relatedTo: <id>`       | `tsk.goToRelated`        | Open the related task's location. |
-| `related: N`            | `tsk.findAllRelated`     | Peek view of every task `@relatedTo`-pointing here. |
-| `<key>: <id> (missing)` | `tsk.codelens.missing`   | Pop an info toast — the referenced `@id` isn't in the workspace. |
+Each lens title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) so the relationship type is visible at a glance:
+
+| Lens title                              | Command                  | Behavior |
+|-----------------------------------------|--------------------------|----------|
+| `$(arrow-up) parent: <id>`              | `tsk.goToParent`         | Open the parent's file at the parent's line. |
+| `$(arrow-down) children: N`             | `tsk.findAllChildren`    | Peek view of every task pointing at this one via `@parent`. |
+| `$(arrow-right) dependsOn: <id>`        | `tsk.goToDependsOn`      | Open the depended-on task's location. |
+| `$(arrow-left) dependents: N`           | `tsk.findAllDependents`  | Peek view of every task `@dependsOn`-pointing here. |
+| `$(link) relatedTo: <id>`               | `tsk.goToRelated`        | Open the related task's location. |
+| `$(references) related: N`              | `tsk.findAllRelated`     | Peek view of every task `@relatedTo`-pointing here. |
+| `$(warning) <key>: <id> (missing)`      | `tsk.codelens.missing`   | Pop an info toast — the referenced `@id` isn't in the workspace. |
+
+Direction mnemonic: arrow-up/down for the vertical parent/children axis, arrow-right/left for the temporal dependsOn/dependents flow, `link`/`references` for the symmetric relatedTo/related pair.
 
 **Canonical-occurrence gating.** Lenses only render on the canonical occurrence of an `@id` (the lex-lowest `(fileUri, line)` in the workspace). Duplicate-`@id` losers get a diagnostic squiggle pointing at the canonical winner instead of a (potentially misleading) lens.
 
