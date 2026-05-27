@@ -20,11 +20,64 @@ After a fresh `npm run build:host`, the existing dev host process is still runni
 
 ```sh
 npm test               # vitest unit tests (src/**/*.test.ts)
-npm run test -- --coverage   # with v8 coverage report
+npm run test -- --coverage   # with v8 coverage report; fails under 80% on src/lib/**
 npm run test:e2e       # @vscode/test-cli — compiles tests, builds host, launches VSCode
 ```
 
-The e2e runner auto-wraps in `xvfb-run` when available (devcontainer/CI) and otherwise relies on a real display (macOS, WSL2 host, etc.).
+The e2e runner auto-wraps in `xvfb-run` when available (devcontainer/CI) and otherwise relies on a real display (macOS, WSL2 host, etc.). The coverage gate is opt-in (instrumentation slows iteration) — bare `npm test` skips it; the `-- --coverage` invocation enforces.
+
+## Adding an e2e test
+
+End-to-end tests live in `tests/e2e/**/*.test.ts` and run inside a real VSCode host driven by `@vscode/test-cli`. The pattern is mature enough that adding a new test usually means picking one of the recipes below.
+
+### Acquire the extension API
+
+```ts
+import * as vscode from 'vscode';
+import type { TskExtensionApi } from '../../src/extension';
+
+const EXTENSION_ID = 'garyng.tsk';
+
+suite('my feature', () => {
+    let api: TskExtensionApi;
+    suiteSetup(async () => {
+        const ext = vscode.extensions.getExtension<TskExtensionApi>(EXTENSION_ID);
+        api = await ext!.activate();
+    });
+    // ...
+});
+```
+
+The returned `TskExtensionApi` carries the test-only introspection methods listed in `src/extension.ts`: `counts()`, `findTaskById(id)`, `listAllTags()`, `getDecorations(uri)`, `getTags()`, `reloadTags()`, `lookupGraph(id)`, `getNavigationHighlight()`. Each one delegates to live state in the activation layer, so assertions read the same values the extension would render.
+
+### Fixtures
+
+Workspace fixtures live in `tests/e2e/fixtures/workspace/`. The host opens this folder as its workspace root, so cache + graph + tag scans see every `.tsk` file there. Today: `sample.tsk` (M3 deterministic content), `dup.tsk` (graph + dup-id), `.vscode/tsk/tags.yml` (tag completion fixture).
+
+Adding a new `.tsk` fixture changes the cache counts — update the `cache.test.ts` `counts.files` / `counts.tasks` assertions in lockstep.
+
+### Robust assertion patterns (covered)
+
+- **Provider outputs** via the built-in `vscode.execute…` commands:
+  ```ts
+  const lenses = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+      'vscode.executeCodeLensProvider', uri,
+  );
+  const completions = await vscode.commands.executeCommand<vscode.CompletionList>(
+      'vscode.executeCompletionItemProvider', uri, position, '#',
+  );
+  ```
+- **Command registration** via `vscode.commands.getCommands(true)`.
+- **Keybinding / configuration drift** via `ext.packageJSON.contributes.keybindings` and `.configuration.properties`.
+- **State** via the API methods above.
+- **Document edits** via `editor.selection = …` + `vscode.commands.executeCommand('tsk.foo')` + reading `doc.getText()` back. Use `await new Promise(resolve => setImmediate(resolve))` to yield to VSCode's event loop between an action and its assertion.
+
+### Not covered (don't try to assert these)
+
+- **Visual rendering of decorations** — VSCode doesn't expose what `setDecorations` actually drew. The extension records every applied range in a snapshot accessible via `api.getDecorations(uri)`; that's the proxy you assert.
+- **QuickPick contents** at the UI level — the picker resolves to a value only when the user selects, and the test can't simulate that without driving the input box.
+- **Info / warning toasts** (`showInformationMessage` / `showWarningMessage`) — no programmatic interception. Test the precondition (state should be X before the toast fires) and trust the toast call.
+- **True user input kinds** — `editor.selection = …` and `vscode.commands.executeCommand` fire `TextEditorSelectionChangeKind.Command`. There's no way to synthesize `Keyboard` or `Mouse` from the test runner; if your test depends on that distinction (e.g., the navigation-highlight kind filter), factor a pure helper and unit-test the branching logic separately.
 
 ## Lint & format
 
