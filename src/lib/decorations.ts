@@ -125,3 +125,40 @@ export function computePriorityRanges(tasks: readonly Task[]): Map<PriorityLevel
     }
     return out;
 }
+
+/**
+ * Non-greedy match of an entire `<!-- ... -->` HTML comment block. `[\s\S]`
+ * tolerates a stray newline inside (parser strips trailing `\r` but doesn't
+ * forbid a `\n` inside the comment body); the `?` keeps multi-comment lines
+ * from being captured as one giant match.
+ */
+const METADATA_COMMENT_RE = /<!--[\s\S]*?-->/g;
+
+/**
+ * Find every inline `<!-- ... -->` block across the given tasks and emit
+ * one `RangeLike` per comment (covering the full `<!--` … `-->` span,
+ * including the brackets and dashes).
+ *
+ * The activation layer applies a single dimmed decoration type to this
+ * flat list so metadata recedes into the editor background. Phase 2's
+ * hover-on-task surface will display the parsed values; until then the
+ * comment text is present-but-quiet.
+ *
+ * Unclosed `<!--` is silently dropped — non-greedy matching just won't
+ * fire without a closing `-->`. Pure — no `vscode` import.
+ */
+export function computeMetadataRanges(tasks: readonly Task[]): RangeLike[] {
+    const out: RangeLike[] = [];
+    for (const task of tasks) {
+        for (const match of task.raw.matchAll(METADATA_COMMENT_RE)) {
+            if (match.index === undefined) continue;
+            out.push({
+                startLine: task.line,
+                startCol: match.index,
+                endLine: task.line,
+                endCol: match.index + match[0].length,
+            });
+        }
+    }
+    return out;
+}

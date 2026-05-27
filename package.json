@@ -87,6 +87,14 @@
                     "light": "#7e57c2",
                     "dark": "#bb6dd9"
                 }
+            },
+            {
+                "id": "tsk.metadata.foreground",
+                "description": "Foreground color of inline metadata comments (<!-- @key:value -->), dimmed so they recede into the editor background. Hover-on-task surfaces the parsed values in Phase 2.",
+                "defaults": {
+                    "light": "#5c5c5cb0",
+                    "dark": "#969696b0"
+                }
             }
         ],
         "configuration": {

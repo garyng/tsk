@@ -79,6 +79,13 @@ suite('decorations', () => {
         );
     });
 
+    test('metadata snapshot covers the <!-- ... --> block on every task that has one', () => {
+        const snapshot = api.getDecorations(sampleUri.toString());
+        assert.ok(snapshot);
+        // All four fixture tasks carry inline metadata (lines 5-8).
+        assert.deepStrictEqual(snapshot.metadata.map((r) => r.startLine).sort(), [5, 6, 7, 8]);
+    });
+
     test('flipping tsk.decorations.priority.opacity stays consistent', async () => {
         const config = () => vscode.workspace.getConfiguration('tsk');
         // Use inspect() so we restore the *workspace-layer* value specifically

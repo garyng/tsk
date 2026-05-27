@@ -76,7 +76,10 @@ export const MARKERS = [
             light: '#388e3c',
             dark: '#67c23a',
         },
-        strikethrough: true,
+        // Reads as "done!" with just the green color; striking it through felt
+        // like "discarded / no longer relevant", which is what `cancelled`
+        // already conveys.
+        strikethrough: false,
         scopeName: 'markup.task-marker.completed.tsk',
         label: 'Completed',
     },

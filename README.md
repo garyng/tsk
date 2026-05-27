@@ -78,8 +78,9 @@ On activation, the extension scans `**/*.tsk` (excluding `**/node_modules/**`) a
 
 Two layers of editor decorations on `.tsk` documents:
 
-- **Marker triplet color.** Each `[X]` is colored per marker — `[/]` blue, `[x]` green (struck through), `[>]` orange, `[!]` gray (struck through), `[n]` purple; `[ ]` keeps the editor's default foreground. Hues come from `contributes.colors` entries (`tsk.marker.{inprogress,completed,moved,cancelled,notes}`); users can override per workspace via `workbench.colorCustomizations`.
+- **Marker triplet color.** Each `[X]` is colored per marker — `[/]` blue, `[x]` green, `[>]` orange, `[!]` gray (struck through), `[n]` purple; `[ ]` keeps the editor's default foreground. Hues come from `contributes.colors` entries (`tsk.marker.{inprogress,completed,moved,cancelled,notes}`); users can override per workspace via `workbench.colorCustomizations`.
 - **Priority line background.** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); changes apply live without a reload.
+- **Dimmed inline metadata.** Every `<!-- @key:value -->` block is dimmed via `tsk.metadata.foreground` so the comments recede into the editor background. Phase 2 surfaces the parsed values via hover-on-task; until then the dim is the "present but quiet" hint that those comments are extension-managed bookkeeping.
 
 Decorations apply on editor focus, after save, and on a 300 ms debounce after text changes — independent from the cache rescan debounce. Definitions live in the `MARKERS` / `PRIORITIES` registries (`src/lib/markers.ts` / `src/lib/priorities.ts`); adding a new marker is a single registry entry plus mirroring into `package.json` and the grammar JSON (drift-tested).
 

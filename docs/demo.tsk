@@ -42,6 +42,11 @@ Two decoration layers on `.tsk` documents:
   `:2` yellow, `:3` blue. Opacity is settable via
   `tsk.decorations.priority.opacity` (default `0.15`); flipping it triggers
   a live rebuild of the decoration types — no reload needed.
+- **Dimmed inline metadata** — every `<!-- @key:value -->` block is colored
+  via `tsk.metadata.foreground` (a dim gray with alpha) so the comments
+  recede into the editor background. The parsed values surface via
+  hover-on-task in Phase 2; for now the dimming is the "present but quiet"
+  hint that those comments are extension-managed bookkeeping, not content.
 
 Decorations apply on editor focus, on save, and on a 300 ms debounce after
 text changes; the timer is independent of the cache rescan debounce.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     computeMarkerRanges,
+    computeMetadataRanges,
     computePriorityRanges,
     MARKER_STRIKETHROUGH,
     MARKER_THEME_COLOR_IDS,
@@ -48,12 +49,12 @@ describe('MARKER_THEME_COLOR_IDS', () => {
 });
 
 describe('MARKER_STRIKETHROUGH', () => {
-    it('contains exactly completed and cancelled', () => {
-        expect([...MARKER_STRIKETHROUGH].sort()).toEqual(['cancelled', 'completed']);
+    it('contains exactly cancelled (completed reads as "done!" without it)', () => {
+        expect([...MARKER_STRIKETHROUGH].sort()).toEqual(['cancelled']);
     });
 
-    it('does not strike through moved (terminal but linked) or inprogress/notes/todo', () => {
-        for (const marker of ['todo', 'inprogress', 'moved', 'notes'] as const) {
+    it('does not strike through moved, completed, or any in-flight marker', () => {
+        for (const marker of ['todo', 'inprogress', 'completed', 'moved', 'notes'] as const) {
             expect(MARKER_STRIKETHROUGH.has(marker)).toBe(false);
         }
     });
@@ -274,5 +275,78 @@ describe('computePriorityRanges', () => {
         expect(out.get(1)?.map((r) => r.startLine)).toEqual([0, 2]);
         expect(out.get(2)?.map((r) => r.startLine)).toEqual([5]);
         expect(out.get(3)).toBeUndefined();
+    });
+});
+
+describe('computeMetadataRanges', () => {
+    it('returns an empty array when given no tasks', () => {
+        expect(computeMetadataRanges([])).toEqual([]);
+    });
+
+    it('emits a range spanning the full <!-- ... --> block for a single comment', () => {
+        const tasks = [
+            task({
+                marker: 'todo',
+                raw: '- [ ] something <!-- @id:abc -->',
+                line: 0,
+                indent: '',
+            }),
+        ];
+        expect(computeMetadataRanges(tasks)).toEqual<RangeLike[]>([
+            {
+                startLine: 0,
+                startCol: '- [ ] something '.length,
+                endLine: 0,
+                endCol: '- [ ] something <!-- @id:abc -->'.length,
+            },
+        ]);
+    });
+
+    it('emits one range per comment on a multi-comment line', () => {
+        const raw = '- [ ] x <!-- @id:1 --> y <!-- @flag -->';
+        const tasks = [task({ marker: 'todo', raw, line: 3, indent: '' })];
+        const ranges = computeMetadataRanges(tasks);
+        expect(ranges).toHaveLength(2);
+        expect(ranges[0]?.startCol).toBe(raw.indexOf('<!-- @id'));
+        expect(ranges[1]?.startCol).toBe(raw.indexOf('<!-- @flag'));
+        // Each range is bounded by the closing `-->`.
+        expect(raw.slice(ranges[0]?.startCol, ranges[0]?.endCol)).toBe('<!-- @id:1 -->');
+        expect(raw.slice(ranges[1]?.startCol, ranges[1]?.endCol)).toBe('<!-- @flag -->');
+    });
+
+    it('returns no ranges for a task without inline metadata', () => {
+        const tasks = [task({ marker: 'todo', raw: '- [ ] plain task', line: 0, indent: '' })];
+        expect(computeMetadataRanges(tasks)).toEqual([]);
+    });
+
+    it('handles an empty-body comment (<!-- -->)', () => {
+        const raw = '- [ ] x <!-- -->';
+        const tasks = [task({ marker: 'todo', raw, line: 0, indent: '' })];
+        expect(computeMetadataRanges(tasks)).toEqual<RangeLike[]>([
+            { startLine: 0, startCol: raw.indexOf('<!--'), endLine: 0, endCol: raw.length },
+        ]);
+    });
+
+    it('ignores stray < or -- that are not a metadata comment opening', () => {
+        const tasks = [
+            task({ marker: 'todo', raw: '- [ ] math: 1 < 2 -- maybe', line: 0, indent: '' }),
+            task({ marker: 'todo', raw: '- [ ] <-- not a comment', line: 1, indent: '' }),
+        ];
+        expect(computeMetadataRanges(tasks)).toEqual([]);
+    });
+
+    it('shifts the range right by indent length on an indented task', () => {
+        const raw = '    - [ ] nested <!-- @id:n -->';
+        const tasks = [task({ marker: 'todo', raw, line: 4, indent: '    ' })];
+        expect(computeMetadataRanges(tasks)).toEqual<RangeLike[]>([
+            { startLine: 4, startCol: raw.indexOf('<!--'), endLine: 4, endCol: raw.length },
+        ]);
+    });
+
+    it('drops an unclosed <!-- — non-greedy match requires a closing -->', () => {
+        const tasks = [
+            task({ marker: 'todo', raw: '- [ ] dangling <!-- @id:x', line: 0, indent: '' }),
+        ];
+        expect(computeMetadataRanges(tasks)).toEqual([]);
     });
 });

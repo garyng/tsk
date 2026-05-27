@@ -4,6 +4,7 @@ import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-p
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
 import {
     computeMarkerRanges,
+    computeMetadataRanges,
     computePriorityRanges,
     priorityBackgroundColor,
     type RangeLike,
@@ -37,6 +38,8 @@ export interface TskExtensionApi {
 export interface DecorationSnapshot {
     markers: Record<Marker, RangeLike[]>;
     priorities: Record<PriorityLevel, RangeLike[]>;
+    /** Flat list of `<!-- ... -->` ranges across all tasks on this URI. */
+    metadata: RangeLike[];
 }
 
 /**
@@ -55,6 +58,7 @@ const TSK_LANGUAGE_ID = 'tsk';
 const PRIORITY_OPACITY_SETTING = 'tsk.decorations.priority.opacity';
 const PRIORITY_OPACITY_KEY = 'decorations.priority.opacity';
 const DEFAULT_PRIORITY_OPACITY = 0.15;
+const METADATA_FOREGROUND_COLOR_ID = 'tsk.metadata.foreground';
 
 let state: ActivationState | undefined;
 
@@ -75,6 +79,11 @@ interface ActivationState {
     markerDecorationTypes: Record<Marker, vscode.TextEditorDecorationType>;
     /** Per-priority decoration types — rebuilt when opacity setting changes. */
     priorityDecorationTypes: Record<PriorityLevel, vscode.TextEditorDecorationType>;
+    /**
+     * Single dimmed decoration type for inline metadata comments. Color is
+     * `tsk.metadata.foreground` (themable), built once.
+     */
+    metadataDecorationType: vscode.TextEditorDecorationType;
     /** Per-URI snapshot of last-applied decoration ranges (for the e2e API). */
     decorationSnapshots: Map<string, DecorationSnapshot>;
 }
@@ -118,6 +127,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         },
     });
 
+    // Metadata decoration type: dims `<!-- ... -->` comments via the
+    // `tsk.metadata.foreground` theme color. One shared type for all
+    // metadata across all editors.
+    const metadataDecorationType = vscode.window.createTextEditorDecorationType({
+        color: new vscode.ThemeColor(METADATA_FOREGROUND_COLOR_ID),
+    });
+    context.subscriptions.push(metadataDecorationType);
+
     state = {
         db,
         cache,
@@ -127,6 +144,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         decorationTimers: new Map(),
         markerDecorationTypes,
         priorityDecorationTypes,
+        metadataDecorationType,
         decorationSnapshots: new Map(),
     };
 
@@ -366,11 +384,17 @@ function rebuildPriorityDecorationTypes(): void {
 
 function applyDecorationsToEditor(editor: vscode.TextEditor): void {
     if (!state || editor.document.languageId !== TSK_LANGUAGE_ID) return;
-    const { markerDecorationTypes, priorityDecorationTypes, decorationSnapshots } = state;
+    const {
+        markerDecorationTypes,
+        priorityDecorationTypes,
+        metadataDecorationType,
+        decorationSnapshots,
+    } = state;
 
     const tasks = parseDocument(editor.document.getText());
     const markerRanges = computeMarkerRanges(tasks);
     const priorityRanges = computePriorityRanges(tasks);
+    const metadataRanges = computeMetadataRanges(tasks);
 
     // Apply *every* marker type — including with empty arrays — so a marker
     // that just lost its last instance gets its old decorations cleared.
@@ -388,9 +412,12 @@ function applyDecorationsToEditor(editor: vscode.TextEditor): void {
         editor.setDecorations(priorityDecorationTypes[def.level], ranges.map(toVscodeRange));
     }
 
+    editor.setDecorations(metadataDecorationType, metadataRanges.map(toVscodeRange));
+
     decorationSnapshots.set(editor.document.uri.toString(), {
         markers: markerSnapshot,
         priorities: prioritySnapshot,
+        metadata: metadataRanges,
     });
 }
 

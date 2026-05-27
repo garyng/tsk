@@ -86,17 +86,21 @@ describe('MARKER_SYMBOL_CHAR_CLASS', () => {
 describe('drift — package.json contributes.colors mirrors MARKERS', () => {
     const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf-8'));
     const pkgColors = (pkg.contributes?.colors ?? []) as PackageColor[];
+    // The drift tests scope themselves to the `tsk.marker.*` namespace —
+    // other `tsk.*.*` colors (e.g. `tsk.metadata.foreground`) live outside
+    // the MARKERS registry and aren't drift-tested here.
+    const pkgMarkerColors = pkgColors.filter((c) => c.id.startsWith('tsk.marker.'));
 
     it('one entry in package.json for every MARKER with a color', () => {
         const expected = MARKERS.flatMap((m) => (m.color ? [m.color.id] : []));
-        expect(pkgColors.map((c) => c.id)).toEqual(expected);
+        expect(pkgMarkerColors.map((c) => c.id)).toEqual(expected);
     });
 
     it('each MARKER.color matches the package.json entry exactly', () => {
         for (const def of MARKERS) {
             const color = def.color;
             if (!color) continue;
-            const entry = pkgColors.find((c) => c.id === color.id);
+            const entry = pkgMarkerColors.find((c) => c.id === color.id);
             expect(entry, `expected colors entry for ${color.id}`).toBeDefined();
             expect(entry).toEqual({
                 id: color.id,
@@ -106,12 +110,13 @@ describe('drift — package.json contributes.colors mirrors MARKERS', () => {
         }
     });
 
-    it('package.json does not declare colors outside the MARKERS registry', () => {
+    it('package.json does not declare stray tsk.marker.* ids outside MARKERS', () => {
         const registryIds = new Set<string>(MARKERS.flatMap((m) => (m.color ? [m.color.id] : [])));
-        for (const entry of pkgColors) {
-            expect(registryIds.has(entry.id), `stray color id ${entry.id} in package.json`).toBe(
-                true,
-            );
+        for (const entry of pkgMarkerColors) {
+            expect(
+                registryIds.has(entry.id),
+                `stray tsk.marker.* id ${entry.id} in package.json`,
+            ).toBe(true);
         }
     });
 });
