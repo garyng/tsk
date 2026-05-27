@@ -323,6 +323,19 @@ the "(missing)" info toast surface:
 
 - [ ] orphaned reference <!-- @id:m9dangle @parent:never-existed -->
 
+### Navigation highlight (M10)
+
+After clicking any forward-edge lens (the navigate ones, not the peek
+ones), the target line stays softly tinted via the
+`tsk.navigation.highlight` theme color until you do one of three
+things: click another navigate lens (the highlight follows the next
+jump), move the cursor with the keyboard or mouse, or switch to a
+different editor. There's no fade timer — the highlight sticks around
+so you can find your spot after scrolling, then clears itself the
+moment you start interacting again. Override the tint via
+`workbench.colorCustomizations` if the default soft yellow clashes
+with your theme.
+
 ## Parser model (M2)
 
 The parser reads every line above into a `Task` record exposing `marker`,

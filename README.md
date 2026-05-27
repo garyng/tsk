@@ -2,7 +2,7 @@
 
 A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching markdown task lists with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.
 
-Currently in **early development (M0–M9 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits, offers tag autocompletion + find-all-tasks-by-tag driven by a workspace-local `tags.yml`, and renders relationship code lenses (parent/children/dependsOn/dependents/relatedTo/related) on every canonical task with navigate + peek commands. Navigation highlights land in M10. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
+Currently in **early development (M0–M10 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits, offers tag autocompletion + find-all-tasks-by-tag driven by a workspace-local `tags.yml`, renders relationship code lenses (parent/children/dependsOn/dependents/relatedTo/related) on every canonical task with navigate + peek commands, and tints the target line after every navigate until you move the cursor or jump again. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
 
 ## Development
 
@@ -13,6 +13,8 @@ npm run dev:host       # same, in watch mode
 ```
 
 Open the repo in VS Code and pick **Run and Debug → Run Extension** to launch a development host with this extension loaded.
+
+After a fresh `npm run build:host`, the existing dev host process is still running the *previous* bundle — VSCode doesn't auto-reload extensions. In the dev host window, run **Developer: Restart Extension Host** (Command Palette) to pick up the new build.
 
 ## Tests
 
@@ -49,6 +51,7 @@ src/
   tags-completion.ts          # registerTagsCompletionProvider — #-triggered CompletionItemProvider
   find-tasks-by-tag.ts        # registerFindAllTasksByTagCommand — QuickPick → workbench.action.findInFiles
   codelens.ts                 # registerCodelens — TskCodeLensProvider + 7 navigate/peek/missing commands
+  navigation-highlight.ts     # NavigationHighlight — persistent line decoration after a goTo* navigate
   diagnostics-manager.ts      # DiagnosticsManager — merges cache scan warnings + graph dup reports per-file
   lib/                        # pure logic — unit-tested
     markers.ts                # MARKERS registry — single source of truth for marker name/symbols/color/scope
@@ -190,6 +193,18 @@ The exact codicon per relationship type lives in `CODICONS` in `src/lib/codelens
 **Commands are not contributed to `contributes.commands`** — they're invoked exclusively by lens clicks. No palette entries, no keybindings; the lens IS the invocation. They are registered (`vscode.commands.getCommands` reports them) so other extensions can compose if needed.
 
 **Codelens font caveat.** `editor.codeLensFontFamily` controls the rendered font; in practice it doesn't always match the editor font even when the option doc implies it should. We don't customize per-lens fonts — only the global setting helps.
+
+## Navigation highlight (M10)
+
+Clicking a forward-edge lens (parent / dependsOn / relatedTo) lands on the target file and line, then leaves a soft whole-line tint on that line until the next interaction. Implementation in `src/navigation-highlight.ts`. The highlight is **persistent, not a flash** — no timer, no fade. It clears on:
+
+- another navigate (the next `set()` replaces the prior highlight before applying the new one),
+- a user-initiated cursor move (`TextEditorSelectionChangeKind.Keyboard` or `Mouse`) in the highlighted editor,
+- the active editor moving off the highlighted one (tab switch, editor close).
+
+Programmatic selection changes (`TextEditorSelectionChangeKind.Command`) are deliberately ignored, otherwise the navigate's own `editor.selection = …` would clear the highlight before the user even saw it.
+
+Theme the tint via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id — defaults are soft yellow with alpha so it works on both light and dark themes without overwhelming the text underneath.
 
 ## Conventions
 
