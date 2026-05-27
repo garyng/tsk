@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
+import { TSK_LANGUAGE_ID } from './constants';
 import type { CacheService } from './lib/cache';
 import { findTagPrefixContext } from './lib/tags-completion-logic';
 import { mergeTagDefs } from './lib/tags-config';
 import type { TagsLoader } from './tags-loader';
 
-const TSK_LANGUAGE_ID = 'tsk';
 const TRIGGER_CHARACTER = '#';
 
 /**

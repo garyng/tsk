@@ -1,11 +1,10 @@
 import * as vscode from 'vscode';
+import { COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { mergeTagDefs } from './lib/tags-config';
 import { buildFindInFilesArgs, tagsToPickItems } from './lib/tags-find-logic';
 import type { TagsLoader } from './tags-loader';
-
-const COMMAND_ID = 'tsk.findAllTasksByTag';
 
 /**
  * Register the `tsk.findAllTasksByTag` command. Behavior:
@@ -29,13 +28,13 @@ export function registerFindAllTasksByTagCommand(
     logger: Logger,
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand(COMMAND_ID, async () => {
+        vscode.commands.registerCommand(COMMANDS.findAllTasksByTag, async () => {
             const merged = mergeTagDefs(loader.getTags(), cache.listAllTags());
             if (merged.size === 0) {
                 void vscode.window.showInformationMessage(
                     'Tsk: no tags found in the current workspace.',
                 );
-                logger.info(`${COMMAND_ID}: aborted — no tags available.`);
+                logger.info(`${COMMANDS.findAllTasksByTag}: aborted — no tags available.`);
                 return;
             }
             const items = tagsToPickItems(merged);
@@ -46,7 +45,7 @@ export function registerFindAllTasksByTagCommand(
             });
             if (!picked) return;
             const args = buildFindInFilesArgs(picked.label);
-            logger.info(`${COMMAND_ID}: searching for ${args.query}`);
+            logger.info(`${COMMANDS.findAllTasksByTag}: searching for ${args.query}`);
             await vscode.commands.executeCommand('workbench.action.findInFiles', args);
         }),
     );

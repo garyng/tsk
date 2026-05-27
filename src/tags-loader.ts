@@ -1,11 +1,9 @@
 import { basename, dirname } from 'node:path';
 import * as vscode from 'vscode';
+import { TAGS_PATH_KEY, TAGS_PATH_SETTING } from './constants';
 import type { Logger } from './lib/logger';
 import { parseTagsYaml, type TagDef } from './lib/tags-config';
 import { resolveTagsPath } from './lib/tags-path';
-
-const TAGS_PATH_SETTING = 'tsk.tags.path';
-const TAGS_PATH_KEY = 'tags.path';
 
 /**
  * Read-only handle on the workspace's `tags.yml` state. Returned from
