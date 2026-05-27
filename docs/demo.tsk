@@ -170,6 +170,31 @@ Group"; the `when: editorLangId == 'tsk'` clause makes our binding win inside
 `.tsk` files only. `` Alt+` `` uses the backtick key, which varies by keyboard
 layout (UK / DE / FR users may need to rebind via Keyboard Shortcuts).
 
+## Try Enter / Tab here (M7)
+
+Place your cursor on one of these tasks and press Enter, Tab, or Shift+Tab.
+Edits land as a single `WorkspaceEdit` — one Ctrl+Z reverts everything.
+
+| Key       | Effect on a task line                                                                  |
+|-----------|----------------------------------------------------------------------------------------|
+| `Enter`   | At end of content → continue the list (new empty task below). Mid-content → split (metadata pins to line 1). On an empty task → outdent (or remove at col 0). |
+| `Tab`     | On an empty task → indent one level. Otherwise → default editor Tab.                   |
+| `Shift+Tab` | On any indented task → outdent one level.                                            |
+
+When suggest / snippet UI is visible, Enter and Tab go back to their default
+roles (accept suggestion, advance snippet placeholder) — the `when` clause
+on the keybinding gives priority back to VSCode in those cases.
+
+- [ ] press Enter at the end of this line to continue the list <!-- @id:m7try1 -->
+- [ ] no metadata here — Enter still continues the list, just without pinning
+- [ ] press Enter between `foo` and `bar` to see the split with metadata pinned to line 1 <!-- @id:m7try2 -->
+- [ ]
+- [ ] ↑ that's an empty task — Enter on it removes the marker (col 0) or outdents (col > 0)
+    - [ ] indented empty task — Enter outdents <!-- @id:m7try3 -->
+        - [ ] deeply nested — repeated Shift+Tab walks back to column 0 <!-- @id:m7try4 -->
+- [ ] Tab on this content task is a no-op (defers to default editor Tab)
+- [x] Enter at end of a completed task still continues with a fresh `[ ]` marker
+
 ## Parser model (M2)
 
 The parser reads every line above into a `Task` record exposing `marker`,

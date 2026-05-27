@@ -2,7 +2,7 @@
 
 A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching markdown task lists with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.
 
-Currently in **early development (M0–M5 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, and provides 13 toggle/copy commands with keybindings (marker / priority / relationship / picker-driven). Codelens, Enter/Tab handling, and tag autocompletion land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
+Currently in **early development (M0–M7 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, and replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits. Codelens, navigation highlights, and tag autocompletion land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
 
 ## Development
 
@@ -41,24 +41,26 @@ npm run package        # builds, then runs @vscode/vsce → produces tsk-<versio
 
 ```
 src/
-  extension.ts          # activate/deactivate, cache + decoration wire-up, command + watcher registration
-  toggle-commands.ts    # applyEdit + registerToggleCommands / registerCopyTaskIdCommand / registerRelationshipCommands
-  picker.ts             # pickTaskId — InputBox prefilled from clipboard, "Browse tasks…" QuickPick
-  lib/                  # pure logic — unit-tested
-    markers.ts          # MARKERS registry — single source of truth for marker name/symbols/color/scope
-    priorities.ts       # PRIORITIES registry — level/rgb/label
-    parser.ts           # parseLine, parseDocument; regex char class derived from MARKERS
-    metadata.ts         # extractMetadata, serializeMetadata, replaceMetadata
-    toggle.ts           # swapMarker, wrapAsTask, unwrapTask, (set|remove|toggle)MetadataEntry
-    toggle-mutators.ts  # 10 toggle mutator factories composing toggle.ts + parser.ts
-    picker-logic.ts     # sanitizeClipboardForId, taskToPickItem (vscode-free pieces of the picker)
-    decorations.ts      # RangeLike + computeMarkerRanges + computePriorityRanges + priorityBackgroundColor
-    cache.ts            # CacheService — orchestrates parser + db with warnings
-    db.ts               # node:sqlite wrapper with schema, prepared statements
-    cache-path.ts       # ${workspaceFolder} resolver + in-memory fallback
-    ids.ts              # nanoid + seedable PRNG for @id generation
-    time.ts             # ISO-local timestamp helper
-    logger.ts           # leveled Output channel logger
+  extension.ts             # activate/deactivate, cache + decoration wire-up, command + watcher registration
+  toggle-commands.ts       # applyEdit + registerToggleCommands / registerCopyTaskIdCommand / registerRelationshipCommands
+  list-edit-commands.ts    # registerListEditCommands — Enter / Tab / Shift+Tab handlers + default fallback
+  picker.ts                # pickTaskId — InputBox prefilled from clipboard, "Browse tasks…" QuickPick
+  lib/                     # pure logic — unit-tested
+    markers.ts             # MARKERS registry — single source of truth for marker name/symbols/color/scope
+    priorities.ts          # PRIORITIES registry — level/rgb/label
+    parser.ts              # parseLine, parseDocument; regex char class derived from MARKERS
+    metadata.ts            # extractMetadata, serializeMetadata, replaceMetadata
+    toggle.ts              # swapMarker, wrapAsTask, unwrapTask, (set|remove|toggle)MetadataEntry
+    toggle-mutators.ts     # 10 toggle mutator factories composing toggle.ts + parser.ts
+    list-edit.ts           # compute(Enter|Tab|ShiftTab)Edit — pure list-edit logic + metadata pinning
+    picker-logic.ts        # sanitizeClipboardForId, taskToPickItem (vscode-free pieces of the picker)
+    decorations.ts         # RangeLike + computeMarkerRanges + computePriorityRanges + priorityBackgroundColor
+    cache.ts               # CacheService — orchestrates parser + db with warnings
+    db.ts                  # node:sqlite wrapper with schema, prepared statements
+    cache-path.ts          # ${workspaceFolder} resolver + in-memory fallback
+    ids.ts                 # nanoid + seedable PRNG for @id generation
+    time.ts                # ISO-local timestamp helper
+    logger.ts              # leveled Output channel logger
 syntaxes/
   tsk.tmLanguage.json   # grammar that includes text.html.markdown
 tests/
@@ -111,6 +113,20 @@ Thirteen palette-registered commands operate on the cursor line (or every unique
 - `Alt+1`/`Alt+2`/`Alt+3` are globally bound to "Focus N-th Editor Group" in VSCode defaults. Our `when: editorLangId == 'tsk'` clause makes the toggle win inside `.tsk` files; the editor-group focus still works elsewhere.
 - `` Alt+` `` uses the backtick key, which varies by keyboard layout — UK / DE / FR users may need to rebind via the Keyboard Shortcuts editor.
 - Other Alt-letter combos depend on installed extensions and themes; the language-scoped `when` clause prevents `.tsk` toggles from leaking outside, but third-party extensions binding the same chord with an equally specific `when` clause could clash.
+
+## List editing (M7)
+
+Enter / Tab / Shift+Tab inside a `.tsk` file are intercepted to mimic MD-AIO's list semantics with one tsk-specific extension: inline metadata never gets pushed to the next line. Pure logic in `src/lib/list-edit.ts`; activation handlers in `src/list-edit-commands.ts`.
+
+| Key       | Behavior                                                                                              |
+|-----------|-------------------------------------------------------------------------------------------------------|
+| `Enter`   | Cursor at end-of-content (before `<!--` or end of line) → continue the list with a fresh empty task (new `@id` + `@created`). Cursor mid-content → split at the cursor; **metadata stays on the original line**. On an empty task → outdent (col > 0) or remove the whole task (col 0). |
+| `Tab`     | On an empty task → indent one level (spaces or tab per editor settings). Otherwise → default editor Tab.   |
+| `Shift+Tab` | On any task with indent → outdent one level. Otherwise → default editor outdent.                    |
+
+**`when` clause** on every keybinding: `editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`. So Enter accepts an IntelliSense suggestion when one is visible, and Tab advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
+
+**Continuation marker is always `[ ]`** — pressing Enter at the end of a `[x]` completed task still creates a fresh `[ ]` todo on the next line. Matches MD-AIO.
 
 ## Conventions
 
