@@ -131,6 +131,45 @@ A real task usually has a marker, content, tags, and metadata together:
 
 - [/] integrate `node:sqlite` cache layer #project/tsk #milestone/M3 <!-- @id:p4f8c2dh @created:2026-05-24T17:45:11+08:00 @started:2026-05-25T09:00:00+08:00 -->
 
+## Try these (M5 — toggle commands)
+
+Place your cursor on a task and press one of the keybindings below. Edits
+land as a single `WorkspaceEdit` — one Ctrl+Z reverts the whole operation.
+Multi-cursor works too; the toggle applies once per unique line.
+
+| Keybinding   | Command                                       | Behavior |
+|--------------|-----------------------------------------------|----------|
+| `Alt+A`      | `tsk.toggleTodo`                              | Wrap a plain/empty line as `[ ]` with `@id` + `@created`; unwrap an empty todo back to its indent. |
+| `Alt+S`      | `tsk.toggleInprogress`                        | Swap marker to `[/]` + `@started`; toggling again reverts to `[ ]`. |
+| `Alt+C`      | `tsk.toggleCompleted`                         | Same shape with `[x]` + `@completed`. |
+| `Alt+X`      | `tsk.toggleCancelled`                         | Same shape with `[!]` + `@cancelled`. |
+| `Alt+N`      | `tsk.toggleNote`                              | Wrap/unwrap as `[n]`, like `toggleTodo`. |
+| `Alt+M`      | `tsk.toggleMoved`                             | Picker → `[>]` + `@movedTo` + `@moved`. Empty submission writes only `@moved` ("moved elsewhere, no target"). |
+| `Alt+R`      | `tsk.toggleRelatedTo`                         | Absent → picker → write; present → silently remove. |
+| `Alt+D`      | `tsk.toggleDependsOn`                         | Same shape with `@dependsOn`. |
+| `Alt+P`      | `tsk.toggleParent`                            | Same shape with `@parent`. |
+| `Alt+1/2/3`  | `tsk.toggleP1` / `P2` / `P3`                  | Toggle `@priority:N` (switching levels overwrites in one step). |
+| `` Alt+` ``  | `tsk.copyTaskId`                              | Copy the current task's `@id` to the system clipboard. |
+
+Cursor on any of the lines below and try the matching keybinding:
+
+- [ ] flip me to in-progress with Alt+S <!-- @id:d5try1 -->
+- [/] flip me back to todo with Alt+S <!-- @id:d5try2 @started:2026-05-27T09:00:00+08:00 -->
+- [ ] complete me with Alt+C <!-- @id:d5try3 -->
+- [x] uncomplete me with Alt+C <!-- @id:d5try4 @completed:2026-05-27T09:00:00+08:00 -->
+- [ ] cancel me with Alt+X <!-- @id:d5try5 -->
+- [ ] move me with Alt+M — leave the picker empty to mark as moved-elsewhere <!-- @id:d5try6 -->
+- [ ] add a relatedTo with Alt+R <!-- @id:d5try7 -->
+- [ ] add a dependsOn with Alt+D <!-- @id:d5try8 -->
+- [ ] add a parent with Alt+P <!-- @id:d5try9 -->
+- [ ] toggle me to P1 with Alt+1, then to P2 with Alt+2 (overwrite) <!-- @id:d5try10 -->
+- [ ] copy my `@id` with `` Alt+` `` <!-- @id:d5try11 -->
+
+**Keybinding caveats.** `Alt+1/2/3` are globally bound to "Focus N-th Editor
+Group"; the `when: editorLangId == 'tsk'` clause makes our binding win inside
+`.tsk` files only. `` Alt+` `` uses the backtick key, which varies by keyboard
+layout (UK / DE / FR users may need to rebind via Keyboard Shortcuts).
+
 ## Parser model (M2)
 
 The parser reads every line above into a `Task` record exposing `marker`,

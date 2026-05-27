@@ -2,7 +2,7 @@
 
 A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching markdown task lists with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.
 
-Currently in **early development (M0–M4 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, and decorates marker triplets and priority lines. Toggle commands, codelens, and the rest land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
+Currently in **early development (M0–M5 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, and provides 13 toggle/copy commands with keybindings (marker / priority / relationship / picker-driven). Codelens, Enter/Tab handling, and tag autocompletion land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
 
 ## Development
 
@@ -42,11 +42,16 @@ npm run package        # builds, then runs @vscode/vsce → produces tsk-<versio
 ```
 src/
   extension.ts          # activate/deactivate, cache + decoration wire-up, command + watcher registration
+  toggle-commands.ts    # applyEdit + registerToggleCommands / registerCopyTaskIdCommand / registerRelationshipCommands
+  picker.ts             # pickTaskId — InputBox prefilled from clipboard, "Browse tasks…" QuickPick
   lib/                  # pure logic — unit-tested
     markers.ts          # MARKERS registry — single source of truth for marker name/symbols/color/scope
     priorities.ts       # PRIORITIES registry — level/rgb/label
     parser.ts           # parseLine, parseDocument; regex char class derived from MARKERS
     metadata.ts         # extractMetadata, serializeMetadata, replaceMetadata
+    toggle.ts           # swapMarker, wrapAsTask, unwrapTask, (set|remove|toggle)MetadataEntry
+    toggle-mutators.ts  # 10 toggle mutator factories composing toggle.ts + parser.ts
+    picker-logic.ts     # sanitizeClipboardForId, taskToPickItem (vscode-free pieces of the picker)
     decorations.ts      # RangeLike + computeMarkerRanges + computePriorityRanges + priorityBackgroundColor
     cache.ts            # CacheService — orchestrates parser + db with warnings
     db.ts               # node:sqlite wrapper with schema, prepared statements
@@ -83,6 +88,29 @@ Two layers of editor decorations on `.tsk` documents:
 - **Dimmed inline metadata.** Every `<!-- @key:value -->` block is dimmed via `tsk.metadata.foreground` so the comments recede into the editor background. Phase 2 surfaces the parsed values via hover-on-task; until then the dim is the "present but quiet" hint that those comments are extension-managed bookkeeping.
 
 Decorations apply on editor focus, after save, and on a 300 ms debounce after text changes — independent from the cache rescan debounce. Definitions live in the `MARKERS` / `PRIORITIES` registries (`src/lib/markers.ts` / `src/lib/priorities.ts`); adding a new marker is a single registry entry plus mirroring into `package.json` and the grammar JSON (drift-tested).
+
+## Toggle commands (M5)
+
+Thirteen palette-registered commands operate on the cursor line (or every unique cursor line in multi-cursor mode). Every command builds a single `WorkspaceEdit` so one Ctrl+Z reverts the whole operation.
+
+| Keybinding   | Command                                       | Behavior |
+|--------------|-----------------------------------------------|----------|
+| `Alt+A`      | `tsk.toggleTodo`                              | Wrap a plain/empty line as `[ ]` with `@id` + `@created`; unwrap an empty todo. |
+| `Alt+S`      | `tsk.toggleInprogress`                        | Swap marker to `[/]` + `@started`; toggling again reverts. |
+| `Alt+C`      | `tsk.toggleCompleted`                         | `[x]` + `@completed`. |
+| `Alt+X`      | `tsk.toggleCancelled`                         | `[!]` + `@cancelled`. |
+| `Alt+N`      | `tsk.toggleNote`                              | Wrap/unwrap as `[n]`. |
+| `Alt+M`      | `tsk.toggleMoved`                             | Picker → `[>]` + `@movedTo` + `@moved`. Empty submission writes only `@moved` (moved-elsewhere). Toggling again reverts. |
+| `Alt+R / D / P` | `tsk.toggleRelatedTo` / `DependsOn` / `Parent` | Absent → picker → write; present → silently remove. |
+| `Alt+1 / 2 / 3` | `tsk.toggleP1` / `P2` / `P3`                | Toggle `@priority:N`; switching levels overwrites in one step. |
+| `` Alt+` ``  | `tsk.copyTaskId`                              | Copy the current task's `@id` to the system clipboard. |
+
+**Task-id picker** (M5/D, originally planned as M6): the four picker-driven commands open an InputBox prefilled with the sanitized first token of clipboard text. Click the **"Browse tasks…"** button (search icon) to switch to a QuickPick of every cached task across the workspace.
+
+**Keybinding caveats**:
+- `Alt+1`/`Alt+2`/`Alt+3` are globally bound to "Focus N-th Editor Group" in VSCode defaults. Our `when: editorLangId == 'tsk'` clause makes the toggle win inside `.tsk` files; the editor-group focus still works elsewhere.
+- `` Alt+` `` uses the backtick key, which varies by keyboard layout — UK / DE / FR users may need to rebind via the Keyboard Shortcuts editor.
+- Other Alt-letter combos depend on installed extensions and themes; the language-scoped `when` clause prevents `.tsk` toggles from leaking outside, but third-party extensions binding the same chord with an equally specific `when` clause could clash.
 
 ## Conventions
 
