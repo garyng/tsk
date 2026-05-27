@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { Logger } from './lib/logger';
+import { parseLine } from './lib/parser';
 import {
     defaultToggleDeps,
     type ToggleDeps,
@@ -7,6 +8,9 @@ import {
     toggleCompletedMutator,
     toggleInprogressMutator,
     toggleNoteMutator,
+    toggleP1Mutator,
+    toggleP2Mutator,
+    toggleP3Mutator,
     toggleTodoMutator,
 } from './lib/toggle-mutators';
 
@@ -85,6 +89,9 @@ export function registerToggleCommands(
         ['tsk.toggleCompleted', bind(toggleCompletedMutator)],
         ['tsk.toggleCancelled', bind(toggleCancelledMutator)],
         ['tsk.toggleNote', bind(toggleNoteMutator)],
+        ['tsk.toggleP1', bind(toggleP1Mutator)],
+        ['tsk.toggleP2', bind(toggleP2Mutator)],
+        ['tsk.toggleP3', bind(toggleP3Mutator)],
     ];
 
     for (const [id, mutator] of commands) {
@@ -99,4 +106,45 @@ export function registerToggleCommands(
             }),
         );
     }
+}
+
+/**
+ * Register `tsk.copyTaskId`. Reads the `@id` from the task on the primary
+ * cursor's line and writes it to the clipboard. Surfaces a notification on
+ * success / when the line isn't a task / when the task has no `@id` so the
+ * keystroke is never silent.
+ *
+ * Distinct from {@link registerToggleCommands} because copying isn't a
+ * line mutation — there's no `WorkspaceEdit` to assemble, no multi-cursor
+ * dedup; the primary selection is the sole input.
+ */
+export function registerCopyTaskIdCommand(context: vscode.ExtensionContext, logger: Logger): void {
+    context.subscriptions.push(
+        vscode.commands.registerCommand('tsk.copyTaskId', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                logger.debug('tsk.copyTaskId: no active editor');
+                return;
+            }
+            if (editor.document.languageId !== TSK_LANGUAGE_ID) {
+                logger.debug(
+                    `tsk.copyTaskId: skipped — language id is "${editor.document.languageId}"`,
+                );
+                return;
+            }
+            const line = editor.document.lineAt(editor.selection.active.line).text;
+            const parsed = parseLine(line);
+            if (!parsed) {
+                void vscode.window.showWarningMessage('Tsk: not on a task line.');
+                return;
+            }
+            const id = parsed.metadata.get('id');
+            if (typeof id !== 'string' || id === '') {
+                void vscode.window.showWarningMessage('Tsk: this task has no @id.');
+                return;
+            }
+            await vscode.env.clipboard.writeText(id);
+            void vscode.window.showInformationMessage(`Tsk: copied "${id}" to clipboard.`);
+        }),
+    );
 }

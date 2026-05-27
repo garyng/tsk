@@ -5,6 +5,9 @@ import {
     toggleCompletedMutator,
     toggleInprogressMutator,
     toggleNoteMutator,
+    toggleP1Mutator,
+    toggleP2Mutator,
+    toggleP3Mutator,
     toggleTodoMutator,
 } from './toggle-mutators';
 
@@ -128,5 +131,32 @@ describe('toggleCancelledMutator', () => {
                 FIXED_DEPS,
             ),
         ).toBe('- [ ] thing');
+    });
+});
+
+describe('toggleP1 / toggleP2 / toggleP3 mutators', () => {
+    it('adds @priority:N when absent', () => {
+        expect(toggleP1Mutator('- [ ] thing', FIXED_DEPS)).toBe('- [ ] thing <!-- @priority:1 -->');
+        expect(toggleP3Mutator('- [ ] thing', FIXED_DEPS)).toBe('- [ ] thing <!-- @priority:3 -->');
+    });
+
+    it('removes the entry when toggling the same level twice', () => {
+        const a = toggleP2Mutator('- [ ] x', FIXED_DEPS);
+        expect(a).toBe('- [ ] x <!-- @priority:2 -->');
+        const b = toggleP2Mutator(a, FIXED_DEPS);
+        expect(b).toBe('- [ ] x');
+    });
+
+    it('swaps levels via mutual exclusion (mismatched → overwrite)', () => {
+        expect(toggleP2Mutator('- [ ] x <!-- @priority:1 -->', FIXED_DEPS)).toBe(
+            '- [ ] x <!-- @priority:2 -->',
+        );
+        expect(toggleP3Mutator('- [ ] x <!-- @priority:2 -->', FIXED_DEPS)).toBe(
+            '- [ ] x <!-- @priority:3 -->',
+        );
+    });
+
+    it('no-ops on a non-task line', () => {
+        expect(toggleP1Mutator('plain text', FIXED_DEPS)).toBe('plain text');
     });
 });

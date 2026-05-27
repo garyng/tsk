@@ -1,11 +1,13 @@
 import { generateId } from './ids';
 import type { Marker } from './markers';
 import { parseLine } from './parser';
+import type { PriorityLevel } from './priorities';
 import { localTimestamp } from './time';
 import {
     removeMetadataEntry,
     setMetadataEntry,
     swapMarker,
+    toggleMetadataEntry,
     unwrapTask,
     wrapAsTask,
 } from './toggle';
@@ -77,3 +79,21 @@ export const toggleNoteMutator = makeCreationToggle('notes');
 export const toggleInprogressMutator = makeStateToggle('inprogress', 'started');
 export const toggleCompletedMutator = makeStateToggle('completed', 'completed');
 export const toggleCancelledMutator = makeStateToggle('cancelled', 'cancelled');
+
+/**
+ * `toggleP1` / `toggleP2` / `toggleP3` toggle the `@priority:N` metadata.
+ * Mutual exclusion is automatic — `toggleMetadataEntry`'s "mismatched →
+ * overwrite" branch swaps levels in one step.
+ *
+ * The `_deps` parameter is unused; it exists to keep all toggle mutators
+ * on the same signature so the activation layer can bind them uniformly.
+ */
+function makeTogglePriority(level: PriorityLevel) {
+    const value = String(level);
+    return (line: string, _deps: ToggleDeps): string =>
+        toggleMetadataEntry(line, 'priority', value);
+}
+
+export const toggleP1Mutator = makeTogglePriority(1);
+export const toggleP2Mutator = makeTogglePriority(2);
+export const toggleP3Mutator = makeTogglePriority(3);

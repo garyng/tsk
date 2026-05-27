@@ -70,6 +70,26 @@
                 "command": "tsk.toggleNote",
                 "title": "Toggle Note",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleP1",
+                "title": "Toggle Priority 1 (High)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleP2",
+                "title": "Toggle Priority 2 (Medium)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleP3",
+                "title": "Toggle Priority 3 (Low)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.copyTaskId",
+                "title": "Copy Task Id",
+                "category": "Tsk"
             }
         ],
         "keybindings": [
@@ -96,6 +116,26 @@
             {
                 "command": "tsk.toggleNote",
                 "key": "alt+n",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleP1",
+                "key": "alt+1",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleP2",
+                "key": "alt+2",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleP3",
+                "key": "alt+3",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.copyTaskId",
+                "key": "alt+`",
                 "when": "editorLangId == 'tsk'"
             }
         ],
