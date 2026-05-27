@@ -1,1 +1,6 @@
-/.vscode
+# Ignore everything in the docs-side .vscode/ (cache.db, scratch files, etc.)
+# except for tags.yml, which is part of the demo experience and is tracked.
+/.vscode/*
+!/.vscode/tsk/
+/.vscode/tsk/*
+!/.vscode/tsk/tags.yml

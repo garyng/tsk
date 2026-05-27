@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
@@ -14,7 +15,6 @@ import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
 import type { TagDef } from './lib/tags-config';
-import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerListEditCommands } from './list-edit-commands';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader } from './tags-loader';

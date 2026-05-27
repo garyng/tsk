@@ -2,7 +2,7 @@
 
 A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching markdown task lists with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.
 
-Currently in **early development (M0–M7 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, and replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits. Codelens, navigation highlights, and tag autocompletion land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
+Currently in **early development (M0–M8 complete)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits, and offers tag autocompletion + find-all-tasks-by-tag driven by a workspace-local `tags.yml`. Codelens and navigation highlights land milestone-by-milestone. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
 
 ## Development
 
@@ -41,33 +41,41 @@ npm run package        # builds, then runs @vscode/vsce → produces tsk-<versio
 
 ```
 src/
-  extension.ts             # activate/deactivate, cache + decoration wire-up, command + watcher registration
-  toggle-commands.ts       # applyEdit + registerToggleCommands / registerCopyTaskIdCommand / registerRelationshipCommands
-  list-edit-commands.ts    # registerListEditCommands — Enter / Tab / Shift+Tab handlers + default fallback
-  picker.ts                # pickTaskId — InputBox prefilled from clipboard, "Browse tasks…" QuickPick
-  lib/                     # pure logic — unit-tested
-    markers.ts             # MARKERS registry — single source of truth for marker name/symbols/color/scope
-    priorities.ts          # PRIORITIES registry — level/rgb/label
-    parser.ts              # parseLine, parseDocument; regex char class derived from MARKERS
-    metadata.ts            # extractMetadata, serializeMetadata, replaceMetadata
-    toggle.ts              # swapMarker, wrapAsTask, unwrapTask, (set|remove|toggle)MetadataEntry
-    toggle-mutators.ts     # 10 toggle mutator factories composing toggle.ts + parser.ts
-    list-edit.ts           # compute(Enter|Tab|ShiftTab)Edit — pure list-edit logic + metadata pinning
-    picker-logic.ts        # sanitizeClipboardForId, taskToPickItem (vscode-free pieces of the picker)
-    decorations.ts         # RangeLike + computeMarkerRanges + computePriorityRanges + priorityBackgroundColor
-    cache.ts               # CacheService — orchestrates parser + db with warnings
-    db.ts                  # node:sqlite wrapper with schema, prepared statements
-    cache-path.ts          # ${workspaceFolder} resolver + in-memory fallback
-    ids.ts                 # nanoid + seedable PRNG for @id generation
-    time.ts                # ISO-local timestamp helper
-    logger.ts              # leveled Output channel logger
+  extension.ts                # activate/deactivate, cache + decoration wire-up, command + watcher registration
+  toggle-commands.ts          # applyEdit + registerToggleCommands / registerCopyTaskIdCommand / registerRelationshipCommands
+  list-edit-commands.ts       # registerListEditCommands — Enter / Tab / Shift+Tab handlers + default fallback
+  picker.ts                   # pickTaskId — InputBox prefilled from clipboard, "Browse tasks…" QuickPick
+  tags-loader.ts              # createTagsLoader — reads tags.yml, wires FileSystemWatcher + config listener
+  tags-completion.ts          # registerTagsCompletionProvider — #-triggered CompletionItemProvider
+  find-tasks-by-tag.ts        # registerFindAllTasksByTagCommand — QuickPick → workbench.action.findInFiles
+  lib/                        # pure logic — unit-tested
+    markers.ts                # MARKERS registry — single source of truth for marker name/symbols/color/scope
+    priorities.ts             # PRIORITIES registry — level/rgb/label
+    parser.ts                 # parseLine, parseDocument; regex char class derived from MARKERS
+    metadata.ts               # extractMetadata, serializeMetadata, replaceMetadata
+    toggle.ts                 # swapMarker, wrapAsTask, unwrapTask, (set|remove|toggle)MetadataEntry
+    toggle-mutators.ts        # 10 toggle mutator factories composing toggle.ts + parser.ts
+    list-edit.ts              # compute(Enter|Tab|ShiftTab)Edit — pure list-edit logic + metadata pinning
+    picker-logic.ts           # sanitizeClipboardForId, taskToPickItem (vscode-free pieces of the picker)
+    decorations.ts            # RangeLike + computeMarkerRanges + computePriorityRanges + priorityBackgroundColor
+    cache.ts                  # CacheService — orchestrates parser + db with warnings
+    db.ts                     # node:sqlite wrapper with schema, prepared statements
+    cache-path.ts             # ${workspaceFolder} resolver + in-memory fallback
+    tags-config.ts            # TagDef, parseTagsYaml, expandImplicitParents, mergeTagDefs
+    tags-path.ts              # resolveTagsPath — ${workspaceFolder} substitution for tsk.tags.path
+    tags-completion-logic.ts  # findTagPrefixContext — pure #-trigger context detector
+    tags-find-logic.ts        # tagsToPickItems, buildFindInFilesArgs
+    ids.ts                    # nanoid + seedable PRNG for @id generation
+    time.ts                   # ISO-local timestamp helper
+    logger.ts                 # leveled Output channel logger
 syntaxes/
   tsk.tmLanguage.json   # grammar that includes text.html.markdown
 tests/
   e2e/                  # @vscode/test-cli suites — run inside a real VSCode host
-    fixtures/           # workspace fixtures opened by the e2e runner
+    fixtures/           # workspace fixtures opened by the e2e runner — includes .vscode/tsk/tags.yml
 docs/
   demo.tsk              # living end-to-end showcase, grown by each milestone
+  .vscode/tsk/tags.yml  # demo-side tag descriptions — picked up by the Extension Development Host
 ```
 
 ## Cache layer (M3)
@@ -127,6 +135,30 @@ Enter / Tab / Shift+Tab inside a `.tsk` file are intercepted to mimic MD-AIO's l
 **`when` clause** on every keybinding: `editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`. So Enter accepts an IntelliSense suggestion when one is visible, and Tab advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
 **Continuation marker is always `[ ]`** — pressing Enter at the end of a `[x]` completed task still creates a fresh `[ ]` todo on the next line. Matches MD-AIO.
+
+## Tags (M8)
+
+Tags use the `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files (per the M2 parser). M8 plugs two user surfaces on top:
+
+- **`#`-triggered completion.** Inside any `.tsk` editor, type `#` (or `#partial`) and a `CompletionItemProvider` surfaces every known tag. Items merge two sources: tags declared in the workspace `tags.yml` (with descriptions, shown as the item `detail`) and tags discovered in `.tsk` files via the M3 cache (plus implicit `/`-separated parents, so `#project/tsk` automatically contributes `#project` to the list).
+- **`Alt+T` find-all-tasks-by-tag.** Opens a `QuickPick` of every known tag (searchable by name *and* yaml description via `matchOnDescription: true`), then dispatches `workbench.action.findInFiles` with `#<tag>` pre-populated and the include glob scoped to `*.tsk`. You land inside VSCode's built-in Search Editor with Ctrl+Click navigation, regex/case toggles, and multi-result preview already wired up — no custom result document needed.
+
+**`tags.yml` location.** Default `${workspaceFolder}/.vscode/tsk/tags.yml` (configurable via `tsk.tags.path`). Both schema forms are accepted:
+
+```yml
+<tag>: <description>            # string shorthand
+<tag>:                           # object form
+    description: <description>
+    parent: <tag>
+```
+
+Empty / missing / malformed `tags.yml` is tolerated — the loader returns an empty map rather than throwing, and a `FileSystemWatcher` re-reads on create/change/delete. A "warn if file exists but parses to empty" log surfaces gross errors in the Output channel.
+
+**Find-in-Files semantics.** The `#tag` query is a literal substring, so `#project` will also match lines containing `#project/tsk`. Read this as a feature — parent-tag searches naturally include their children. For exact matches, toggle regex in the Search bar (e.g. `(?<![\w/-])#project(?![\w/-])`).
+
+**Keybinding caveats** (Alt+T joins the existing list):
+- Third-party extensions with an equally specific `when` clause (`editorLangId == 'tsk' && editorTextFocus`) could shadow Alt+T inside `.tsk` files; the toggle bindings face the same constraint.
+- Some EU keyboard layouts treat `Alt+letter` as a typed-character chord and may need a rebind via the Keyboard Shortcuts editor.
 
 ## Conventions
 

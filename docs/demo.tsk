@@ -195,6 +195,73 @@ on the keybinding gives priority back to VSCode in those cases.
 - [ ] Tab on this content task is a no-op (defers to default editor Tab)
 - [x] Enter at end of a completed task still continues with a fresh `[ ]` marker
 
+## Tags (M8)
+
+Tags participate in two surfaces beyond M2's parser:
+
+- **`#`-triggered autocompletion** — start typing `#` inside any `.tsk`
+  document and a CompletionItemProvider surfaces every tag known to the
+  workspace. Items come from two sources, merged into one list:
+  - declared in `${workspaceFolder}/.vscode/tsk/tags.yml` (configurable
+    via `tsk.tags.path`), and
+  - discovered from `.tsk` files via the M3 cache, plus all their
+    implicit `/`-separated parents (so `#project/tsk` contributes
+    `#project` to the list automatically).
+- **`Alt+T` find-all-tasks-by-tag** — opens a QuickPick of every known
+  tag (searchable by name and yaml description), then drops you into
+  VSCode's built-in Find-in-Files Search Editor with `#<tag>` already
+  populated and scoped to `*.tsk`. Ctrl+Click any result to jump to
+  the line.
+
+The sibling `docs/.vscode/tsk/tags.yml` ships with descriptions for
+every tag below, so the dev host has autocompletion + find-by-tag
+working against this file out of the box.
+
+`tags.yml` schema — both forms are accepted in the same file:
+
+```yml
+<tag>: <description>            # string shorthand
+<tag>:                           # object form
+    description: <description>
+    parent: <tag>
+```
+
+`parent` is an explicit override; implicit parents (`project/tsk` →
+`project`) are computed automatically regardless of what `tags.yml`
+says.
+
+### Try autocompletion
+
+Cursor at the `#` below, then type a few letters — `proj`, `mile`,
+`JIRA` — to see the picker filter. The yaml-declared-but-unused entry
+(`declared-only-example`) should show up too.
+
+- [ ] sketch the parent-child viz #
+- [ ] file the next bug report #
+
+### Tasks exercising the spec'd tag set
+
+These three tasks together cover the three styles called out in the
+M8 plan (`#JIRAID-123`, `#project/test`, `#inventory/homelab/nas1`):
+
+- [ ] follow up on JIRA-123 #JIRAID-123 <!-- @id:m8try1 -->
+- [ ] write the M8 test suite #project/test <!-- @id:m8try2 -->
+- [ ] mount the NAS share #inventory/homelab/nas1 <!-- @id:m8try3 -->
+
+### Try Alt+T
+
+Place your cursor anywhere in this file and press `Alt+T`. The
+QuickPick lists every tag (including implicit parents like `project`
+and `inventory/homelab`). Pick one → Search Editor opens with results
+pre-populated.
+
+**Keybinding caveats.** `Alt+T` follows the same convention as the
+other Alt-letter bindings — gated to `editorLangId == 'tsk' &&
+editorTextFocus`, so it only fires when you're inside a `.tsk`
+editor. Third-party extensions with an equally specific `when` clause
+could shadow it; some EU keyboard layouts (where `Alt+letter` produces
+a typed character) may need a rebind via Keyboard Shortcuts.
+
 ## Parser model (M2)
 
 The parser reads every line above into a `Task` record exposing `marker`,
