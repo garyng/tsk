@@ -265,14 +265,15 @@ a typed character) may need a rebind via Keyboard Shortcuts.
 ## Codelens (M9)
 
 Every task with relationship metadata grows code lenses showing forward
-edges (`$(arrow-up) parent: <id>`, `$(arrow-right) dependsOn: <id>`,
-`$(link) relatedTo: <id>`) and inverse edges (`$(arrow-down) children: N`,
-`$(arrow-left) dependents: N`, `$(references) related: N`). Codicons
-render inline in the rendered lens. Forward lenses navigate on click;
-inverse lenses open a peek view of every source pointing here. Dangling
-forward edges — where the referenced `@id` doesn't exist anywhere in
-the workspace — render with a `$(warning)` glyph and a "(missing)"
-suffix, and pop an info toast on click.
+edges (`parent: <id>`, `dependsOn: <id>`, `relatedTo: <id>`) and inverse
+edges (`children: N`, `dependents: N`, `related: N`). Each title is
+prefixed with a codicon glyph hinting the relationship type — the
+current mapping lives in `CODICONS` in `src/lib/codelens-logic.ts`,
+intended to graduate to a user setting later. Forward lenses navigate
+on click; inverse lenses open a peek view of every source pointing
+here. Dangling forward edges — where the referenced `@id` doesn't exist
+anywhere in the workspace — render with a warning glyph and a
+"(missing)" suffix, and pop an info toast on click.
 
 Lenses appear only on the **canonical occurrence** of an `@id` (the
 lex-lowest `(file, line)` in the workspace). A duplicate-`@id` task

@@ -149,6 +149,33 @@ export class CacheService {
         this.db.deleteFile(uri);
     }
 
+    /**
+     * Project a file's cached tasks + metadata into the shape the graph
+     * layer consumes. Used during the initial scan when a file's mtime
+     * matches the cached value — we skip the parse, but the in-memory
+     * graph still needs to be populated from disk (graphs are rebuilt
+     * on every activation, the cache.db persists across them).
+     */
+    getRelationshipsForFile(uri: string): TaskRelationshipInput[] {
+        const tasks = this.db.listTasksForFile(uri);
+        const out: TaskRelationshipInput[] = [];
+        for (const task of tasks) {
+            const metadata = new Map<string, string | null>();
+            for (const m of this.db.listMetadataForTask(task.id)) {
+                metadata.set(m.key, m.value);
+            }
+            out.push({
+                id: task.id,
+                fileUri: task.fileUri,
+                line: task.line,
+                parent: metadata.get('parent') ?? undefined,
+                dependsOn: metadata.get('dependsOn') ?? undefined,
+                relatedTo: metadata.get('relatedTo') ?? undefined,
+            });
+        }
+        return out;
+    }
+
     /** Drop everything. Used by the `tsk.rebuildCache` command before a fresh scan. */
     purge(): void {
         this.db.purge();

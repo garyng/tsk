@@ -222,6 +222,49 @@ describe('CacheService — read helpers', () => {
     it('counts reports files / tasks / distinct tags', () => {
         expect(cache.counts()).toEqual({ files: 2, tasks: 3, tags: 3 });
     });
+
+    it('getRelationshipsForFile projects cached tasks + metadata into the graph input shape', () => {
+        cache.rescanFile(
+            URI_A,
+            [
+                '- [ ] root <!-- @id:root -->',
+                '- [ ] child <!-- @id:child @parent:root -->',
+                '- [ ] blocked <!-- @id:blocked @dependsOn:root @relatedTo:child -->',
+            ].join('\n'),
+            200,
+        );
+        const relationships = cache.getRelationshipsForFile(URI_A);
+        expect(relationships).toEqual([
+            {
+                id: 'root',
+                fileUri: URI_A,
+                line: 0,
+                parent: undefined,
+                dependsOn: undefined,
+                relatedTo: undefined,
+            },
+            {
+                id: 'child',
+                fileUri: URI_A,
+                line: 1,
+                parent: 'root',
+                dependsOn: undefined,
+                relatedTo: undefined,
+            },
+            {
+                id: 'blocked',
+                fileUri: URI_A,
+                line: 2,
+                parent: undefined,
+                dependsOn: 'root',
+                relatedTo: 'child',
+            },
+        ]);
+    });
+
+    it('getRelationshipsForFile returns an empty array for an unknown file', () => {
+        expect(cache.getRelationshipsForFile('file:///nope.tsk')).toEqual([]);
+    });
 });
 
 describe('CacheService — transaction safety', () => {

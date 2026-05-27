@@ -31,28 +31,30 @@ export interface LensDescriptor {
 export type GraphLookup = (id: string) => GraphNode | undefined;
 
 /**
- * Codicon names prepended to each lens title. VSCode renders these as
- * inline glyphs in code lenses via the `$(codicon-name)` syntax. Hard-
- * coded — users can theme via VSCode's icon settings if they want
- * something different, but the *choice* of glyph is a UX decision tied
- * to the relationship semantics:
+ * Single source of truth for the codicon glyph prepended to each lens
+ * title. VSCode renders these inline via the `$(codicon-name)` syntax.
+ * Exported so tests, the demo, and the README can all reference this
+ * map by name rather than duplicating literal glyph strings — if these
+ * ever become a user-facing setting, only this object changes.
  *
- *   - `parent` / `children` — vertical hierarchy → arrow-up / arrow-down.
- *   - `dependsOn` / `dependents` — temporal order → arrow-right (this
- *     points at what it needs) / arrow-left (these point at us from
- *     the dependent side).
- *   - `relatedTo` / `related` — symmetric link → `link` for the forward
- *     side, `references` for the "show me everyone who points here" side.
- *   - dangling forward edge → `warning`, since the target id can't be
- *     resolved and a click pops an info toast rather than navigating.
+ * Convention (informs the current defaults, will inform any future
+ * configuration UX too):
+ *
+ *   - **Triangles** mark the *structural* pairs (parent/children for
+ *     the vertical hierarchy, dependsOn/dependents for the temporal
+ *     flow). They read as "follow the slot in the structure."
+ *   - **Thinner arrows** mark the *lateral* relatedTo/related link —
+ *     a free-form pointer, not a hierarchy slot.
+ *   - **`warning`** marks dangling forward edges, since the click opens
+ *     an info toast rather than navigating.
  */
-const CODICONS = {
-    parent: 'arrow-up',
-    children: 'arrow-down',
-    dependsOn: 'arrow-right',
-    dependents: 'arrow-left',
-    relatedTo: 'link',
-    related: 'references',
+export const CODICONS = {
+    parent: 'triangle-up',
+    children: 'triangle-down',
+    dependsOn: 'triangle-left',
+    dependents: 'triangle-right',
+    relatedTo: 'arrow-right',
+    related: 'arrow-left',
     missing: 'warning',
 } as const;
 

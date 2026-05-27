@@ -329,7 +329,7 @@ function readLogLevel(): LogLevel {
 
 async function runInitialScan(): Promise<void> {
     if (!state) return;
-    const { cache, logger } = state;
+    const { cache, graph, codelens, logger, diagnosticsManager } = state;
     const start = Date.now();
 
     const uris = await vscode.workspace.findFiles('**/*.tsk', '**/node_modules/**');
@@ -341,6 +341,12 @@ async function runInitialScan(): Promise<void> {
             const stat = await vscode.workspace.fs.stat(uri);
             const cached = cache.getFileMtime(uri.toString());
             if (cached === stat.mtime) {
+                // Cache on disk is current, but the in-memory graph is
+                // fresh on every activation. Hydrate the graph from the
+                // persisted cache so codelens / lookups work without
+                // needing a rebuildCache invocation.
+                const relationships = cache.getRelationshipsForFile(uri.toString());
+                graph.applyFileTasks(uri.toString(), relationships);
                 skipped++;
                 continue;
             }
@@ -350,6 +356,13 @@ async function runInitialScan(): Promise<void> {
             logger.error(`scan failed for ${uri}: ${(err as Error).message}`);
         }
     }
+
+    // After the loop, ensure dup diagnostics + codelens reflect the final
+    // graph state. Per-file rescans already fire these, but the
+    // all-files-skipped case (every file's mtime matched on cold start)
+    // needs the explicit refresh here or the lenses stay empty.
+    diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
+    codelens.refresh();
 
     const elapsed = Date.now() - start;
     const counts = cache.counts();

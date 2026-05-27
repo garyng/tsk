@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeLensesForTask, type GraphLookup, type TaskForLenses } from './codelens-logic';
+import {
+    CODICONS,
+    computeLensesForTask,
+    type GraphLookup,
+    type TaskForLenses,
+} from './codelens-logic';
 import type { GraphNode } from './graph';
 
 function node(
@@ -73,7 +78,7 @@ describe('computeLensesForTask — forward edges', () => {
         expect(lenses).toEqual([
             {
                 line: 0,
-                title: '$(arrow-up) parent: root',
+                title: `$(${CODICONS.parent}) parent: root`,
                 command: 'tsk.goToParent',
                 args: ['root'],
             },
@@ -103,7 +108,7 @@ describe('computeLensesForTask — forward edges', () => {
         expect(lenses).toEqual([
             {
                 line: 0,
-                title: '$(warning) parent: gone (missing)',
+                title: `$(${CODICONS.missing}) parent: gone (missing)`,
                 command: 'tsk.codelens.missing',
                 args: ['gone', 'parent'],
             },
@@ -123,7 +128,7 @@ describe('computeLensesForTask — inverse edges', () => {
         expect(lenses).toEqual([
             {
                 line: 0,
-                title: '$(arrow-down) children: 3',
+                title: `$(${CODICONS.children}) children: 3`,
                 command: 'tsk.findAllChildren',
                 args: ['a.tsk', 0, ['c1', 'c2', 'c3']],
             },
@@ -170,19 +175,19 @@ describe('computeLensesForTask — codicons', () => {
         ]);
         const titles = computeLensesForTask(task('source', 0), 'a.tsk', lookup).map((l) => l.title);
         expect(titles).toEqual([
-            '$(arrow-up) parent: p',
-            '$(arrow-right) dependsOn: d',
-            '$(link) relatedTo: r',
-            '$(arrow-down) children: 1',
-            '$(arrow-left) dependents: 1',
-            '$(references) related: 1',
+            `$(${CODICONS.parent}) parent: p`,
+            `$(${CODICONS.dependsOn}) dependsOn: d`,
+            `$(${CODICONS.relatedTo}) relatedTo: r`,
+            `$(${CODICONS.children}) children: 1`,
+            `$(${CODICONS.dependents}) dependents: 1`,
+            `$(${CODICONS.related}) related: 1`,
         ]);
     });
 
     it('uses the warning codicon on dangling forward edges', () => {
         const lookup = lookupFrom([node('orphan', 'a.tsk', 0, { forward: { dependsOn: 'gone' } })]);
         const titles = computeLensesForTask(task('orphan', 0), 'a.tsk', lookup).map((l) => l.title);
-        expect(titles).toEqual(['$(warning) dependsOn: gone (missing)']);
+        expect(titles).toEqual([`$(${CODICONS.missing}) dependsOn: gone (missing)`]);
     });
 });
 
@@ -198,8 +203,8 @@ describe('computeLensesForTask — mixed', () => {
         ]);
         const lenses = computeLensesForTask(task('hub', 0), 'a.tsk', lookup);
         expect(lenses.map((l) => l.title)).toEqual([
-            '$(arrow-up) parent: root',
-            '$(arrow-down) children: 1',
+            `$(${CODICONS.parent}) parent: root`,
+            `$(${CODICONS.children}) children: 1`,
         ]);
     });
 });
