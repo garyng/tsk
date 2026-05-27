@@ -4,6 +4,12 @@ A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching
 
 **Phase 1 complete (M0–M12)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits, offers tag autocompletion + find-all-tasks-by-tag driven by a workspace-local `tags.yml`, renders relationship code lenses (parent/children/dependsOn/dependents/relatedTo/related) on every canonical task with navigate + peek commands, and tints the target line after every navigate until you move the cursor or jump again. Functionally shippable; clean-profile `.vsix` smoke install + Marketplace screenshots tracked as pre-publication polish. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
 
+## Supported VS Code versions
+
+The engine floor is **VS Code 1.112** (`package.json#engines.vscode = "^1.112.0"`) — this widens Cursor / VSCodium / Insiders reach without forcing users onto the newest editor. The Marketplace gates installs against the engines field; older hosts won't be offered the extension.
+
+`@types/vscode` is pinned to **`~1.110.0`** for development (1.110 is the closest published version at or below the 1.112 floor — npm's type package skips 1.111–1.114). Typechecking against the 1.110 surface gives a *subset* of the 1.112 API, so anything that typechecks is guaranteed to run on 1.112+. End-to-end tests run against both a `stable` VS Code download and the `1.112` floor (see "Tests" below) to catch any divergence between the typing's-subset view and the real 1.112 runtime.
+
 ## Development
 
 ```sh
