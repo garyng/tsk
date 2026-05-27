@@ -90,6 +90,26 @@
                 "command": "tsk.copyTaskId",
                 "title": "Copy Task Id",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleMoved",
+                "title": "Toggle Moved",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleRelatedTo",
+                "title": "Toggle Related To",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleDependsOn",
+                "title": "Toggle Depends On",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleParent",
+                "title": "Toggle Parent",
+                "category": "Tsk"
             }
         ],
         "keybindings": [
@@ -136,6 +156,26 @@
             {
                 "command": "tsk.copyTaskId",
                 "key": "alt+`",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleMoved",
+                "key": "alt+m",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleRelatedTo",
+                "key": "alt+r",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleDependsOn",
+                "key": "alt+d",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleParent",
+                "key": "alt+p",
                 "when": "editorLangId == 'tsk'"
             }
         ],

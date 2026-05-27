@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
+import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { parseLine } from './lib/parser';
+import { removeMetadataEntry, setMetadataEntry, swapMarker } from './lib/toggle';
 import {
     defaultToggleDeps,
     type ToggleDeps,
@@ -13,6 +15,7 @@ import {
     toggleP3Mutator,
     toggleTodoMutator,
 } from './lib/toggle-mutators';
+import { pickTaskId } from './picker';
 
 const TSK_LANGUAGE_ID = 'tsk';
 
@@ -147,4 +150,140 @@ export function registerCopyTaskIdCommand(context: vscode.ExtensionContext, logg
             void vscode.window.showInformationMessage(`Tsk: copied "${id}" to clipboard.`);
         }),
     );
+}
+
+/**
+ * Register the four picker-driven commands: `tsk.toggleMoved` plus the
+ * three relationship toggles (`relatedTo` / `dependsOn` / `parent`).
+ *
+ * **Mode-decided-by-primary-cursor**: each command reads the primary
+ * cursor's line state once at invocation:
+ *   - **Relationship toggles** — if `@<key>` is absent on the primary
+ *     cursor's task, open the picker → write the picked id to every task
+ *     cursor's line (other cursors' existing values are overwritten — by
+ *     design, lets multi-cursor users align several tasks in one keystroke).
+ *     If `@<key>` is present on the primary, no picker; just remove the
+ *     entry from every task cursor's line.
+ *   - **`toggleMoved`** — if the primary task isn't `moved`, picker →
+ *     swap marker + `@movedTo:<id>` + `@moved:<localTimestamp>` on every
+ *     task cursor. If the primary IS already `moved`, swap back to `todo`
+ *     and clear both metadata entries on every task cursor.
+ *
+ * The picker opens at most once per invocation. Cancellation (no id chosen)
+ * bails before any edit; no partial state.
+ */
+export function registerRelationshipCommands(
+    context: vscode.ExtensionContext,
+    logger: Logger,
+    cache: CacheService,
+    deps: ToggleDeps = defaultToggleDeps,
+): void {
+    const registerRel = (commandId: string, key: string, prompt: string): void => {
+        context.subscriptions.push(
+            vscode.commands.registerCommand(commandId, async () => {
+                await runRelationshipToggle(commandId, key, prompt, cache, logger);
+            }),
+        );
+    };
+
+    registerRel('tsk.toggleRelatedTo', 'relatedTo', 'Pick the related task');
+    registerRel('tsk.toggleDependsOn', 'dependsOn', 'Pick the task this depends on');
+    registerRel('tsk.toggleParent', 'parent', 'Pick the parent task');
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('tsk.toggleMoved', async () => {
+            await runMovedToggle(cache, logger, deps);
+        }),
+    );
+}
+
+async function runRelationshipToggle(
+    commandId: string,
+    key: string,
+    prompt: string,
+    cache: CacheService,
+    logger: Logger,
+): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        logger.debug(`${commandId}: no active editor`);
+        return;
+    }
+    if (editor.document.languageId !== TSK_LANGUAGE_ID) {
+        logger.debug(`${commandId}: skipped — language id is "${editor.document.languageId}"`);
+        return;
+    }
+
+    const primaryLine = editor.document.lineAt(editor.selection.active.line).text;
+    const primaryParsed = parseLine(primaryLine);
+    if (!primaryParsed) {
+        logger.debug(`${commandId}: primary cursor not on a task line`);
+        return;
+    }
+
+    const isAdd = !primaryParsed.metadata.has(key);
+
+    if (isAdd) {
+        const id = await pickTaskId({ prompt, cache });
+        if (!id) {
+            logger.debug(`${commandId}: picker cancelled`);
+            return;
+        }
+        await applyEdit(editor, (line) => setMetadataEntry(line, key, id), logger);
+    } else {
+        await applyEdit(editor, (line) => removeMetadataEntry(line, key), logger);
+    }
+}
+
+async function runMovedToggle(
+    cache: CacheService,
+    logger: Logger,
+    deps: ToggleDeps,
+): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        logger.debug('tsk.toggleMoved: no active editor');
+        return;
+    }
+    if (editor.document.languageId !== TSK_LANGUAGE_ID) {
+        logger.debug(`tsk.toggleMoved: skipped — language id is "${editor.document.languageId}"`);
+        return;
+    }
+
+    const primaryLine = editor.document.lineAt(editor.selection.active.line).text;
+    const primaryParsed = parseLine(primaryLine);
+    if (!primaryParsed) {
+        logger.debug('tsk.toggleMoved: primary cursor not on a task line');
+        return;
+    }
+
+    if (primaryParsed.marker !== 'moved') {
+        const id = await pickTaskId({ prompt: 'Pick the task this moved to', cache });
+        if (!id) {
+            logger.debug('tsk.toggleMoved: picker cancelled');
+            return;
+        }
+        const ts = deps.now();
+        await applyEdit(
+            editor,
+            (line) => {
+                let next = swapMarker(line, 'moved');
+                next = setMetadataEntry(next, 'movedTo', id);
+                next = setMetadataEntry(next, 'moved', ts);
+                return next;
+            },
+            logger,
+        );
+    } else {
+        await applyEdit(
+            editor,
+            (line) => {
+                let next = swapMarker(line, 'todo');
+                next = removeMetadataEntry(next, 'movedTo');
+                next = removeMetadataEntry(next, 'moved');
+                return next;
+            },
+            logger,
+        );
+    }
 }

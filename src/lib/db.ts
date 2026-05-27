@@ -104,6 +104,7 @@ interface PreparedStatements {
     listFiles: StatementSync;
     insertTask: StatementSync;
     listTasksForFile: StatementSync;
+    listAllTasks: StatementSync;
     findTaskById: StatementSync;
     insertMetadata: StatementSync;
     listMetadataForTask: StatementSync;
@@ -153,6 +154,10 @@ export class Db {
             listTasksForFile: p(
                 `SELECT id, file_uri, line, marker, content, raw
                  FROM tasks WHERE file_uri = ? ORDER BY line`,
+            ),
+            listAllTasks: p(
+                `SELECT id, file_uri, line, marker, content, raw
+                 FROM tasks ORDER BY file_uri, line`,
             ),
             findTaskById: p(
                 `SELECT id, file_uri, line, marker, content, raw
@@ -220,6 +225,11 @@ export class Db {
 
     listTasksForFile(uri: string): TaskRecord[] {
         return this.stmts.listTasksForFile.all(uri).map(toTask);
+    }
+
+    /** Enumerate every cached task across all files; used by the picker UX. */
+    listAllTasks(): TaskRecord[] {
+        return this.stmts.listAllTasks.all().map(toTask);
     }
 
     findTaskById(id: string): TaskRecord | undefined {

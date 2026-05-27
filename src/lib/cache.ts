@@ -134,6 +134,11 @@ export class CacheService {
         return this.db.findTaskById(id);
     }
 
+    /** Enumerate every cached task across all files; used by the picker UX. */
+    listAllTasks(): TaskRecord[] {
+        return this.db.listAllTasks();
+    }
+
     /** mtime of a cached file, or `undefined` if not cached. Used to skip
      * unchanged files during initial scan. */
     getFileMtime(uri: string): number | undefined {
