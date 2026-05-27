@@ -1,4 +1,14 @@
+import { INTERNAL_COMMANDS } from '../constants';
 import type { GraphNode } from './graph';
+
+/** Union of the three navigate command ids (single-arg, target id). */
+type NavigateCommand = (typeof INTERNAL_COMMANDS)['goToParent' | 'goToDependsOn' | 'goToRelated'];
+
+/** Union of the three peek command ids (source uri + line + target ids). */
+type PeekCommand = (typeof INTERNAL_COMMANDS)[
+    | 'findAllChildren'
+    | 'findAllDependents'
+    | 'findAllRelated'];
 
 /**
  * Vscode-free descriptor for a single code lens. The activation layer
@@ -6,7 +16,9 @@ import type { GraphNode } from './graph';
  * arguments; tests can assert against this shape without instantiating a
  * VSCode host.
  *
- * Argument semantics by command:
+ * Discriminated on `command`: the three command families have distinct
+ * argument shapes, and the union here lets TypeScript narrow `args` at
+ * each call site once the command is known.
  *
  *   - **Navigate** (`tsk.goToParent` / `goToDependsOn` / `goToRelated`):
  *     args = `[targetId]`. The handler resolves the target via the graph
@@ -20,12 +32,20 @@ import type { GraphNode } from './graph';
  *     where `label` is the relationship name ("parent" / "dependsOn" /
  *     "relatedTo") so the toast can name the relationship for context.
  */
-export interface LensDescriptor {
+export type LensDescriptor = {
     line: number;
     title: string;
-    command: string;
-    args: unknown[];
-}
+} & (
+    | { command: NavigateCommand; args: [targetId: string] }
+    | {
+          command: PeekCommand;
+          args: [sourceUri: string, sourceLine: number, targetIds: string[]];
+      }
+    | {
+          command: typeof INTERNAL_COMMANDS.codelensMissing;
+          args: [targetId: string, label: string];
+      }
+);
 
 /** A canonical-node lookup, parameterised so tests can use stubs. */
 export type GraphLookup = (id: string) => GraphNode | undefined;
@@ -98,7 +118,15 @@ export function computeLensesForTask(
     const out: LensDescriptor[] = [];
 
     if (node.forward.parent !== undefined) {
-        out.push(forwardLens(task.line, 'parent', node.forward.parent, 'tsk.goToParent', lookup));
+        out.push(
+            forwardLens(
+                task.line,
+                'parent',
+                node.forward.parent,
+                INTERNAL_COMMANDS.goToParent,
+                lookup,
+            ),
+        );
     }
     if (node.forward.dependsOn !== undefined) {
         out.push(
@@ -106,14 +134,20 @@ export function computeLensesForTask(
                 task.line,
                 'dependsOn',
                 node.forward.dependsOn,
-                'tsk.goToDependsOn',
+                INTERNAL_COMMANDS.goToDependsOn,
                 lookup,
             ),
         );
     }
     if (node.forward.relatedTo !== undefined) {
         out.push(
-            forwardLens(task.line, 'relatedTo', node.forward.relatedTo, 'tsk.goToRelated', lookup),
+            forwardLens(
+                task.line,
+                'relatedTo',
+                node.forward.relatedTo,
+                INTERNAL_COMMANDS.goToRelated,
+                lookup,
+            ),
         );
     }
 
@@ -123,7 +157,7 @@ export function computeLensesForTask(
                 task.line,
                 'children',
                 node.inverse.children,
-                'tsk.findAllChildren',
+                INTERNAL_COMMANDS.findAllChildren,
                 fileUri,
             ),
         );
@@ -134,14 +168,20 @@ export function computeLensesForTask(
                 task.line,
                 'dependents',
                 node.inverse.dependents,
-                'tsk.findAllDependents',
+                INTERNAL_COMMANDS.findAllDependents,
                 fileUri,
             ),
         );
     }
     if (node.inverse.related.length > 0) {
         out.push(
-            inverseLens(task.line, 'related', node.inverse.related, 'tsk.findAllRelated', fileUri),
+            inverseLens(
+                task.line,
+                'related',
+                node.inverse.related,
+                INTERNAL_COMMANDS.findAllRelated,
+                fileUri,
+            ),
         );
     }
 
@@ -152,7 +192,7 @@ function forwardLens(
     line: number,
     label: ForwardLabel,
     targetId: string,
-    command: string,
+    command: NavigateCommand,
     lookup: GraphLookup,
 ): LensDescriptor {
     const target = lookup(targetId);
@@ -160,7 +200,7 @@ function forwardLens(
         return {
             line,
             title: `$(${CODICONS.missing}) ${label}: ${targetId} (missing)`,
-            command: 'tsk.codelens.missing',
+            command: INTERNAL_COMMANDS.codelensMissing,
             args: [targetId, label],
         };
     }
@@ -176,7 +216,7 @@ function inverseLens(
     line: number,
     label: InverseLabel,
     ids: readonly string[],
-    command: string,
+    command: PeekCommand,
     sourceUri: string,
 ): LensDescriptor {
     return {

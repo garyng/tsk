@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { INTERNAL_COMMANDS } from '../constants';
 import {
     CODICONS,
     computeLensesForTask,
@@ -79,7 +80,7 @@ describe('computeLensesForTask — forward edges', () => {
             {
                 line: 0,
                 title: `$(${CODICONS.parent}) parent: root`,
-                command: 'tsk.goToParent',
+                command: INTERNAL_COMMANDS.goToParent,
                 args: ['root'],
             },
         ]);
@@ -96,9 +97,9 @@ describe('computeLensesForTask — forward edges', () => {
         ]);
         const lenses = computeLensesForTask(task('source', 0), 'a.tsk', lookup);
         expect(lenses.map((l) => l.command)).toEqual([
-            'tsk.goToParent',
-            'tsk.goToDependsOn',
-            'tsk.goToRelated',
+            INTERNAL_COMMANDS.goToParent,
+            INTERNAL_COMMANDS.goToDependsOn,
+            INTERNAL_COMMANDS.goToRelated,
         ]);
     });
 
@@ -109,7 +110,7 @@ describe('computeLensesForTask — forward edges', () => {
             {
                 line: 0,
                 title: `$(${CODICONS.missing}) parent: gone (missing)`,
-                command: 'tsk.codelens.missing',
+                command: INTERNAL_COMMANDS.codelensMissing,
                 args: ['gone', 'parent'],
             },
         ]);
@@ -129,7 +130,7 @@ describe('computeLensesForTask — inverse edges', () => {
             {
                 line: 0,
                 title: `$(${CODICONS.children}) children: 3`,
-                command: 'tsk.findAllChildren',
+                command: INTERNAL_COMMANDS.findAllChildren,
                 args: ['a.tsk', 0, ['c1', 'c2', 'c3']],
             },
         ]);
@@ -152,9 +153,9 @@ describe('computeLensesForTask — inverse edges', () => {
         ]);
         const lenses = computeLensesForTask(task('target', 0), 'a.tsk', lookup);
         expect(lenses.map((l) => l.command)).toEqual([
-            'tsk.findAllChildren',
-            'tsk.findAllDependents',
-            'tsk.findAllRelated',
+            INTERNAL_COMMANDS.findAllChildren,
+            INTERNAL_COMMANDS.findAllDependents,
+            INTERNAL_COMMANDS.findAllRelated,
         ]);
     });
 });
