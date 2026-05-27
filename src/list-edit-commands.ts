@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { COMMANDS } from './constants';
+import { isTskDocument } from './editor-guards';
 import {
     computeEnterEdit,
     computeShiftTabEdit,
@@ -8,8 +10,6 @@ import {
 } from './lib/list-edit';
 import type { Logger } from './lib/logger';
 import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
-
-const TSK_LANGUAGE_ID = 'tsk';
 
 /**
  * Register the three M7 list-edit commands (`tsk.handleEnter` /
@@ -31,15 +31,15 @@ export function registerListEditCommands(
     deps: ToggleDeps = defaultToggleDeps,
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('tsk.handleEnter', () => handleEnter(logger, deps)),
-        vscode.commands.registerCommand('tsk.handleTab', () => handleTab(logger)),
-        vscode.commands.registerCommand('tsk.handleShiftTab', () => handleShiftTab(logger)),
+        vscode.commands.registerCommand(COMMANDS.handleEnter, () => handleEnter(logger, deps)),
+        vscode.commands.registerCommand(COMMANDS.handleTab, () => handleTab(logger)),
+        vscode.commands.registerCommand(COMMANDS.handleShiftTab, () => handleShiftTab(logger)),
     );
 }
 
 async function handleEnter(logger: Logger, deps: ToggleDeps): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== TSK_LANGUAGE_ID) {
+    if (!editor || !isTskDocument(editor.document)) {
         await fallbackEnter();
         return;
     }
@@ -56,7 +56,7 @@ async function handleEnter(logger: Logger, deps: ToggleDeps): Promise<void> {
 
 async function handleTab(logger: Logger): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== TSK_LANGUAGE_ID) {
+    if (!editor || !isTskDocument(editor.document)) {
         await vscode.commands.executeCommand('tab');
         return;
     }
@@ -73,7 +73,7 @@ async function handleTab(logger: Logger): Promise<void> {
 
 async function handleShiftTab(logger: Logger): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== TSK_LANGUAGE_ID) {
+    if (!editor || !isTskDocument(editor.document)) {
         await vscode.commands.executeCommand('editor.action.outdentLines');
         return;
     }

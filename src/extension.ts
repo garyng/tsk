@@ -1,10 +1,26 @@
 import * as vscode from 'vscode';
 import { type CodelensHandle, registerCodelens } from './codelens';
+import {
+    CACHE_PATH_KEY,
+    COMMANDS,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_PRIORITY_OPACITY,
+    DIAGNOSTIC_SOURCE,
+    DOC_CHANGE_DEBOUNCE_MS,
+    LOG_LEVEL_KEY,
+    LOG_LEVEL_SETTING,
+    METADATA_FOREGROUND_COLOR_ID,
+    OUTPUT_CHANNEL_NAME,
+    PRIORITY_OPACITY_KEY,
+    PRIORITY_OPACITY_SETTING,
+} from './constants';
 import { DiagnosticsManager } from './diagnostics-manager';
+import { isTskDocument } from './editor-guards';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
+import { scheduleDebounced } from './lib/debounce';
 import {
     computeMarkerRanges,
     computeMetadataRanges,
@@ -22,7 +38,7 @@ import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerTagsCompletionProvider } from './tags-completion';
-import { createTagsLoader } from './tags-loader';
+import { createTagsLoader, type TagsLoader } from './tags-loader';
 import {
     registerCopyTaskIdCommand,
     registerRelationshipCommands,
@@ -91,13 +107,6 @@ export interface DecorationSnapshot {
  * both the cache and the diagnostic collection atomically.
  */
 
-const DOC_CHANGE_DEBOUNCE_MS = 300;
-const TSK_LANGUAGE_ID = 'tsk';
-const PRIORITY_OPACITY_SETTING = 'tsk.decorations.priority.opacity';
-const PRIORITY_OPACITY_KEY = 'decorations.priority.opacity';
-const DEFAULT_PRIORITY_OPACITY = 0.15;
-const METADATA_FOREGROUND_COLOR_ID = 'tsk.metadata.foreground';
-
 let state: ActivationState | undefined;
 
 interface ActivationState {
@@ -130,51 +139,17 @@ interface ActivationState {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<TskExtensionApi> {
-    const channel = vscode.window.createOutputChannel('tsk');
+    const channel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
     context.subscriptions.push(channel);
 
     const logger = new Logger(channel, readLogLevel());
     logger.info('tsk extension activating.');
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const rawSetting = vscode.workspace.getConfiguration('tsk').get<string>('cache.path', '');
-    const cachePath = resolveCachePath(rawSetting, workspaceFolder);
-    ensureCacheParentDir(cachePath);
+    const { db, cache } = openCache(context, logger);
+    const decorationTypes = buildAllDecorationTypes(context);
 
-    const db = new Db(cachePath);
-    const cache = new CacheService(db);
-    context.subscriptions.push({ dispose: () => db.close() });
-
-    if (cachePath === IN_MEMORY) {
-        logger.info('cache opened in-memory (no workspace folder).');
-    } else {
-        logger.info(`cache opened at ${cachePath}.`);
-    }
-
-    const diagnostics = vscode.languages.createDiagnosticCollection('tsk');
+    const diagnostics = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
     context.subscriptions.push(diagnostics);
-
-    // Marker decoration types: built once, live for the whole activation.
-    const markerDecorationTypes = buildMarkerDecorationTypes();
-    for (const type of Object.values(markerDecorationTypes)) context.subscriptions.push(type);
-
-    // Priority decoration types: rebuilt on opacity change, so register a
-    // single disposer that walks the *current* set held in state.
-    const priorityDecorationTypes = buildPriorityDecorationTypes(readPriorityOpacity());
-    context.subscriptions.push({
-        dispose: () => {
-            if (!state) return;
-            for (const type of Object.values(state.priorityDecorationTypes)) type.dispose();
-        },
-    });
-
-    // Metadata decoration type: dims `<!-- ... -->` comments via the
-    // `tsk.metadata.foreground` theme color. One shared type for all
-    // metadata across all editors.
-    const metadataDecorationType = vscode.window.createTextEditorDecorationType({
-        color: new vscode.ThemeColor(METADATA_FOREGROUND_COLOR_ID),
-    });
-    context.subscriptions.push(metadataDecorationType);
 
     const graph = new GraphService();
     const diagnosticsManager = new DiagnosticsManager(diagnostics);
@@ -192,27 +167,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         diagnosticsManager,
         changeTimers: new Map(),
         decorationTimers: new Map(),
-        markerDecorationTypes,
-        priorityDecorationTypes,
-        metadataDecorationType,
+        ...decorationTypes,
         decorationSnapshots: new Map(),
     };
 
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('tsk.log.level')) {
-                logger.setLevel(readLogLevel());
-                logger.info(`log level changed to ${readLogLevel()}.`);
-            }
-            if (event.affectsConfiguration(PRIORITY_OPACITY_SETTING)) {
-                rebuildPriorityDecorationTypes();
-                logger.info(`priority opacity changed to ${readPriorityOpacity()}.`);
-            }
-        }),
-    );
+    attachConfigListener(context, logger);
 
     await runInitialScan();
-
     // workspaceContains activation can fire with `.tsk` editors already visible
     // (e.g. when restoring a previous session). Decorate them right after the
     // initial scan finishes.
@@ -220,77 +181,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         applyDecorationsToEditor(editor);
     }
 
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*.tsk');
-    context.subscriptions.push(
-        watcher,
-        watcher.onDidCreate((uri) => void rescanFromFs(uri)),
-        watcher.onDidChange((uri) => void rescanFromFs(uri)),
-        watcher.onDidDelete((uri) => {
-            if (!state) return;
-            const key = uri.toString();
-            state.cache.removeFile(key);
-            state.graph.removeFile(key);
-            state.diagnosticsManager.deleteFile(key);
-            state.diagnosticsManager.setGraphDuplicates(state.graph.getDuplicates());
-            state.codelens.refresh();
-            state.decorationSnapshots.delete(key);
-        }),
-    );
-
-    context.subscriptions.push(
-        vscode.workspace.onDidSaveTextDocument((doc) => {
-            if (doc.languageId !== TSK_LANGUAGE_ID) return;
-            // Untitled docs aren't workspace files — decorate them, but don't
-            // pollute the workspace cache. The cache is the "what tasks exist
-            // on disk" view; codelens / find-by-tag etc. should only resolve
-            // through it. M8/M9 can revisit if untitled-doc participation
-            // becomes desired.
-            if (!doc.isUntitled) rescanFromDoc(doc);
-            applyDecorationsForDoc(doc);
-        }),
-    );
-
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeTextDocument((event) => {
-            if (event.document.languageId !== TSK_LANGUAGE_ID) return;
-            if (!event.document.isUntitled) scheduleDebouncedRescan(event.document);
-            scheduleDebouncedDecorate(event.document);
-        }),
-    );
-
-    context.subscriptions.push(
-        vscode.window.onDidChangeActiveTextEditor((editor) => {
-            if (editor) applyDecorationsToEditor(editor);
-        }),
-    );
-
-    context.subscriptions.push(
-        vscode.window.onDidChangeVisibleTextEditors((editors) => {
-            for (const editor of editors) applyDecorationsToEditor(editor);
-        }),
-    );
+    attachFileSystemWatcher(context);
+    attachDocumentListeners(context);
 
     const tagsLoader = await createTagsLoader(context, logger);
-
-    registerToggleCommands(context, logger);
-    registerCopyTaskIdCommand(context, logger);
-    registerRelationshipCommands(context, logger, cache);
-    registerListEditCommands(context, logger);
-    registerTagsCompletionProvider(context, cache, tagsLoader);
-    registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand('tsk.rebuildCache', async () => {
-            if (!state) return;
-            state.logger.info('tsk.rebuildCache invoked.');
-            state.diagnosticsManager.clear();
-            state.cache.purge();
-            state.graph.purge();
-            await runInitialScan();
-            state.codelens.refresh();
-            void vscode.window.showInformationMessage('Tsk: cache rebuilt.');
-        }),
-    );
+    registerAllCommands(context, cache, tagsLoader, logger);
 
     logger.info('tsk extension activated.');
 
@@ -319,8 +214,176 @@ export function deactivate(): void {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve the configured cache path, open the SQLite cache, and register
+ * the close hook on `context.subscriptions`. Logs the resolved path (or
+ * `IN_MEMORY` fallback) to the Output channel.
+ */
+function openCache(
+    context: vscode.ExtensionContext,
+    logger: Logger,
+): { db: Db; cache: CacheService } {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const rawSetting = vscode.workspace.getConfiguration('tsk').get<string>(CACHE_PATH_KEY, '');
+    const cachePath = resolveCachePath(rawSetting, workspaceFolder);
+    ensureCacheParentDir(cachePath);
+
+    const db = new Db(cachePath);
+    const cache = new CacheService(db);
+    context.subscriptions.push({ dispose: () => db.close() });
+
+    if (cachePath === IN_MEMORY) {
+        logger.info('cache opened in-memory (no workspace folder).');
+    } else {
+        logger.info(`cache opened at ${cachePath}.`);
+    }
+
+    return { db, cache };
+}
+
+/**
+ * Build the three decoration-type collections (markers, priorities,
+ * metadata) and register their disposers. Priority decorations are
+ * rebuilt on opacity changes — the disposer walks the *current* set
+ * held in state, so the post-activation replacement still cleans up.
+ */
+function buildAllDecorationTypes(context: vscode.ExtensionContext): {
+    markerDecorationTypes: Record<Marker, vscode.TextEditorDecorationType>;
+    priorityDecorationTypes: Record<PriorityLevel, vscode.TextEditorDecorationType>;
+    metadataDecorationType: vscode.TextEditorDecorationType;
+} {
+    const markerDecorationTypes = buildMarkerDecorationTypes();
+    for (const type of Object.values(markerDecorationTypes)) context.subscriptions.push(type);
+
+    const priorityDecorationTypes = buildPriorityDecorationTypes(readPriorityOpacity());
+    context.subscriptions.push({
+        dispose: () => {
+            if (!state) return;
+            for (const type of Object.values(state.priorityDecorationTypes)) type.dispose();
+        },
+    });
+
+    const metadataDecorationType = vscode.window.createTextEditorDecorationType({
+        color: new vscode.ThemeColor(METADATA_FOREGROUND_COLOR_ID),
+    });
+    context.subscriptions.push(metadataDecorationType);
+
+    return { markerDecorationTypes, priorityDecorationTypes, metadataDecorationType };
+}
+
+/**
+ * Wire the `onDidChangeConfiguration` listener. Reacts to two settings:
+ * the log level (re-reads the level + announces the change) and the
+ * priority opacity (rebuilds the decoration types + announces).
+ */
+function attachConfigListener(context: vscode.ExtensionContext, logger: Logger): void {
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration(LOG_LEVEL_SETTING)) {
+                logger.setLevel(readLogLevel());
+                logger.info(`log level changed to ${readLogLevel()}.`);
+            }
+            if (event.affectsConfiguration(PRIORITY_OPACITY_SETTING)) {
+                rebuildPriorityDecorationTypes();
+                logger.info(`priority opacity changed to ${readPriorityOpacity()}.`);
+            }
+        }),
+    );
+}
+
+/**
+ * Wire the workspace `**\/*.tsk` FileSystemWatcher. Create / change
+ * events delegate to {@link rescanFromFs}; delete events clear the
+ * URI's cache / graph / diagnostics / decoration state in one shot.
+ */
+function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*.tsk');
+    context.subscriptions.push(
+        watcher,
+        watcher.onDidCreate((uri) => void rescanFromFs(uri)),
+        watcher.onDidChange((uri) => void rescanFromFs(uri)),
+        watcher.onDidDelete((uri) => {
+            if (!state) return;
+            const key = uri.toString();
+            state.cache.removeFile(key);
+            state.graph.removeFile(key);
+            state.diagnosticsManager.deleteFile(key);
+            state.diagnosticsManager.setGraphDuplicates(state.graph.getDuplicates());
+            state.codelens.refresh();
+            state.decorationSnapshots.delete(key);
+        }),
+    );
+}
+
+/**
+ * Wire the four document / editor lifecycle listeners. Save triggers a
+ * synchronous rescan; change triggers a debounced rescan + decorate.
+ * Editor visibility events (active / visible-list changed) trigger
+ * decoration only — the cache state is unaffected by which editor is
+ * focused.
+ *
+ * Untitled documents are decorated but not cached: the cache is the
+ * "what tasks exist on disk" view, and untitled docs aren't on disk.
+ */
+function attachDocumentListeners(context: vscode.ExtensionContext): void {
+    context.subscriptions.push(
+        vscode.workspace.onDidSaveTextDocument((doc) => {
+            if (!isTskDocument(doc)) return;
+            if (!doc.isUntitled) rescanFromDoc(doc);
+            applyDecorationsForDoc(doc);
+        }),
+        vscode.workspace.onDidChangeTextDocument((event) => {
+            if (!isTskDocument(event.document)) return;
+            if (!event.document.isUntitled) scheduleDebouncedRescan(event.document);
+            scheduleDebouncedDecorate(event.document);
+        }),
+        vscode.window.onDidChangeActiveTextEditor((editor) => {
+            if (editor) applyDecorationsToEditor(editor);
+        }),
+        vscode.window.onDidChangeVisibleTextEditors((editors) => {
+            for (const editor of editors) applyDecorationsToEditor(editor);
+        }),
+    );
+}
+
+/**
+ * Register every contributed command: the toggle set, the copy-id
+ * command, the relationship picker commands, the list-edit handlers,
+ * the tags completion provider, the find-by-tag command, and the
+ * `tsk.rebuildCache` palette entry. Commands registered via the
+ * codelens provider are attached separately during initial setup.
+ */
+function registerAllCommands(
+    context: vscode.ExtensionContext,
+    cache: CacheService,
+    tagsLoader: TagsLoader,
+    logger: Logger,
+): void {
+    registerToggleCommands(context, logger);
+    registerCopyTaskIdCommand(context, logger);
+    registerRelationshipCommands(context, logger, cache);
+    registerListEditCommands(context, logger);
+    registerTagsCompletionProvider(context, cache, tagsLoader);
+    registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {
+            if (!state) return;
+            state.logger.info(`${COMMANDS.rebuildCache} invoked.`);
+            state.diagnosticsManager.clear();
+            state.cache.purge();
+            state.graph.purge();
+            await runInitialScan();
+            state.codelens.refresh();
+            void vscode.window.showInformationMessage('Tsk: cache rebuilt.');
+        }),
+    );
+}
+
 function readLogLevel(): LogLevel {
-    const value = vscode.workspace.getConfiguration('tsk').get<string>('log.level', 'info');
+    const value = vscode.workspace
+        .getConfiguration('tsk')
+        .get<string>(LOG_LEVEL_KEY, DEFAULT_LOG_LEVEL);
     if (value === 'debug' || value === 'info' || value === 'warn' || value === 'error') {
         return value;
     }
@@ -403,14 +466,9 @@ function rescanFromDoc(doc: vscode.TextDocument): void {
 
 function scheduleDebouncedRescan(doc: vscode.TextDocument): void {
     if (!state) return;
-    const key = doc.uri.toString();
-    const existing = state.changeTimers.get(key);
-    if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => {
-        state?.changeTimers.delete(key);
-        rescanFromDoc(doc);
-    }, DOC_CHANGE_DEBOUNCE_MS);
-    state.changeTimers.set(key, timer);
+    scheduleDebounced(state.changeTimers, doc.uri.toString(), DOC_CHANGE_DEBOUNCE_MS, () =>
+        rescanFromDoc(doc),
+    );
 }
 
 function applyWarnings(uri: vscode.Uri, warnings: CacheWarning[]): void {
@@ -475,7 +533,7 @@ function rebuildPriorityDecorationTypes(): void {
 }
 
 function applyDecorationsToEditor(editor: vscode.TextEditor): void {
-    if (!state || editor.document.languageId !== TSK_LANGUAGE_ID) return;
+    if (!state || !isTskDocument(editor.document)) return;
     const {
         markerDecorationTypes,
         priorityDecorationTypes,
@@ -523,14 +581,9 @@ function applyDecorationsForDoc(doc: vscode.TextDocument): void {
 
 function scheduleDebouncedDecorate(doc: vscode.TextDocument): void {
     if (!state) return;
-    const key = doc.uri.toString();
-    const existing = state.decorationTimers.get(key);
-    if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => {
-        state?.decorationTimers.delete(key);
-        applyDecorationsForDoc(doc);
-    }, DOC_CHANGE_DEBOUNCE_MS);
-    state.decorationTimers.set(key, timer);
+    scheduleDebounced(state.decorationTimers, doc.uri.toString(), DOC_CHANGE_DEBOUNCE_MS, () =>
+        applyDecorationsForDoc(doc),
+    );
 }
 
 function toVscodeRange(r: RangeLike): vscode.Range {

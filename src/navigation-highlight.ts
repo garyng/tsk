@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-
-const HIGHLIGHT_COLOR_ID = 'tsk.navigation.highlight';
+import { NAVIGATION_HIGHLIGHT_COLOR_ID } from './constants';
+import { pointRange } from './range-helpers';
 
 interface CurrentHighlight {
     editor: vscode.TextEditor;
@@ -34,7 +34,7 @@ export class NavigationHighlight implements vscode.Disposable {
 
     constructor() {
         this.decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: new vscode.ThemeColor(HIGHLIGHT_COLOR_ID),
+            backgroundColor: new vscode.ThemeColor(NAVIGATION_HIGHLIGHT_COLOR_ID),
             isWholeLine: true,
         });
         this.subscriptions.push(
@@ -53,7 +53,7 @@ export class NavigationHighlight implements vscode.Disposable {
      */
     set(editor: vscode.TextEditor, line: number): void {
         this.clear();
-        editor.setDecorations(this.decorationType, [new vscode.Range(line, 0, line, 0)]);
+        editor.setDecorations(this.decorationType, [pointRange(line)]);
         this.current = { editor, line };
     }
 

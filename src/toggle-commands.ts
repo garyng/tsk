@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { COMMANDS } from './constants';
+import { isTskDocument, requireTskEditor } from './editor-guards';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { parseLine } from './lib/parser';
@@ -16,8 +18,6 @@ import {
     toggleTodoMutator,
 } from './lib/toggle-mutators';
 import { pickTaskId } from './picker';
-
-const TSK_LANGUAGE_ID = 'tsk';
 
 type LineMutator = (line: string) => string;
 
@@ -39,10 +39,8 @@ export async function applyEdit(
     mutator: LineMutator,
     logger?: Logger,
 ): Promise<number> {
-    if (editor.document.languageId !== TSK_LANGUAGE_ID) {
-        logger?.debug(
-            `applyEdit: skipped — language id is "${editor.document.languageId}", not "${TSK_LANGUAGE_ID}"`,
-        );
+    if (!isTskDocument(editor.document)) {
+        logger?.debug(`applyEdit: skipped — language id is "${editor.document.languageId}"`);
         return 0;
     }
     const doc = editor.document;
@@ -87,14 +85,14 @@ export function registerToggleCommands(
             m(line, deps);
 
     const commands: ReadonlyArray<[string, LineMutator]> = [
-        ['tsk.toggleTodo', bind(toggleTodoMutator)],
-        ['tsk.toggleInprogress', bind(toggleInprogressMutator)],
-        ['tsk.toggleCompleted', bind(toggleCompletedMutator)],
-        ['tsk.toggleCancelled', bind(toggleCancelledMutator)],
-        ['tsk.toggleNote', bind(toggleNoteMutator)],
-        ['tsk.toggleP1', bind(toggleP1Mutator)],
-        ['tsk.toggleP2', bind(toggleP2Mutator)],
-        ['tsk.toggleP3', bind(toggleP3Mutator)],
+        [COMMANDS.toggleTodo, bind(toggleTodoMutator)],
+        [COMMANDS.toggleInprogress, bind(toggleInprogressMutator)],
+        [COMMANDS.toggleCompleted, bind(toggleCompletedMutator)],
+        [COMMANDS.toggleCancelled, bind(toggleCancelledMutator)],
+        [COMMANDS.toggleNote, bind(toggleNoteMutator)],
+        [COMMANDS.toggleP1, bind(toggleP1Mutator)],
+        [COMMANDS.toggleP2, bind(toggleP2Mutator)],
+        [COMMANDS.toggleP3, bind(toggleP3Mutator)],
     ];
 
     for (const [id, mutator] of commands) {
@@ -123,18 +121,9 @@ export function registerToggleCommands(
  */
 export function registerCopyTaskIdCommand(context: vscode.ExtensionContext, logger: Logger): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('tsk.copyTaskId', async () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) {
-                logger.debug('tsk.copyTaskId: no active editor');
-                return;
-            }
-            if (editor.document.languageId !== TSK_LANGUAGE_ID) {
-                logger.debug(
-                    `tsk.copyTaskId: skipped — language id is "${editor.document.languageId}"`,
-                );
-                return;
-            }
+        vscode.commands.registerCommand(COMMANDS.copyTaskId, async () => {
+            const editor = requireTskEditor(logger, COMMANDS.copyTaskId);
+            if (!editor) return;
             const line = editor.document.lineAt(editor.selection.active.line).text;
             const parsed = parseLine(line);
             if (!parsed) {
@@ -186,12 +175,12 @@ export function registerRelationshipCommands(
         );
     };
 
-    registerRel('tsk.toggleRelatedTo', 'relatedTo', 'Pick the related task');
-    registerRel('tsk.toggleDependsOn', 'dependsOn', 'Pick the task this depends on');
-    registerRel('tsk.toggleParent', 'parent', 'Pick the parent task');
+    registerRel(COMMANDS.toggleRelatedTo, 'relatedTo', 'Pick the related task');
+    registerRel(COMMANDS.toggleDependsOn, 'dependsOn', 'Pick the task this depends on');
+    registerRel(COMMANDS.toggleParent, 'parent', 'Pick the parent task');
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('tsk.toggleMoved', async () => {
+        vscode.commands.registerCommand(COMMANDS.toggleMoved, async () => {
             await runMovedToggle(cache, logger, deps);
         }),
     );
@@ -204,15 +193,8 @@ async function runRelationshipToggle(
     cache: CacheService,
     logger: Logger,
 ): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        logger.debug(`${commandId}: no active editor`);
-        return;
-    }
-    if (editor.document.languageId !== TSK_LANGUAGE_ID) {
-        logger.debug(`${commandId}: skipped — language id is "${editor.document.languageId}"`);
-        return;
-    }
+    const editor = requireTskEditor(logger, commandId);
+    if (!editor) return;
 
     const primaryLine = editor.document.lineAt(editor.selection.active.line).text;
     const primaryParsed = parseLine(primaryLine);
@@ -240,20 +222,13 @@ async function runMovedToggle(
     logger: Logger,
     deps: ToggleDeps,
 ): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        logger.debug('tsk.toggleMoved: no active editor');
-        return;
-    }
-    if (editor.document.languageId !== TSK_LANGUAGE_ID) {
-        logger.debug(`tsk.toggleMoved: skipped — language id is "${editor.document.languageId}"`);
-        return;
-    }
+    const editor = requireTskEditor(logger, COMMANDS.toggleMoved);
+    if (!editor) return;
 
     const primaryLine = editor.document.lineAt(editor.selection.active.line).text;
     const primaryParsed = parseLine(primaryLine);
     if (!primaryParsed) {
-        logger.debug('tsk.toggleMoved: primary cursor not on a task line');
+        logger.debug(`${COMMANDS.toggleMoved}: primary cursor not on a task line`);
         return;
     }
 
@@ -268,7 +243,7 @@ async function runMovedToggle(
             allowEmpty: true,
         });
         if (id === undefined) {
-            logger.debug('tsk.toggleMoved: picker cancelled');
+            logger.debug(`${COMMANDS.toggleMoved}: picker cancelled`);
             return;
         }
         const ts = deps.now();

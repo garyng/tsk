@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
+import { INTERNAL_COMMANDS, TSK_LANGUAGE_ID } from './constants';
 import { computeLensesForTask } from './lib/codelens-logic';
 import type { GraphService } from './lib/graph-service';
 import type { Logger } from './lib/logger';
 import { parseDocument } from './lib/parser';
 import type { NavigationHighlight } from './navigation-highlight';
-
-const TSK_LANGUAGE_ID = 'tsk';
+import { pointRange } from './range-helpers';
 
 class TskCodeLensProvider implements vscode.CodeLensProvider {
     private readonly _onDidChange = new vscode.EventEmitter<void>();
@@ -35,7 +35,7 @@ class TskCodeLensProvider implements vscode.CodeLensProvider {
             );
             for (const d of descriptors) {
                 out.push(
-                    new vscode.CodeLens(new vscode.Range(d.line, 0, d.line, 0), {
+                    new vscode.CodeLens(pointRange(d.line), {
                         title: d.title,
                         command: d.command,
                         arguments: d.args,
@@ -95,7 +95,7 @@ export function registerCodelens(
         const uri = vscode.Uri.parse(node.fileUri);
         const doc = await vscode.workspace.openTextDocument(uri);
         const editor = await vscode.window.showTextDocument(doc);
-        const targetRange = new vscode.Range(node.line, 0, node.line, 0);
+        const targetRange = pointRange(node.line);
         editor.selection = new vscode.Selection(targetRange.start, targetRange.end);
         editor.revealRange(targetRange, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
         navigationHighlight.set(editor, node.line);
@@ -138,26 +138,31 @@ export function registerCodelens(
     }
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('tsk.goToParent', (id: string) => navigate(id)),
-        vscode.commands.registerCommand('tsk.goToDependsOn', (id: string) => navigate(id)),
-        vscode.commands.registerCommand('tsk.goToRelated', (id: string) => navigate(id)),
+        vscode.commands.registerCommand(INTERNAL_COMMANDS.goToParent, (id: string) => navigate(id)),
+        vscode.commands.registerCommand(INTERNAL_COMMANDS.goToDependsOn, (id: string) =>
+            navigate(id),
+        ),
+        vscode.commands.registerCommand(INTERNAL_COMMANDS.goToRelated, (id: string) =>
+            navigate(id),
+        ),
         vscode.commands.registerCommand(
-            'tsk.findAllChildren',
+            INTERNAL_COMMANDS.findAllChildren,
             (sourceUri: string, sourceLine: number, ids: string[]) =>
                 peek(sourceUri, sourceLine, ids),
         ),
         vscode.commands.registerCommand(
-            'tsk.findAllDependents',
+            INTERNAL_COMMANDS.findAllDependents,
             (sourceUri: string, sourceLine: number, ids: string[]) =>
                 peek(sourceUri, sourceLine, ids),
         ),
         vscode.commands.registerCommand(
-            'tsk.findAllRelated',
+            INTERNAL_COMMANDS.findAllRelated,
             (sourceUri: string, sourceLine: number, ids: string[]) =>
                 peek(sourceUri, sourceLine, ids),
         ),
-        vscode.commands.registerCommand('tsk.codelens.missing', (targetId: string, label: string) =>
-            missingTarget(targetId, label),
+        vscode.commands.registerCommand(
+            INTERNAL_COMMANDS.codelensMissing,
+            (targetId: string, label: string) => missingTarget(targetId, label),
         ),
     );
 
