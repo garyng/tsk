@@ -55,6 +55,16 @@ suite('toggle relationship + moved commands', () => {
         assert.strictEqual(line, '- [ ] thing');
     });
 
+    test('toggleMoved unmarks a "no-target moved" task (only @moved, no @movedTo)', async () => {
+        // Moved-elsewhere tasks (picker accepted with empty input) carry `@moved`
+        // but no `@movedTo`. Toggling back to todo must still clear cleanly.
+        const line = await runOnLine(
+            '- [>] sent to paper <!-- @moved:2026-05-25T09:00:00+08:00 -->',
+            'tsk.toggleMoved',
+        );
+        assert.strictEqual(line, '- [ ] sent to paper');
+    });
+
     test('contributes.commands registers all four picker-driven commands', () => {
         const ext = vscode.extensions.getExtension(EXTENSION_ID);
         assert.ok(ext);

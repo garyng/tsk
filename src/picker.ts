@@ -7,6 +7,16 @@ export interface PickTaskIdOpts {
     prompt: string;
     /** Cache to enumerate when the user switches to "Browse tasks…". */
     cache: CacheService;
+    /**
+     * When true, accepting an empty InputBox resolves to `''` (the
+     * sentinel for "explicitly no target") instead of `undefined`. Escape
+     * / hide still resolves to `undefined`, so callers can distinguish
+     * "user wants no target" from "user cancelled". Default false.
+     *
+     * Used by `toggleMoved` so users can mark a task as moved-elsewhere
+     * without picking a specific target task.
+     */
+    allowEmpty?: boolean;
 }
 
 /**
@@ -50,7 +60,13 @@ export async function pickTaskId(opts: PickTaskIdOpts): Promise<string | undefin
 
         input.onDidAccept(() => {
             const trimmed = input.value.trim();
-            settle(trimmed === '' ? undefined : trimmed);
+            if (trimmed !== '') {
+                settle(trimmed);
+                return;
+            }
+            // Empty submission: '' if caller opted into the "no target" path,
+            // otherwise treated identically to a cancel.
+            settle(opts.allowEmpty ? '' : undefined);
         });
         input.onDidHide(() => settle(undefined));
         input.onDidTriggerButton((button) => {

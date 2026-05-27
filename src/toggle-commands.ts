@@ -258,8 +258,16 @@ async function runMovedToggle(
     }
 
     if (primaryParsed.marker !== 'moved') {
-        const id = await pickTaskId({ prompt: 'Pick the task this moved to', cache });
-        if (!id) {
+        // `allowEmpty: true` lets the user mark a task as moved-elsewhere with
+        // no specific target — leave the InputBox empty and press Enter; the
+        // picker resolves to `''` (distinct from `undefined` cancellation).
+        // Tasks moved this way carry `@moved` only; no `@movedTo`.
+        const id = await pickTaskId({
+            prompt: 'Pick the task this moved to (or leave empty for no target)',
+            cache,
+            allowEmpty: true,
+        });
+        if (id === undefined) {
             logger.debug('tsk.toggleMoved: picker cancelled');
             return;
         }
@@ -268,7 +276,7 @@ async function runMovedToggle(
             editor,
             (line) => {
                 let next = swapMarker(line, 'moved');
-                next = setMetadataEntry(next, 'movedTo', id);
+                if (id !== '') next = setMetadataEntry(next, 'movedTo', id);
                 next = setMetadataEntry(next, 'moved', ts);
                 return next;
             },
