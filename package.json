@@ -234,7 +234,7 @@
             "properties": {
                 "tsk.cache.path": {
                     "type": "string",
-                    "default": "${workspaceFolder}/.vscode/tsk-cache.db",
+                    "default": "${workspaceFolder}/.vscode/tsk/cache.db",
                     "description": "Path to the on-disk SQLite cache. Supports ${workspaceFolder} substitution. When no workspace folder is open, falls back to in-memory."
                 },
                 "tsk.log.level": {

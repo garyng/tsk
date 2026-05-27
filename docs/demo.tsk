@@ -10,7 +10,7 @@ decorations, code lenses, and commands in action.
 
 On activation, the extension scans every `**/*.tsk` file in the workspace
 (excluding `**/node_modules/**`) and indexes tasks, metadata, and tags into
-a SQLite cache at `${workspaceFolder}/.vscode/tsk-cache.db` (configurable
+a SQLite cache at `${workspaceFolder}/.vscode/tsk/cache.db` (configurable
 via `tsk.cache.path`; opens in-memory when no workspace folder is open).
 The `tsk` Output channel logs a `initial scan: N scanned, … tasks indexed,
 … tags, …ms` line at completion.

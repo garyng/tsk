@@ -72,7 +72,7 @@ docs/
 
 On activation, the extension scans `**/*.tsk` (excluding `**/node_modules/**`) and indexes tasks into a SQLite cache:
 
-- Default location: `${workspaceFolder}/.vscode/tsk-cache.db`. Configurable via `tsk.cache.path`. Falls back to in-memory when no workspace folder is open.
+- Default location: `${workspaceFolder}/.vscode/tsk/cache.db`. Configurable via `tsk.cache.path`. Falls back to in-memory when no workspace folder is open. (M8's `tags.yml` lives next to it under `.vscode/tsk/`.)
 - WAL mode + relaxed `synchronous` + foreign-key cascades. Schema is `IF NOT EXISTS`, so reopening preserves data.
 - File events (FileSystemWatcher, doc save, debounced doc change) trigger per-file rescans inside a `Db` transaction.
 - Run **Tsk: Rebuild Cache** to purge and rerun the initial scan.
