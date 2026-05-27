@@ -97,6 +97,9 @@ npm run package        # builds, then runs @vscode/vsce → produces tsk-<versio
 ```
 src/
   extension.ts                # activate/deactivate, cache + decoration wire-up, command + watcher registration
+  constants.ts                # cross-cutting constants — language id, settings, theme color ids, COMMANDS / INTERNAL_COMMANDS, defaults
+  editor-guards.ts            # requireTskEditor (fetch + validate + log) + isTskDocument (predicate)
+  range-helpers.ts            # pointRange — single-line anchor at column 0
   toggle-commands.ts          # applyEdit + registerToggleCommands / registerCopyTaskIdCommand / registerRelationshipCommands
   list-edit-commands.ts       # registerListEditCommands — Enter / Tab / Shift+Tab handlers + default fallback
   picker.ts                   # pickTaskId — InputBox prefilled from clipboard, "Browse tasks…" QuickPick
@@ -119,13 +122,14 @@ src/
     cache.ts                  # CacheService — orchestrates parser + db with warnings
     db.ts                     # node:sqlite wrapper with schema, prepared statements
     cache-path.ts             # ${workspaceFolder} resolver + in-memory fallback
-    tags-config.ts            # TagDef, parseTagsYaml, expandImplicitParents, mergeTagDefs
+    tags-config.ts            # TagDef, parseTagsYaml (named per-rule helpers), expandImplicitParents, mergeTagDefs
     tags-path.ts              # resolveTagsPath — ${workspaceFolder} substitution for tsk.tags.path
     tags-completion-logic.ts  # findTagPrefixContext — pure #-trigger context detector
     tags-find-logic.ts        # tagsToPickItems, buildFindInFilesArgs
     graph.ts                  # buildGraph, GraphNode, DuplicateIdReport — pure relationship graph + dup detection
     graph-service.ts          # GraphService — scoped invalidation over the pure builder + occurrences index
-    codelens-logic.ts         # computeLensesForTask — pure lens descriptors (forward, inverse, dangling)
+    codelens-logic.ts         # computeLensesForTask + CODICONS + LensDescriptor (discriminated union)
+    debounce.ts               # scheduleDebounced — keyed setTimeout coalescer, unit-testable with fake timers
     ids.ts                    # nanoid + seedable PRNG for @id generation
     time.ts                   # ISO-local timestamp helper
     logger.ts                 # leveled Output channel logger
@@ -258,6 +262,41 @@ Clicking a forward-edge lens (parent / dependsOn / relatedTo) lands on the targe
 Programmatic selection changes (`TextEditorSelectionChangeKind.Command`) are deliberately ignored, otherwise the navigate's own `editor.selection = …` would clear the highlight before the user even saw it.
 
 Theme the tint via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id — defaults are soft yellow with alpha so it works on both light and dark themes without overwhelming the text underneath.
+
+## Constants & helpers (Phase 2)
+
+Cross-cutting strings, defaults, and small glue helpers live in dedicated modules so a future rename touches one file.
+
+**`src/constants.ts`** is the registry for values that span more than one module:
+
+- **Identifiers** — `TSK_LANGUAGE_ID`, `OUTPUT_CHANNEL_NAME`, `DIAGNOSTIC_SOURCE`. All happen to be the literal `'tsk'` today but stay as separate names; future renames of any one don't drag the others.
+- **Settings** — each setting has *two* constants kept side-by-side: `*_SETTING` is the full dotted name (`tsk.cache.path`, used with `affectsConfiguration` and matched against `package.json#contributes.configuration.properties`) and `*_KEY` is the sub-key (`cache.path`, used with `getConfiguration('tsk').get`).
+- **Theme color ids** — `METADATA_FOREGROUND_COLOR_ID`, `NAVIGATION_HIGHLIGHT_COLOR_ID`. The marker color ids (`tsk.marker.X`) stay in `lib/markers.ts` because they're registry-internal — properties of the MARKERS definitions, not free-standing constants.
+- **Defaults** — `DEFAULT_LOG_LEVEL`, `DEFAULT_PRIORITY_OPACITY`. Mirror the `default` in `package.json#contributes.configuration` so the code fallback stays consistent with the schema.
+- **Timing** — `DOC_CHANGE_DEBOUNCE_MS`. Marked `// TODO: configurable` for a future user setting.
+- **Commands** — `COMMANDS` (18 entries, palette-contributed) and `INTERNAL_COMMANDS` (7 entries, lens-only). The split keeps `constants.test.ts`'s cross-check against `package.json` sharp: every `COMMANDS` value must appear in the manifest, no `INTERNAL_COMMANDS` value may.
+
+The `// TODO: configurable` marker is the convention for entries that are plausible future user settings. When a setting lands, the constant here becomes the *default* and the lookup site reads `getConfiguration('tsk').get(..., DEFAULT)` instead.
+
+What deliberately doesn't live in `constants.ts`:
+
+- `CODICONS` in `lib/codelens-logic.ts` — registry-internal, tightly coupled to lens construction.
+- Regex patterns — co-located with their parser in `parser.ts` / `decorations.ts`.
+- The SQL schema — already a `SCHEMA` const in `lib/db.ts`.
+- Feature-local consts (e.g. `TRIGGER_CHARACTER = '#'` in `tags-completion.ts`) — single-consumer, not cross-cutting.
+
+**Glue-tier helpers** (sibling to `extension.ts`):
+
+- `editor-guards.ts` — `requireTskEditor(logger, commandId)` fetches `vscode.window.activeTextEditor`, validates the language, logs on miss; `isTskDocument(doc)` is the underlying predicate (also usable from doc-event handlers that have no editor).
+- `range-helpers.ts` — `pointRange(line)` returns a zero-width `vscode.Range` at column 0. Used by CodeLens anchors, whole-line decorations, `revealRange` targets.
+
+**Lib-tier helpers**:
+
+- `lib/debounce.ts` — `scheduleDebounced(map, key, ms, fn)`. Pure with respect to its inputs (no module state, no vscode dependency); the shared `map` lets each call site keep its own debounce channel independent.
+
+## Design log
+
+The per-phase decision records — non-obvious choices, trade-offs, "this surprised me" observations — live in `plans/<yyyy-mm-dd>_*.md`. Each completed phase has a **Design notes worth a second look** sub-section capturing the durable rationale that the diff alone doesn't show. Worth grepping before making a similar change.
 
 ## Conventions
 
