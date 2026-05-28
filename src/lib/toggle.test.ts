@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    promoteMissingMetadata,
     removeMetadataEntry,
     setMetadataEntry,
     swapMarker,
@@ -10,6 +11,10 @@ import {
 } from './toggle';
 
 const FIXED_OPTS: WrapOpts = { id: 'abcd1234', timestamp: '2026-05-27T09:00:00+08:00' };
+const FIXED_DEPS = {
+    generateId: () => 'newid',
+    now: () => '2026-05-27T10:00:00+08:00',
+};
 
 describe('swapMarker', () => {
     it('swaps an empty marker into completed', () => {
@@ -75,6 +80,39 @@ describe('wrapAsTask', () => {
     it('passes an existing task through unchanged', () => {
         const existing = '- [/] in flight <!-- @id:zz -->';
         expect(wrapAsTask(existing, 'todo', FIXED_OPTS)).toBe(existing);
+    });
+});
+
+describe('promoteMissingMetadata', () => {
+    it('fills @id + @created on a markered task with no metadata', () => {
+        expect(promoteMissingMetadata('- [ ] needs id', FIXED_DEPS)).toBe(
+            '- [ ] needs id <!-- @id:newid @created:2026-05-27T10:00:00+08:00 -->',
+        );
+    });
+
+    it('fills only @id when @created is already present', () => {
+        expect(
+            promoteMissingMetadata(
+                '- [ ] partial <!-- @created:2026-01-01T00:00:00+08:00 -->',
+                FIXED_DEPS,
+            ),
+        ).toBe('- [ ] partial <!-- @created:2026-01-01T00:00:00+08:00 @id:newid -->');
+    });
+
+    it('is marker-agnostic — works on completed tasks too', () => {
+        // The code-action provider relies on this: a hand-typed `- [x] done`
+        // without @id can be promoted in place without changing the marker.
+        expect(promoteMissingMetadata('- [x] done', FIXED_DEPS)).toBe(
+            '- [x] done <!-- @id:newid @created:2026-05-27T10:00:00+08:00 -->',
+        );
+    });
+
+    it('returns null when the task already has @id (no work to do)', () => {
+        expect(promoteMissingMetadata('- [ ] x <!-- @id:abc -->', FIXED_DEPS)).toBeNull();
+    });
+
+    it('returns null on a non-task line', () => {
+        expect(promoteMissingMetadata('plain text', FIXED_DEPS)).toBeNull();
     });
 });
 

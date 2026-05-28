@@ -4,6 +4,7 @@ import { parseLine } from './parser';
 import type { PriorityLevel } from './priorities';
 import { localTimestamp } from './time';
 import {
+    promoteMissingMetadata,
     removeMetadataEntry,
     setMetadataEntry,
     swapMarker,
@@ -55,11 +56,8 @@ function makeCreationToggle(targetMarker: Marker) {
             return unwrapTask(line);
         }
         if (parsed.marker === targetMarker && !parsed.metadata.has('id')) {
-            let next = setMetadataEntry(line, 'id', deps.generateId());
-            if (!parsed.metadata.has('created')) {
-                next = setMetadataEntry(next, 'created', deps.now());
-            }
-            return next;
+            const promoted = promoteMissingMetadata(line, deps);
+            if (promoted !== null) return promoted;
         }
         return line;
     };

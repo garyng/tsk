@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { registerCodeActionsProvider } from './code-actions';
 import { type CodelensHandle, registerCodelens } from './codelens';
 import {
     CACHE_PATH_KEY,
@@ -365,6 +366,7 @@ function registerAllCommands(
     registerListEditCommands(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
+    registerCodeActionsProvider(context);
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {

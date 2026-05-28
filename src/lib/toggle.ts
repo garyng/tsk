@@ -36,6 +36,34 @@ export interface WrapOpts {
 }
 
 /**
+ * Promote a parsed task that's missing `@id` by filling it in (always)
+ * plus `@created` (if also missing). Returns the rewritten line, or
+ * `null` if no promotion applies — line isn't a task, or it already
+ * carries an `@id`.
+ *
+ * **Marker-agnostic.** Promotes whatever marker the task carries
+ * (`- [ ]`, `- [/]`, `- [x]`, `- [n]`, etc.) without rewriting it. The
+ * Alt+A toggle mutator gates this on a specific target marker; the
+ * code-action provider gates on "any markered task" so a user can
+ * promote a hand-typed `- [x] done` in place too.
+ *
+ * `deps.generateId` / `deps.now` are injected so the helper stays
+ * pure and deterministically testable.
+ */
+export function promoteMissingMetadata(
+    line: string,
+    deps: { generateId: () => string; now: () => string },
+): string | null {
+    const parsed = parseLine(line);
+    if (!parsed || parsed.metadata.has('id')) return null;
+    let next = setMetadataEntry(line, 'id', deps.generateId());
+    if (!parsed.metadata.has('created')) {
+        next = setMetadataEntry(next, 'created', deps.now());
+    }
+    return next;
+}
+
+/**
  * Convert a non-task line into a task with `@id` + `@created` metadata.
  *
  * - Empty line (possibly whitespace-only) → `- [m]  <!-- @id:… @created:… -->`

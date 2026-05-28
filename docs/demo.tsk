@@ -166,11 +166,19 @@ Cursor on any of the lines below and try the matching keybinding:
 - [ ] copy my `@id` with `` Alt+` `` <!-- @id:d5try11 -->
 - [ ] promote me with Alt+A — I have no `@id` yet
 - [n] promote me with Alt+N — I have no `@id` yet
+- [x] promote me via the lightbulb (Ctrl+.) — Alt+A wouldn't fire here because the marker isn't `[ ]`
 
 **Keybinding caveats.** `Alt+1/2/3` are globally bound to "Focus N-th Editor
 Group"; the `when: editorLangId == 'tsk'` clause makes our binding win inside
 `.tsk` files only. `` Alt+` `` uses the backtick key, which varies by keyboard
 layout (UK / DE / FR users may need to rebind via Keyboard Shortcuts).
+
+**Code actions (M19/C).** Place the cursor on any markered task missing
+`@id` (including non-`[ ]` markers) and press Ctrl+. (or click the lightbulb).
+A "Tsk: Add missing id + created" (or "Tsk: Add missing id" if `@created`
+already exists) quick-fix surfaces. Applying it writes the same metadata
+Alt+A would, but works regardless of marker — handy for promoting a
+pre-existing `[x]` task you imported from somewhere else.
 
 ## Try Enter / Tab here (M7)
 
