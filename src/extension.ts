@@ -18,6 +18,7 @@ import {
 import { DiagnosticsManager } from './diagnostics-manager';
 import { isPersistableDocument, isTskDocument } from './editor-guards';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
+import { registerHoverProvider } from './hover';
 import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
@@ -186,7 +187,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     attachDocumentListeners(context);
 
     const tagsLoader = await createTagsLoader(context, logger);
-    registerAllCommands(context, cache, tagsLoader, logger);
+    registerAllCommands(context, cache, graph, tagsLoader, logger);
 
     logger.info('tsk extension activated.');
 
@@ -359,6 +360,7 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
 function registerAllCommands(
     context: vscode.ExtensionContext,
     cache: CacheService,
+    graph: GraphService,
     tagsLoader: TagsLoader,
     logger: Logger,
 ): void {
@@ -369,6 +371,7 @@ function registerAllCommands(
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
     registerCodeActionsProvider(context);
+    registerHoverProvider(context, cache, graph, tagsLoader);
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {

@@ -7,6 +7,13 @@
  * Second precision is intentional so two toggles within the same minute
  * produce distinct timestamps. The explicit offset (instead of `Z` or no
  * suffix) makes timestamps unambiguous when files travel across timezones.
+ *
+ * TODO: simplify with `date-fns` — `format(date, "yyyy-MM-dd'T'HH:mm:ssxxx")`
+ * produces the same output (lowercase `xxx` is the ISO-8601 extended offset
+ * that never collapses to `Z`). Defer the swap until we have a dedicated
+ * dependency-cleanup phase; current implementation is 100% test-covered and
+ * the manual padding has zero runtime overhead, so the change is purely
+ * cosmetic.
  */
 export function localTimestamp(date: Date = new Date()): string {
     const pad = (n: number): string => n.toString().padStart(2, '0');
