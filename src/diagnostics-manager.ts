@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import type { CacheWarning } from './lib/cache';
-import type { DuplicateIdReport } from './lib/graph';
+import type { BrokenEdgeReport, DuplicateIdReport } from './lib/graph';
 
 /**
  * Tracks per-file diagnostic state for the tsk extension and merges the
- * two warning sources before writing to `diagnostics.set`:
+ * three warning sources before writing to `diagnostics.set`:
  *
  *   - **Per-file scan warnings** from `CacheService.rescanFile` — today
  *     only `no-id` after this merge layer filters out `duplicate-id`.
@@ -15,6 +15,10 @@ import type { DuplicateIdReport } from './lib/graph';
  *     One report per id; emits one diagnostic per occurrence so every
  *     conflicting file gets squiggled, not just the loser as the cache
  *     would do per-rescan.
+ *   - **Broken forward-edge reports** from
+ *     `GraphService.getBrokenForwardEdges` (M20/B). One diagnostic per
+ *     `(sourceLine, key)` pair — a task with three broken refs gets
+ *     three squiggles, each carrying the offending key name.
  *
  * The merge is necessary because `vscode.DiagnosticCollection.set(uri, …)`
  * replaces the URI's collection wholesale — so we can't write scan
@@ -28,6 +32,9 @@ export class DiagnosticsManager {
     private graphDuplicates: readonly DuplicateIdReport[] = [];
     /** Files mentioned in the *current* graph dup report; refreshed on each setGraphDuplicates call. */
     private graphFiles = new Set<string>();
+    private brokenReferences: readonly BrokenEdgeReport[] = [];
+    /** Files mentioned in the *current* broken-ref report; refreshed on each setBrokenReferences call. */
+    private brokenRefFiles = new Set<string>();
 
     constructor(private readonly collection: vscode.DiagnosticCollection) {}
 
@@ -66,6 +73,23 @@ export class DiagnosticsManager {
         }
     }
 
+    /**
+     * Replace the broken-forward-edge report. Same flush-on-affected-files
+     * dance as `setGraphDuplicates`: files that were in the previous
+     * report but not the new one get re-flushed (clearing stale
+     * squiggles), as do all files in the new report.
+     */
+    setBrokenReferences(reports: readonly BrokenEdgeReport[]): void {
+        const previousFiles = this.brokenRefFiles;
+        const nextFiles = new Set<string>();
+        for (const r of reports) nextFiles.add(r.sourceFile);
+        this.brokenReferences = reports;
+        this.brokenRefFiles = nextFiles;
+
+        const affected = new Set<string>([...previousFiles, ...nextFiles]);
+        for (const fileUri of affected) this.flushFile(fileUri);
+    }
+
     /** Drop any state for a file (e.g. on delete). */
     deleteFile(fileUri: string): void {
         this.scanWarningsByFile.delete(fileUri);
@@ -77,6 +101,8 @@ export class DiagnosticsManager {
         this.scanWarningsByFile.clear();
         this.graphDuplicates = [];
         this.graphFiles.clear();
+        this.brokenReferences = [];
+        this.brokenRefFiles.clear();
         this.collection.clear();
     }
 
@@ -114,6 +140,19 @@ export class DiagnosticsManager {
                     ),
                 );
             }
+        }
+
+        for (const ref of this.brokenReferences) {
+            if (ref.sourceFile !== fileUri) continue;
+            const diagnostic = new vscode.Diagnostic(
+                new vscode.Range(ref.sourceLine, 0, ref.sourceLine, ROW_END),
+                `Tsk: @${ref.key} references unknown task id "${ref.targetId}".`,
+                vscode.DiagnosticSeverity.Warning,
+            );
+            // Surface the broken-ref key so the M20/C code action can match
+            // on it without re-parsing the message.
+            diagnostic.code = `broken-ref:${ref.key}`;
+            diagnostics.push(diagnostic);
         }
 
         if (diagnostics.length === 0) {

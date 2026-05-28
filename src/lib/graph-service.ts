@@ -1,4 +1,5 @@
 import {
+    type BrokenEdgeReport,
     type BuildGraphResult,
     buildGraph,
     type DuplicateIdReport,
@@ -91,6 +92,34 @@ export class GraphService {
     /** Every id that has more than one occurrence, sorted alphabetically. */
     getDuplicates(): readonly DuplicateIdReport[] {
         return this.snapshot.duplicates;
+    }
+
+    /**
+     * Every forward edge whose target id has no canonical occurrence in
+     * the workspace. Walks the canonical graph (so dup losers aren't
+     * double-reported; their canonical winner is the only source that
+     * surfaces a broken edge for the same id). Emits one report per
+     * `(source, key)` pair — a task with all three of `@parent`,
+     * `@dependsOn`, `@relatedTo` pointing at unknown ids produces three
+     * reports.
+     */
+    getBrokenForwardEdges(): readonly BrokenEdgeReport[] {
+        const reports: BrokenEdgeReport[] = [];
+        for (const node of this.snapshot.graph.values()) {
+            for (const key of ['parent', 'dependsOn', 'relatedTo'] as const) {
+                const targetId = node.forward[key];
+                if (!targetId) continue;
+                if (this.snapshot.graph.has(targetId)) continue;
+                reports.push({
+                    sourceId: node.id,
+                    sourceFile: node.fileUri,
+                    sourceLine: node.line,
+                    key,
+                    targetId,
+                });
+            }
+        }
+        return reports;
     }
 
     /** Counts — useful for activation logging + diagnostics drift checks. */

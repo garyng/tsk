@@ -72,6 +72,22 @@ export interface DuplicateIdReport {
     readonly occurrences: ReadonlyArray<{ readonly fileUri: string; readonly line: number }>;
 }
 
+/**
+ * One forward edge whose target id has no canonical occurrence in the
+ * graph. The source task (`sourceId` at `sourceFile:sourceLine`) carries
+ * a `@<key>:<targetId>` metadata entry that points at a phantom node.
+ *
+ * Emitted by `GraphService.getBrokenForwardEdges()` and consumed by the
+ * diagnostics manager to squiggle the source line with a Warning.
+ */
+export interface BrokenEdgeReport {
+    readonly sourceId: string;
+    readonly sourceFile: string;
+    readonly sourceLine: number;
+    readonly key: 'parent' | 'dependsOn' | 'relatedTo';
+    readonly targetId: string;
+}
+
 export interface BuildGraphResult {
     readonly graph: ReadonlyMap<string, GraphNode>;
     readonly duplicates: readonly DuplicateIdReport[];

@@ -311,6 +311,7 @@ function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
             state.graph.removeFile(key);
             state.diagnosticsManager.deleteFile(key);
             state.diagnosticsManager.setGraphDuplicates(state.graph.getDuplicates());
+            state.diagnosticsManager.setBrokenReferences(state.graph.getBrokenForwardEdges());
             state.codelens.refresh();
             state.decorationSnapshots.delete(key);
         }),
@@ -427,11 +428,12 @@ async function runInitialScan(): Promise<void> {
         }
     }
 
-    // After the loop, ensure dup diagnostics + codelens reflect the final
-    // graph state. Per-file rescans already fire these, but the
-    // all-files-skipped case (every file's mtime matched on cold start)
-    // needs the explicit refresh here or the lenses stay empty.
+    // After the loop, ensure dup + broken-ref diagnostics + codelens
+    // reflect the final graph state. Per-file rescans already fire these,
+    // but the all-files-skipped case (every file's mtime matched on cold
+    // start) needs the explicit refresh here or the lenses stay empty.
     diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
+    diagnosticsManager.setBrokenReferences(graph.getBrokenForwardEdges());
     codelens.refresh();
 
     const elapsed = Date.now() - start;
@@ -452,6 +454,7 @@ async function rescanFromFs(uri: vscode.Uri): Promise<void> {
         graph.applyFileTasks(uri.toString(), result.relationships);
         applyWarnings(uri, result.warnings);
         diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
+        diagnosticsManager.setBrokenReferences(graph.getBrokenForwardEdges());
         codelens.refresh();
     } catch (err) {
         logger.error(`rescan failed for ${uri}: ${(err as Error).message}`);
@@ -468,6 +471,7 @@ function rescanFromDoc(doc: vscode.TextDocument): void {
     graph.applyFileTasks(doc.uri.toString(), result.relationships);
     applyWarnings(doc.uri, result.warnings);
     diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
+    diagnosticsManager.setBrokenReferences(graph.getBrokenForwardEdges());
     codelens.refresh();
 }
 

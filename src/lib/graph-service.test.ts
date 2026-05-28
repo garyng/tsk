@@ -228,3 +228,77 @@ describe('GraphService — invariant against pure buildGraph', () => {
         }
     });
 });
+
+describe('GraphService — broken forward edges', () => {
+    it('returns an empty report when every forward edge resolves', () => {
+        const svc = new GraphService();
+        svc.applyFileTasks('a.tsk', [
+            task('a', 'a.tsk', 1),
+            task('b', 'a.tsk', 2, { parent: 'a' }),
+        ]);
+        expect(svc.getBrokenForwardEdges()).toEqual([]);
+    });
+
+    it('reports a parent edge whose target id is not in the workspace', () => {
+        const svc = new GraphService();
+        svc.applyFileTasks('a.tsk', [task('b', 'a.tsk', 2, { parent: 'ghost' })]);
+        expect(svc.getBrokenForwardEdges()).toEqual([
+            {
+                sourceId: 'b',
+                sourceFile: 'a.tsk',
+                sourceLine: 2,
+                key: 'parent',
+                targetId: 'ghost',
+            },
+        ]);
+    });
+
+    it('emits one report per broken key on a task with multiple broken refs', () => {
+        const svc = new GraphService();
+        svc.applyFileTasks('a.tsk', [
+            task('multi', 'a.tsk', 0, {
+                parent: 'missing-p',
+                dependsOn: 'missing-d',
+                relatedTo: 'missing-r',
+            }),
+        ]);
+        const reports = svc.getBrokenForwardEdges();
+        expect(reports).toHaveLength(3);
+        expect(reports.map((r) => r.key).sort()).toEqual(['dependsOn', 'parent', 'relatedTo']);
+        for (const r of reports) {
+            expect(r.sourceId).toBe('multi');
+            expect(r.sourceFile).toBe('a.tsk');
+            expect(r.sourceLine).toBe(0);
+        }
+    });
+
+    it('does NOT report an edge once the target is added by another file', () => {
+        const svc = new GraphService();
+        svc.applyFileTasks('a.tsk', [task('child', 'a.tsk', 1, { parent: 'p' })]);
+        expect(svc.getBrokenForwardEdges()).toHaveLength(1);
+        svc.applyFileTasks('b.tsk', [task('p', 'b.tsk', 0)]);
+        expect(svc.getBrokenForwardEdges()).toEqual([]);
+    });
+
+    it('re-reports after the target file is removed', () => {
+        const svc = new GraphService();
+        svc.applyFileTasks('a.tsk', [task('child', 'a.tsk', 1, { parent: 'p' })]);
+        svc.applyFileTasks('b.tsk', [task('p', 'b.tsk', 0)]);
+        expect(svc.getBrokenForwardEdges()).toEqual([]);
+        svc.removeFile('b.tsk');
+        expect(svc.getBrokenForwardEdges()).toHaveLength(1);
+    });
+
+    it('walks the canonical graph — dup losers do not double-report', () => {
+        // Two files declare the same `child` id with `@parent:p`. Only one
+        // wins canonicality (lex-lowest file), so only one broken-ref
+        // surfaces, not two.
+        const svc = new GraphService();
+        svc.applyFileTasks('b.tsk', [task('child', 'b.tsk', 1, { parent: 'p' })]);
+        svc.applyFileTasks('a.tsk', [task('child', 'a.tsk', 2, { parent: 'p' })]);
+        const reports = svc.getBrokenForwardEdges();
+        expect(reports).toHaveLength(1);
+        // canonical winner is the lex-lowest file (a.tsk).
+        expect(reports[0]?.sourceFile).toBe('a.tsk');
+    });
+});
