@@ -371,7 +371,7 @@ function registerAllCommands(
     registerListEditCommands(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
-    registerCodeActionsProvider(context);
+    registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
 
     context.subscriptions.push(

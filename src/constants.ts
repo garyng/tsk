@@ -167,4 +167,12 @@ export const INTERNAL_COMMANDS = {
     findAllDependents: 'tsk.findAllDependents',
     findAllRelated: 'tsk.findAllRelated',
     codelensMissing: 'tsk.codelens.missing',
+    /**
+     * Quick-fix backing for broken-ref diagnostics (M20/C). Takes
+     * `(uri: vscode.Uri, line: number, key: 'parent' | 'dependsOn' | 'relatedTo')`,
+     * opens the task picker, and rewrites `@<key>:<picked-id>` on the
+     * given line. Hidden from the palette because the args make no
+     * sense outside a code-action invocation.
+     */
+    replaceBrokenReference: 'tsk.replaceBrokenReference',
 } as const satisfies Record<string, `tsk.${string}`>;

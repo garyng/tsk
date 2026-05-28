@@ -180,6 +180,17 @@ already exists) quick-fix surfaces. Applying it writes the same metadata
 Alt+A would, but works regardless of marker — handy for promoting a
 pre-existing `[x]` task you imported from somewhere else.
 
+**Broken-reference quick-fixes (M20/C).** When a task has `@parent`,
+`@dependsOn`, or `@relatedTo` pointing at an id with no canonical
+occurrence in the workspace, you'll see a yellow squiggle on the line.
+Open the lightbulb and pick **"Tsk: Remove broken @<key>"** to drop the
+bad reference, or **"Tsk: Replace @<key> via picker…"** to open the task
+picker and write a new id. Try the lines below — both reference ghost
+ids that don't exist anywhere in the workspace.
+
+- [ ] orphan with broken @parent <!-- @id:m20-demo-orphan @parent:m20-demo-ghost -->
+- [ ] orphan with broken @dependsOn <!-- @id:m20-demo-orphan-dep @dependsOn:m20-demo-ghost-dep -->
+
 ## Try Enter / Tab here (M7)
 
 Place your cursor on one of these tasks and press Enter, Tab, or Shift+Tab.

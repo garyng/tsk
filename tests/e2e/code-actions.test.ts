@@ -89,4 +89,80 @@ suite('code actions — Add missing id + created', () => {
         const after = doc.lineAt(0).text;
         assert.match(after, /^- \[ \] needs id <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
     });
+
+    test('surfaces "Remove broken @parent" and "Replace @parent via picker…" on a broken-ref diagnostic', async () => {
+        // Lean on the M20/B `broken-ref.tsk` fixture — its first task has a
+        // broken @parent (ghost id).
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder);
+        const brokenUri = vscode.Uri.joinPath(folder.uri, 'broken-ref.tsk');
+        const doc = await vscode.workspace.openTextDocument(brokenUri);
+        await vscode.window.showTextDocument(doc);
+        // Give the graph time to index + emit the diagnostic.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const diagnostics = vscode.languages.getDiagnostics(brokenUri).filter((d) => {
+            return typeof d.code === 'string' && d.code === 'broken-ref:parent';
+        });
+        const parentDiag = diagnostics.find((d) => d.message.includes('m20-ghost-parent'));
+        assert.ok(parentDiag, 'expected a broken-ref:parent diagnostic on the fixture');
+
+        // Code-action request needs the matching diagnostic in its context.
+        const orphanLine = parentDiag.range.start.line;
+        const range = new vscode.Range(orphanLine, 0, orphanLine, 0);
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            brokenUri,
+            range,
+            vscode.CodeActionKind.QuickFix.value,
+        );
+        const titles = (actions ?? []).map((a) => a.title);
+        assert.ok(
+            titles.includes('Tsk: Remove broken @parent'),
+            `expected Remove action; got: ${titles.join(', ')}`,
+        );
+        assert.ok(
+            titles.includes('Tsk: Replace @parent via picker…'),
+            `expected Replace action; got: ${titles.join(', ')}`,
+        );
+
+        const remove = (actions ?? []).find((a) => a.title === 'Tsk: Remove broken @parent');
+        assert.ok(remove?.edit, 'Remove action should carry a precomputed WorkspaceEdit');
+
+        const replace = (actions ?? []).find((a) => a.title === 'Tsk: Replace @parent via picker…');
+        assert.ok(replace?.command, 'Replace action should be backed by a command');
+        assert.strictEqual(replace.command.command, 'tsk.replaceBrokenReference');
+        assert.deepStrictEqual(replace.command.arguments?.[2], 'parent');
+    });
+
+    test('applying the Remove action drops the @parent entry from the line', async () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder);
+        const brokenUri = vscode.Uri.joinPath(folder.uri, 'broken-ref.tsk');
+        const doc = await vscode.workspace.openTextDocument(brokenUri);
+        await vscode.window.showTextDocument(doc);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const diagnostics = vscode.languages
+            .getDiagnostics(brokenUri)
+            .filter((d) => typeof d.code === 'string' && d.message.includes('m20-ghost-parent'));
+        const parentDiag = diagnostics[0];
+        assert.ok(parentDiag);
+
+        const orphanLine = parentDiag.range.start.line;
+        const range = new vscode.Range(orphanLine, 0, orphanLine, 0);
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            brokenUri,
+            range,
+            vscode.CodeActionKind.QuickFix.value,
+        );
+        const remove = (actions ?? []).find((a) => a.title === 'Tsk: Remove broken @parent');
+        assert.ok(remove?.edit);
+        await vscode.workspace.applyEdit(remove.edit);
+        const after = doc.lineAt(orphanLine).text;
+        assert.ok(!after.includes('@parent'), `expected @parent removed; line is now: ${after}`);
+        // Undo so the file fixture isn't dirtied for the next test run.
+        await vscode.commands.executeCommand('undo');
+    });
 });
