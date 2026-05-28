@@ -16,7 +16,7 @@ import {
     PRIORITY_OPACITY_SETTING,
 } from './constants';
 import { DiagnosticsManager } from './diagnostics-manager';
-import { isTskDocument } from './editor-guards';
+import { isPersistableDocument, isTskDocument } from './editor-guards';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
@@ -323,19 +323,21 @@ function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
  * decoration only — the cache state is unaffected by which editor is
  * focused.
  *
- * Untitled documents are decorated but not cached: the cache is the
- * "what tasks exist on disk" view, and untitled docs aren't on disk.
+ * Persistable vs non-persistable: cache writes are gated by
+ * `isPersistableDocument` (false for untitled buffers). Untitled docs
+ * still drive decoration / codelens / completion live, but their tasks
+ * never reach SQLite — see M18 for the local-only scope.
  */
 function attachDocumentListeners(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument((doc) => {
             if (!isTskDocument(doc)) return;
-            if (!doc.isUntitled) rescanFromDoc(doc);
+            if (isPersistableDocument(doc)) rescanFromDoc(doc);
             applyDecorationsForDoc(doc);
         }),
         vscode.workspace.onDidChangeTextDocument((event) => {
             if (!isTskDocument(event.document)) return;
-            if (!event.document.isUntitled) scheduleDebouncedRescan(event.document);
+            if (isPersistableDocument(event.document)) scheduleDebouncedRescan(event.document);
             scheduleDebouncedDecorate(event.document);
         }),
         vscode.window.onDidChangeActiveTextEditor((editor) => {

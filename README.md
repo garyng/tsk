@@ -10,6 +10,26 @@ The engine floor is **VS Code 1.112** (`package.json#engines.vscode = "^1.112.0"
 
 `@types/vscode` is pinned to **`~1.110.0`** for development (1.110 is the closest published version at or below the 1.112 floor — npm's type package skips 1.111–1.114). Typechecking against the 1.110 surface gives a *subset* of the 1.112 API, so anything that typechecks is guaranteed to run on 1.112+. End-to-end tests run against both a `stable` VS Code download and the `1.112` floor (see "Tests" below) to catch any divergence between the typing's-subset view and the real 1.112 runtime.
 
+## Limitations
+
+### Untitled buffers (M18)
+
+Open a new buffer (Ctrl+N), set the language to `tsk`, and the following work locally:
+
+- Marker / priority / metadata **decorations**
+- **Toggle commands** (Alt+A / N / S / C / X / 1 / 2 / 3 / `, M / R / D / P)
+- **Tag completion** (`#`) — surfaces workspace-known tags
+- **Code action** "Tsk: Add missing id + created"
+- **Enter / Tab / Shift+Tab** list-edit semantics
+- **Hover** and **diagnostics** (when added in M20)
+
+These do NOT work on untitled buffers (they require the SQLite cache, which is file-only):
+
+- **Codelens** — neither forward (`goToParent` etc.) nor inverse (`findAllChildren` etc.) lenses render on untitled tasks. The lens computer's canonical-occurrence gate requires the source task to be in the graph, and untitled tasks are excluded from the cache.
+- **Find by Tag** results — the search editor only scans on-disk `*.tsk` files.
+
+Save the buffer to disk to opt back into the cache-backed features. The boundary is enforced by `isPersistableDocument(doc)` in `src/editor-guards.ts` — search there if you're refactoring the cache write paths.
+
 ## Development
 
 ```sh
