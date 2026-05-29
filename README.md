@@ -141,7 +141,10 @@ src/
   find-tasks-by-tag.ts        # registerFindAllTasksByTagCommand — QuickPick (task counts) → search.action.openNewEditor
   codelens.ts                 # registerCodelens — TskCodeLensProvider + 7 navigate/peek/missing commands
   navigation-highlight.ts     # NavigationHighlight — persistent line decoration after a goTo* navigate
-  diagnostics-manager.ts      # DiagnosticsManager — merges cache scan warnings + graph dup reports per-file
+  diagnostics-manager.ts      # DiagnosticsManager — merges scan warnings + graph dup + broken-ref reports per-file
+  hover.ts                    # registerHoverProvider — task metadata popup (wraps lib/hover-logic)
+  code-actions.ts             # registerCodeActionsProvider — add-missing-id + broken-ref Remove/Replace quick-fixes
+  clipboard-bridge.ts         # registerClipboardBridge — fs.watch → host clipboard (devcontainer escape hatch)
   lib/                        # pure logic — unit-tested
     markers.ts                # MARKERS registry — single source of truth for marker name/symbols/color/scope
     priorities.ts             # PRIORITIES registry — level/rgb/label
@@ -157,8 +160,10 @@ src/
     cache-path.ts             # ${workspaceFolder} resolver + in-memory fallback
     tags-config.ts            # TagDef, parseTagsYaml (named per-rule helpers), expandImplicitParents, mergeTagDefs
     tags-path.ts              # resolveTagsPath — ${workspaceFolder} substitution for tsk.tags.path
-    tags-completion-logic.ts  # findTagPrefixContext — pure #-trigger context detector
-    tags-find-logic.ts        # tagsToPickItems, buildFindInFilesArgs
+    tags-completion-logic.ts  # findTagPrefixContext + buildTagFilterText — pure #-trigger helpers
+    tags-find-logic.ts        # tagsToPickItems, countTasksByTag, buildSearchEditorArgs
+    hover-logic.ts            # buildTaskHoverMarkdown — pure hover markdown builder (date-fns relative time)
+    clipboard-bridge-path.ts  # resolveBridgePath — ${workspaceFolder} substitution for the bridge watch file
     graph.ts                  # buildGraph, GraphNode, DuplicateIdReport — pure relationship graph + dup detection
     graph-service.ts          # GraphService — scoped invalidation over the pure builder + occurrences index
     codelens-logic.ts         # computeLensesForTask + CODICONS + LensDescriptor (discriminated union)
@@ -295,6 +300,23 @@ Clicking a forward-edge lens (parent / dependsOn / relatedTo) lands on the targe
 Programmatic selection changes (`TextEditorSelectionChangeKind.Command`) are deliberately ignored, otherwise the navigate's own `editor.selection = …` would clear the highlight before the user even saw it.
 
 Theme the tint via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id — defaults are soft yellow with alpha so it works on both light and dark themes without overwhelming the text underneath.
+
+## Clipboard bridge (devcontainer) (M22)
+
+Inside a devcontainer, no host clipboard tool is reachable — `xclip` / `wl-copy` / `clip.exe` / `pbcopy` aren't installed or can't see the host, OSC 52 escape sequences don't survive Claude Code's TUI, and the bundled `code` remote-CLI has no clipboard subcommand. But the **extension host** runs with `vscode.env.clipboard` access. The clipboard bridge exploits that: it watches a file and copies the file's contents to the host clipboard on every change, so any process that can write a file (a shell, a Claude Code skill) can push text to the host clipboard.
+
+**Opt-in.** Both settings default to off / unset:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `tsk.clipboard.bridgeEnabled` | `false` | Master switch. Silently watching a file and pushing it to the clipboard is surprising to enable by default. |
+| `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk-clipboard.txt` | The watched file. `${workspaceFolder}` is expanded at runtime; an absolute path is used verbatim. Blank / no-workspace-folder ⇒ bridge inactive. |
+
+Enable it, then `echo "hello" > .vscode/tsk-clipboard.txt` — `"hello"` lands on your host clipboard. Implementation in `src/clipboard-bridge.ts` (watcher + 50 ms read debounce); path resolution is the pure, unit-tested `src/lib/clipboard-bridge-path.ts`.
+
+**Watch caveat.** The bridge `fs.watch`es the file directly (tracks its inode). In-place writers — `echo >`, `printf >`, the `git-commit-phase` skill's `Write` — keep the inode and fire correctly. An *atomic* writer (write-temp-then-`rename`) swaps the inode and the watch goes stale; write in place if you're integrating a new producer.
+
+**`git-commit-phase` integration.** When the bridge is enabled, the `git-commit-phase` skill's manual mode drops the generated commit message to the watch file (in addition to printing it in chat), so the message is on your clipboard ready to paste into the SCM input — no manual select-and-copy. If the watch file doesn't exist (bridge disabled) the skill skips the drop silently and the chat block remains the copy source.
 
 ## Constants & helpers (Phase 2)
 

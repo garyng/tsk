@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { registerClipboardBridge } from './clipboard-bridge';
 import { registerCodeActionsProvider } from './code-actions';
 import { type CodelensHandle, registerCodelens } from './codelens';
 import {
@@ -188,6 +189,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
 
     const tagsLoader = await createTagsLoader(context, logger);
     registerAllCommands(context, cache, graph, tagsLoader, logger);
+
+    registerClipboardBridge(context, logger);
 
     logger.info('tsk extension activated.');
 

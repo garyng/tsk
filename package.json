@@ -307,6 +307,16 @@
                     "minimum": 0,
                     "maximum": 1,
                     "description": "Background opacity of priority line decorations (0 = invisible, 1 = full)."
+                },
+                "tsk.clipboard.bridgeEnabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Watch the clipboard-bridge file and copy its contents to the host clipboard on change. Off by default. Useful inside devcontainers where no host clipboard tool (xclip / wl-copy / clip.exe / pbcopy) is reachable — any process that can write the file can push text to the host clipboard."
+                },
+                "tsk.clipboard.bridgePath": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk-clipboard.txt",
+                    "description": "Path to the clipboard-bridge watch file. Supports ${workspaceFolder} substitution. Only used when tsk.clipboard.bridgeEnabled is true. When blank or no workspace folder is open, the bridge stays inactive."
                 }
             }
         }

@@ -87,6 +87,12 @@ export const LOG_LEVEL_KEY = 'log.level';
 export const PRIORITY_OPACITY_SETTING = 'tsk.decorations.priority.opacity';
 export const PRIORITY_OPACITY_KEY = 'decorations.priority.opacity';
 
+export const CLIPBOARD_BRIDGE_ENABLED_SETTING = 'tsk.clipboard.bridgeEnabled';
+export const CLIPBOARD_BRIDGE_ENABLED_KEY = 'clipboard.bridgeEnabled';
+
+export const CLIPBOARD_BRIDGE_PATH_SETTING = 'tsk.clipboard.bridgePath';
+export const CLIPBOARD_BRIDGE_PATH_KEY = 'clipboard.bridgePath';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 
 /**
@@ -98,6 +104,16 @@ export const DEFAULT_PRIORITY_OPACITY = 0.15;
 
 /** Default log level used when the setting is missing or invalid. */
 export const DEFAULT_LOG_LEVEL = 'info';
+
+/**
+ * Default watch-file path for the clipboard bridge. Mirrors the `default`
+ * in `package.json`; `${workspaceFolder}` is expanded at runtime by
+ * `resolveBridgePath` (VSCode doesn't auto-expand it in plain settings).
+ */
+export const DEFAULT_CLIPBOARD_BRIDGE_PATH = '${workspaceFolder}/.vscode/tsk-clipboard.txt';
+
+/** The clipboard bridge is opt-in — off unless the user enables it. */
+export const DEFAULT_CLIPBOARD_BRIDGE_ENABLED = false;
 
 // ── Theme color ids ─────────────────────────────────────────────────────────
 
@@ -114,6 +130,14 @@ export const NAVIGATION_HIGHLIGHT_COLOR_ID = 'tsk.navigation.highlight';
  * TODO: configurable
  */
 export const DOC_CHANGE_DEBOUNCE_MS = 300;
+
+/**
+ * Debounce interval (ms) for clipboard-bridge file reads. A single
+ * `echo > file` can fire multiple `fs.watch` change events (truncate +
+ * write); coalescing them to one read-and-copy avoids redundant
+ * clipboard writes. Short enough to feel instant.
+ */
+export const CLIPBOARD_BRIDGE_DEBOUNCE_MS = 50;
 
 // ── Commands ────────────────────────────────────────────────────────────────
 
