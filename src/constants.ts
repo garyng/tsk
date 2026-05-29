@@ -132,12 +132,16 @@ export const NAVIGATION_HIGHLIGHT_COLOR_ID = 'tsk.navigation.highlight';
 export const DOC_CHANGE_DEBOUNCE_MS = 300;
 
 /**
- * Debounce interval (ms) for clipboard-bridge file reads. A single
- * `echo > file` can fire multiple `fs.watch` change events (truncate +
- * write); coalescing them to one read-and-copy avoids redundant
- * clipboard writes. Short enough to feel instant.
+ * Poll interval (ms) for the clipboard-bridge `fs.watchFile` watcher.
+ * We poll by stat rather than `fs.watch` (inotify) because the common
+ * writer is VS Code's editor save, which writes a temp file and renames
+ * it over the target — swapping the inode and going invisible to an
+ * inode-bound `fs.watch`. Stat-polling the path follows the rename, and
+ * also works on devcontainer / WSL2 mounts where inotify is unreliable.
+ * 300ms keeps the paste-after-write feel sub-second; stat-polling one
+ * small file at this cadence is negligible CPU.
  */
-export const CLIPBOARD_BRIDGE_DEBOUNCE_MS = 50;
+export const CLIPBOARD_BRIDGE_POLL_INTERVAL_MS = 300;
 
 // ── Commands ────────────────────────────────────────────────────────────────
 

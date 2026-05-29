@@ -312,9 +312,9 @@ Inside a devcontainer, no host clipboard tool is reachable — `xclip` / `wl-cop
 | `tsk.clipboard.bridgeEnabled` | `false` | Master switch. Silently watching a file and pushing it to the clipboard is surprising to enable by default. |
 | `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk-clipboard.txt` | The watched file. `${workspaceFolder}` is expanded at runtime; an absolute path is used verbatim. Blank / no-workspace-folder ⇒ bridge inactive. |
 
-Enable it, then `echo "hello" > .vscode/tsk-clipboard.txt` — `"hello"` lands on your host clipboard. Implementation in `src/clipboard-bridge.ts` (watcher + 50 ms read debounce); path resolution is the pure, unit-tested `src/lib/clipboard-bridge-path.ts`.
+Enable it, then `echo "hello" > .vscode/tsk-clipboard.txt` — `"hello"` lands on your host clipboard. Implementation in `src/clipboard-bridge.ts` (stat-polling watcher); path resolution is the pure, unit-tested `src/lib/clipboard-bridge-path.ts`.
 
-**Watch caveat.** The bridge `fs.watch`es the file directly (tracks its inode). In-place writers — `echo >`, `printf >`, the `git-commit-phase` skill's `Write` — keep the inode and fire correctly. An *atomic* writer (write-temp-then-`rename`) swaps the inode and the watch goes stale; write in place if you're integrating a new producer.
+**Why stat-polling, not `fs.watch`.** The bridge uses `fs.watchFile` (re-stats the path every 300 ms) rather than `fs.watch` (inotify). VS Code's own editor save writes a temp file and renames it over the target, which **swaps the inode** — an inode-bound `fs.watch` follows the old inode and goes silent after the first save. Stat-polling follows the rename, and also works on devcontainer / WSL2 mounts where inotify is unreliable. The trade-off is up to ~300 ms of latency before the clipboard updates (imperceptible for paste-after-write). So any writer works: `echo >`, the editor's Save, the `git-commit-phase` skill's `Write`.
 
 **`git-commit-phase` integration.** When the bridge is enabled, the `git-commit-phase` skill's manual mode drops the generated commit message to the watch file (in addition to printing it in chat), so the message is on your clipboard ready to paste into the SCM input — no manual select-and-copy. If the watch file doesn't exist (bridge disabled) the skill skips the drop silently and the chat block remains the copy source.
 

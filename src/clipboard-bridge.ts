@@ -1,11 +1,11 @@
-import { closeSync, type FSWatcher, openSync, readFileSync, watch } from 'node:fs';
+import { closeSync, openSync, readFileSync, type Stats, unwatchFile, watchFile } from 'node:fs';
 import * as vscode from 'vscode';
 import {
-    CLIPBOARD_BRIDGE_DEBOUNCE_MS,
     CLIPBOARD_BRIDGE_ENABLED_KEY,
     CLIPBOARD_BRIDGE_ENABLED_SETTING,
     CLIPBOARD_BRIDGE_PATH_KEY,
     CLIPBOARD_BRIDGE_PATH_SETTING,
+    CLIPBOARD_BRIDGE_POLL_INTERVAL_MS,
     DEFAULT_CLIPBOARD_BRIDGE_ENABLED,
     DEFAULT_CLIPBOARD_BRIDGE_PATH,
 } from './constants';
@@ -25,17 +25,19 @@ import type { Logger } from './lib/logger';
  * file and pushing its contents to the clipboard is surprising behavior to
  * enable by default.
  *
- * **Watch caveat.** We `fs.watch` the file directly, which tracks the inode.
- * Truncate-and-rewrite (`echo > file`, our skill's write) keeps the inode
- * and fires correctly. An *atomic* writer (write-temp-then-rename) would
- * swap the inode and the watch would go stale — not a concern for the
- * shell / skill writers we target, but documented so a future integration
- * knows to write in place.
+ * **Why `fs.watchFile` (stat-polling), not `fs.watch` (inotify).** The
+ * common writer is VS Code's own editor save, which writes a temp file
+ * and renames it over the target — swapping the inode. An inode-bound
+ * `fs.watch` follows the *old* inode and goes silent after the first
+ * atomic save. `fs.watchFile` re-stats the *path* each interval, so it
+ * follows the rename, and also works on devcontainer / WSL2 mounts where
+ * inotify is unreliable. The cost is up to one poll-interval of latency
+ * (see {@link CLIPBOARD_BRIDGE_POLL_INTERVAL_MS}) — imperceptible for
+ * clipboard use, and the interval naturally coalesces burst writes.
  */
 class ClipboardBridge {
-    private watcher: FSWatcher | undefined;
     private watchedPath: string | undefined;
-    private debounceTimer: NodeJS.Timeout | undefined;
+    private watchListener: ((curr: Stats, prev: Stats) => void) | undefined;
 
     constructor(private readonly logger: Logger) {}
 
@@ -73,28 +75,29 @@ class ClipboardBridge {
 
     private start(path: string): void {
         try {
-            // Touch the file so `fs.watch` has something to attach to.
+            // Touch the file so `watchFile` has a baseline to poll. Append
+            // mode creates-if-missing without truncating existing content
+            // (and without bumping mtime when it already exists, so no
+            // spurious initial fire).
             closeSync(openSync(path, 'a'));
-            this.watcher = watch(path, (eventType) => {
-                if (eventType !== 'change' && eventType !== 'rename') return;
-                this.scheduleCopy(path);
-            });
             this.watchedPath = path;
-            this.logger.info(`clipboard-bridge: watching ${path}`);
+            this.watchListener = (curr, prev) => {
+                // watchFile fires whenever the stat changed; only react when
+                // the modification time actually advanced (ignore atime-only
+                // touches). Equal mtime → nothing to copy.
+                if (curr.mtimeMs === prev.mtimeMs) return;
+                this.copyToClipboard(path);
+            };
+            watchFile(path, { interval: CLIPBOARD_BRIDGE_POLL_INTERVAL_MS }, this.watchListener);
+            this.logger.info(
+                `clipboard-bridge: watching ${path} (stat-poll ${CLIPBOARD_BRIDGE_POLL_INTERVAL_MS}ms)`,
+            );
         } catch (err) {
             this.logger.error(
                 `clipboard-bridge: failed to watch ${path}: ${(err as Error).message}`,
             );
             this.stop();
         }
-    }
-
-    private scheduleCopy(path: string): void {
-        if (this.debounceTimer) clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => {
-            this.debounceTimer = undefined;
-            this.copyToClipboard(path);
-        }, CLIPBOARD_BRIDGE_DEBOUNCE_MS);
     }
 
     private copyToClipboard(path: string): void {
@@ -117,18 +120,14 @@ class ClipboardBridge {
         );
     }
 
-    /** Close the watcher + cancel any pending copy. Safe to call repeatedly. */
+    /** Stop polling the watch file. Safe to call repeatedly. */
     stop(): void {
-        if (this.debounceTimer) {
-            clearTimeout(this.debounceTimer);
-            this.debounceTimer = undefined;
-        }
-        if (this.watcher) {
-            this.watcher.close();
-            this.watcher = undefined;
+        if (this.watchedPath && this.watchListener) {
+            unwatchFile(this.watchedPath, this.watchListener);
             this.logger.info(`clipboard-bridge: stopped watching ${this.watchedPath}`);
-            this.watchedPath = undefined;
         }
+        this.watchedPath = undefined;
+        this.watchListener = undefined;
     }
 
     dispose(): void {
