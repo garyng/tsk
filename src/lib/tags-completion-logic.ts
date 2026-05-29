@@ -64,3 +64,21 @@ export function findTagPrefixContext(
     }
     return { startCol: start, endCol: end, partial: line.slice(start, cursorCol) };
 }
+
+/**
+ * Build the `filterText` for a tag completion item. VSCode runs fuzzy
+ * matching against this string, so embedding the yaml description
+ * alongside the name lets users find a tag by typing words from its
+ * description (e.g. typing `infra` surfaces `homelab` if its yaml
+ * description is "Self-hosted infrastructure").
+ *
+ * **Ordering is load-bearing.** Name comes first so an exact-prefix
+ * match against the tag name still scores higher than a partial match
+ * inside the description text — typing `mile` still ranks
+ * `milestone/M3` above any tag whose description happens to contain
+ * "mile" mid-word.
+ */
+export function buildTagFilterText(name: string, description: string | undefined): string {
+    if (!description) return name;
+    return `${name} ${description}`;
+}

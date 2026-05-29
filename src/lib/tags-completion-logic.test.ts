@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findTagPrefixContext } from './tags-completion-logic';
+import { buildTagFilterText, findTagPrefixContext } from './tags-completion-logic';
 
 describe('findTagPrefixContext', () => {
     it('returns context immediately after a `#` at start of line', () => {
@@ -64,5 +64,29 @@ describe('findTagPrefixContext', () => {
     it('does NOT trigger when `#` is preceded by a non-whitespace character', () => {
         // "abc#tag|" — the `#` is inline with no whitespace gap.
         expect(findTagPrefixContext('abc#tag', 7)).toBeUndefined();
+    });
+});
+
+describe('buildTagFilterText', () => {
+    it('returns just the name when there is no description', () => {
+        expect(buildTagFilterText('homelab', undefined)).toBe('homelab');
+        expect(buildTagFilterText('only-here', '')).toBe('only-here');
+    });
+
+    it('joins name + description with a single space (name first)', () => {
+        // Typing `infra` should match this tag because its description
+        // carries the word; name-first ensures `homelab` still beats
+        // "any tag whose description happens to contain `home`".
+        expect(buildTagFilterText('homelab', 'Self-hosted infrastructure')).toBe(
+            'homelab Self-hosted infrastructure',
+        );
+    });
+
+    it('preserves the description verbatim (no escaping or normalisation)', () => {
+        // The string is fed to VSCode's fuzzy matcher, which handles its
+        // own scoring — we don't need to massage punctuation or case.
+        expect(buildTagFilterText('milestone/M3', 'Cache layer milestone.')).toBe(
+            'milestone/M3 Cache layer milestone.',
+        );
     });
 });

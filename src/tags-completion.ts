@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { TSK_LANGUAGE_ID } from './constants';
 import type { CacheService } from './lib/cache';
-import { findTagPrefixContext } from './lib/tags-completion-logic';
+import { buildTagFilterText, findTagPrefixContext } from './lib/tags-completion-logic';
 import { mergeTagDefs } from './lib/tags-config';
 import type { TagsLoader } from './tags-loader';
 
@@ -10,14 +10,21 @@ const TRIGGER_CHARACTER = '#';
 /**
  * Register a `#`-triggered completion provider that surfaces every known
  * tag — yaml-declared first, then cache-discovered (with implicit parents
- * filled in). The pure logic (`findTagPrefixContext` + `mergeTagDefs`)
- * lives in `src/lib/**`; this module just adapts it to the VSCode API
- * surface.
+ * filled in). The pure logic (`findTagPrefixContext` + `mergeTagDefs` +
+ * `buildTagFilterText`) lives in `src/lib/**`; this module just adapts
+ * it to the VSCode API surface.
  *
- * The provider returns the same item set regardless of the partial
- * typed; VSCode does its own fuzzy filtering using each item's
- * `filterText` (set to the tag name so matching feels intuitive — both
- * substring and CamelCase scoring kick in).
+ * **Description-driven matching.** `item.filterText` includes both the
+ * tag name and the yaml description (name first, so exact-prefix matches
+ * still rank highest). Typing `infrastructure` finds a tag whose name is
+ * `homelab` but whose description carries the word — same way
+ * `matchOnDescription: true` works on a QuickPick.
+ *
+ * **Description visibility.** `detail` shows in the right column of the
+ * suggestion list (single line); `documentation` powers the side-panel
+ * doc popup. Setting both gives users two places to see the description
+ * — at-a-glance in the list, full text in the popup. Same source string;
+ * the redundancy is on VSCode's side, not ours.
  */
 export function registerTagsCompletionProvider(
     context: vscode.ExtensionContext,
@@ -40,9 +47,12 @@ export function registerTagsCompletionProvider(
             const items: vscode.CompletionItem[] = [];
             for (const [name, def] of merged) {
                 const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Value);
-                if (def.description) item.detail = def.description;
+                if (def.description) {
+                    item.detail = def.description;
+                    item.documentation = new vscode.MarkdownString(def.description);
+                }
                 item.insertText = name;
-                item.filterText = name;
+                item.filterText = buildTagFilterText(name, def.description);
                 item.range = replaceRange;
                 items.push(item);
             }

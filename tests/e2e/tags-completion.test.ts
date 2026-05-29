@@ -82,13 +82,21 @@ suite('tags completion', () => {
         assert.ok(labels.includes('project'), 'implicit parent `project` from `project/tsk`');
         assert.ok(labels.includes('milestone'), 'implicit parent `milestone` from `milestone/M3`');
 
-        // Yaml-defined tags carry their description as `detail`.
+        // Yaml-defined tags carry their description as BOTH `detail`
+        // (single-line column in the suggestion list) and `documentation`
+        // (side-panel doc popup). Same source string for both surfaces.
         const projectTsk = list.items.find(
             (i) => (typeof i.label === 'string' ? i.label : i.label.label) === 'project/tsk',
         );
         assert.ok(projectTsk, 'project/tsk item found');
         assert.strictEqual(projectTsk.detail, 'The tsk extension itself');
+        const docContent = projectTsk.documentation;
+        const docText = typeof docContent === 'string' ? docContent : docContent?.value;
+        assert.strictEqual(docText, 'The tsk extension itself');
         assert.strictEqual(projectTsk.kind, vscode.CompletionItemKind.Value);
+        // filterText embeds the description so VS Code's fuzzy matcher
+        // can find this tag by typing words from the description.
+        assert.strictEqual(projectTsk.filterText, 'project/tsk The tsk extension itself');
 
         // Roll back the edit so the next test starts clean.
         const undo = new vscode.WorkspaceEdit();
