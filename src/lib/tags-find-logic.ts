@@ -97,29 +97,50 @@ export function tagsToPickItems(
 }
 
 /**
- * Args passed verbatim to `workbench.action.findInFiles`. We always:
- * - prefix the query with `#` so the search finds the tag token itself
- *   (substring-match against the rest of the file content);
- * - scope to `*.tsk` so the result list is on-topic;
- * - trigger immediately so the user lands inside the populated Search
- *   panel rather than an empty search bar they'd have to confirm.
+ * Args passed verbatim to the `search.action.openNewEditor` command
+ * (VS Code's **Search Editor** — a full-tab result document, not the
+ * side panel). Subset of `OpenSearchEditorArgs`; the fields we set:
  *
- * Substring semantics (intended): searching for `#project` will also
- * surface `#project/tsk` lines, which we read as a feature — finding
- * tasks under a parent tag naturally includes its children. If the user
- * needs an exact match, the Search bar's regex toggle is one click
- * away (`^|\s#project($|\s)` or similar).
+ * - `query` — prefixed with `#` so the search finds the tag token itself
+ *   (substring-match against file content).
+ * - `filesToInclude: '*.tsk'` — scope the result list to task files.
+ * - `isRegexp: false` — plain substring, explicit (don't inherit the
+ *   user's last regex-toggle state from a prior search).
+ * - `triggerSearch: true` — run immediately so the editor opens already
+ *   populated rather than waiting on the user to confirm.
+ * - `focusResults: true` — land the cursor in the results so Ctrl+Click
+ *   / arrow-navigation works without a manual focus shift.
+ * - `showIncludesExcludes: true` — reveal the include/exclude inputs so
+ *   the `*.tsk` scope is visible (and tweakable) rather than hidden.
+ *
+ * **Why the Search Editor over `findInFiles` (the side panel).** Search-
+ * editor results render in a real editor tab with the source language's
+ * grammar highlighting (so `.tsk` rows get tsk syntax colors) and
+ * inherit Ctrl+Click-to-jump, regex/case toggles, and result folding
+ * for free. The side panel offers none of the grammar highlighting.
+ *
+ * Substring semantics (intended): searching `#project` also surfaces
+ * `#project/tsk` lines — finding tasks under a parent tag naturally
+ * includes its children, mirroring the hierarchical count in the picker.
+ * For an exact match the editor's regex toggle is one click away
+ * (`(^|\s)#project($|\s)`).
  */
-export interface FindInFilesArgs {
+export interface SearchEditorArgs {
     query: string;
     filesToInclude: string;
+    isRegexp: boolean;
     triggerSearch: boolean;
+    focusResults: boolean;
+    showIncludesExcludes: boolean;
 }
 
-export function buildFindInFilesArgs(tagName: string): FindInFilesArgs {
+export function buildSearchEditorArgs(tagName: string): SearchEditorArgs {
     return {
         query: `#${tagName}`,
         filesToInclude: '*.tsk',
+        isRegexp: false,
         triggerSearch: true,
+        focusResults: true,
+        showIncludesExcludes: true,
     };
 }

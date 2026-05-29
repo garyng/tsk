@@ -3,23 +3,27 @@ import { COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { mergeTagDefs } from './lib/tags-config';
-import { buildFindInFilesArgs, countTasksByTag, tagsToPickItems } from './lib/tags-find-logic';
+import { buildSearchEditorArgs, countTasksByTag, tagsToPickItems } from './lib/tags-find-logic';
 import type { TagsLoader } from './tags-loader';
+
+/** Search Editor open command (verified present in VS Code ≥1.112). */
+const SEARCH_EDITOR_COMMAND = 'search.action.openNewEditor';
 
 /**
  * Register the `tsk.findAllTasksByTag` command. Behavior:
  *
  *   1. Merge current yaml + cache-discovered tags.
  *   2. Empty map → show an info message and exit.
- *   3. Otherwise open a QuickPick (matchOnDescription: true).
- *   4. On pick → fire `workbench.action.findInFiles` with `#<tag>` and
- *      a `*.tsk` include glob.
+ *   3. Otherwise open a QuickPick (matchOnDescription: true) with
+ *      per-tag task counts.
+ *   4. On pick → open VS Code's **Search Editor** (`search.action.
+ *      openNewEditor`) with `#<tag>` pre-queried + scoped to `*.tsk`.
  *   5. On cancel → no-op.
  *
- * The findInFiles invocation uses VSCode's built-in Search Editor, so
- * users get Ctrl+Click navigation, multi-result preview, and the usual
- * regex / case / word-match toggles "for free" — we deliberately do
- * NOT build a custom result document.
+ * The Search Editor (a full-tab result document, not the side panel)
+ * gives users grammar-highlighted `.tsk` result lines, Ctrl+Click
+ * navigation, and the usual regex / case toggles "for free" — we
+ * deliberately do NOT build a custom result document.
  */
 export function registerFindAllTasksByTagCommand(
     context: vscode.ExtensionContext,
@@ -45,9 +49,9 @@ export function registerFindAllTasksByTagCommand(
                 matchOnDescription: true,
             });
             if (!picked) return;
-            const args = buildFindInFilesArgs(picked.label);
+            const args = buildSearchEditorArgs(picked.label);
             logger.info(`${COMMANDS.findAllTasksByTag}: searching for ${args.query}`);
-            await vscode.commands.executeCommand('workbench.action.findInFiles', args);
+            await vscode.commands.executeCommand(SEARCH_EDITOR_COMMAND, args);
         }),
     );
 }

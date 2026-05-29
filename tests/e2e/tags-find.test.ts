@@ -56,4 +56,18 @@ suite('find all tasks by tag', () => {
         assert.match(binding.when, /editorLangId == 'tsk'/);
         assert.match(binding.when, /editorTextFocus/);
     });
+
+    test('the Search Editor command we dispatch to exists in this VS Code host', async () => {
+        // M21/D switched find-by-tag from the side panel to the Search
+        // Editor. `search.action.openNewEditor` is the command we fire on
+        // pick — verify it's actually registered, so a future VS Code
+        // rename (or the 1.112 floor missing it) fails loudly here rather
+        // than silently no-op'ing the user's pick. Runs on both the
+        // `stable` and `floor` (1.112) e2e configs.
+        const registered = await vscode.commands.getCommands(true);
+        assert.ok(
+            registered.includes('search.action.openNewEditor'),
+            'search.action.openNewEditor must exist for find-by-tag to open the Search Editor',
+        );
+    });
 });

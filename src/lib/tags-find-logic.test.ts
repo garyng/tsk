@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TagDef } from './tags-config';
-import { buildFindInFilesArgs, countTasksByTag, tagsToPickItems } from './tags-find-logic';
+import { buildSearchEditorArgs, countTasksByTag, tagsToPickItems } from './tags-find-logic';
 
 const NO_COUNTS = new Map<string, number>();
 
@@ -121,16 +121,23 @@ describe('countTasksByTag', () => {
     });
 });
 
-describe('buildFindInFilesArgs', () => {
-    it('prefixes the query with `#` and scopes to *.tsk', () => {
-        expect(buildFindInFilesArgs('project/tsk')).toEqual({
+describe('buildSearchEditorArgs', () => {
+    it('prefixes the query with `#`, scopes to *.tsk, and sets the search-editor flags', () => {
+        expect(buildSearchEditorArgs('project/tsk')).toEqual({
             query: '#project/tsk',
             filesToInclude: '*.tsk',
+            isRegexp: false,
             triggerSearch: true,
+            focusResults: true,
+            showIncludesExcludes: true,
         });
     });
 
     it('passes tag names with hyphens / digits through unchanged', () => {
-        expect(buildFindInFilesArgs('JIRAID-123').query).toBe('#JIRAID-123');
+        expect(buildSearchEditorArgs('JIRAID-123').query).toBe('#JIRAID-123');
+    });
+
+    it('never enables regex (substring semantics are intentional)', () => {
+        expect(buildSearchEditorArgs('project').isRegexp).toBe(false);
     });
 });

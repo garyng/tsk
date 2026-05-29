@@ -229,10 +229,11 @@ Tags participate in two surfaces beyond M2's parser:
     implicit `/`-separated parents (so `#project/tsk` contributes
     `#project` to the list automatically).
 - **`Alt+T` find-all-tasks-by-tag** — opens a QuickPick of every known
-  tag (searchable by name, task count, and yaml description), then drops
-  you into VSCode's built-in Find-in-Files Search Editor with `#<tag>`
-  already populated and scoped to `*.tsk`. Ctrl+Click any result to jump
-  to the line. Each row shows a task count: `5 tasks · <description>`.
+  tag (searchable by name, task count, and yaml description), then opens
+  VSCode's built-in **Search Editor** (a full result tab) with `#<tag>`
+  already queried and scoped to `*.tsk`. Result rows keep `.tsk` grammar
+  highlighting; Ctrl+Click any result to jump to the line. Each picker
+  row shows a task count: `5 tasks · <description>`.
   The count is **hierarchical** — `#project` reports every task under it
   (including `#project/tsk` ones), matching what the `#project` search
   returns. A tag declared in `tags.yml` but carried by no task shows

@@ -138,7 +138,7 @@ src/
   picker.ts                   # pickTaskId — InputBox prefilled from clipboard, "Browse tasks…" QuickPick
   tags-loader.ts              # createTagsLoader — reads tags.yml, wires FileSystemWatcher + config listener
   tags-completion.ts          # registerTagsCompletionProvider — #-triggered CompletionItemProvider
-  find-tasks-by-tag.ts        # registerFindAllTasksByTagCommand — QuickPick → workbench.action.findInFiles
+  find-tasks-by-tag.ts        # registerFindAllTasksByTagCommand — QuickPick (task counts) → search.action.openNewEditor
   codelens.ts                 # registerCodelens — TskCodeLensProvider + 7 navigate/peek/missing commands
   navigation-highlight.ts     # NavigationHighlight — persistent line decoration after a goTo* navigate
   diagnostics-manager.ts      # DiagnosticsManager — merges cache scan warnings + graph dup reports per-file
@@ -239,7 +239,7 @@ Enter / Tab / Shift+Tab inside a `.tsk` file are intercepted to mimic MD-AIO's l
 Tags use the `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files (per the M2 parser). M8 plugs two user surfaces on top:
 
 - **`#`-triggered completion.** Inside any `.tsk` editor, type `#` (or `#partial`) and a `CompletionItemProvider` surfaces every known tag. Items merge two sources: tags declared in the workspace `tags.yml` (with descriptions, shown as the item `detail`) and tags discovered in `.tsk` files via the M3 cache (plus implicit `/`-separated parents, so `#project/tsk` automatically contributes `#project` to the list).
-- **`Alt+T` find-all-tasks-by-tag.** Opens a `QuickPick` of every known tag (searchable by name *and* yaml description via `matchOnDescription: true`), then dispatches `workbench.action.findInFiles` with `#<tag>` pre-populated and the include glob scoped to `*.tsk`. You land inside VSCode's built-in Search Editor with Ctrl+Click navigation, regex/case toggles, and multi-result preview already wired up — no custom result document needed.
+- **`Alt+T` find-all-tasks-by-tag.** Opens a `QuickPick` of every known tag — each row showing a hierarchical task count (`5 tasks · <description>`), searchable by name, count, *and* yaml description via `matchOnDescription: true` — then dispatches `search.action.openNewEditor` (VSCode's **Search Editor**) with `#<tag>` pre-queried and the include glob scoped to `*.tsk`. The Search Editor is a full result tab: `.tsk` rows keep their grammar highlighting, and Ctrl+Click navigation, regex/case toggles, and result folding come for free — no custom result document needed. The per-tag count is prefix-inclusive (a `#project` row counts its `#project/tsk` tasks too) so it matches what the substring search returns.
 
 **`tags.yml` location.** Default `${workspaceFolder}/.vscode/tsk/tags.yml` (configurable via `tsk.tags.path`). Both schema forms are accepted:
 
@@ -252,7 +252,7 @@ Tags use the `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files (per the M2 p
 
 Empty / missing / malformed `tags.yml` is tolerated — the loader returns an empty map rather than throwing, and a `FileSystemWatcher` re-reads on create/change/delete. A "warn if file exists but parses to empty" log surfaces gross errors in the Output channel.
 
-**Find-in-Files semantics.** The `#tag` query is a literal substring, so `#project` will also match lines containing `#project/tsk`. Read this as a feature — parent-tag searches naturally include their children. For exact matches, toggle regex in the Search bar (e.g. `(?<![\w/-])#project(?![\w/-])`).
+**Search Editor semantics.** The `#tag` query is a literal substring (`isRegexp: false`), so `#project` will also match lines containing `#project/tsk`. Read this as a feature — parent-tag searches naturally include their children, mirroring the picker's hierarchical count. For exact matches, toggle regex in the Search Editor's toolbar (e.g. `(?<![\w/-])#project(?![\w/-])`).
 
 **Keybinding caveats** (Alt+T joins the existing list):
 - Third-party extensions with an equally specific `when` clause (`editorLangId == 'tsk' && editorTextFocus`) could shadow Alt+T inside `.tsk` files; the toggle bindings face the same constraint.
