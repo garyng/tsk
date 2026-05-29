@@ -198,6 +198,16 @@ describe('Db — tags', () => {
         db.insertTag({ taskId: 'b', tag: 'y' });
         expect(db.listAllTags()).toEqual(['x', 'y']);
     });
+
+    it('lists every (taskId, tag) pair via listAllTaskTags', () => {
+        db.insertTag({ taskId: 'a', tag: 'x' });
+        db.insertTag({ taskId: 'b', tag: 'x' });
+        db.insertTag({ taskId: 'b', tag: 'y' });
+        const pairs = db.listAllTaskTags();
+        // Order isn't guaranteed by the query; compare as a sorted set.
+        const sorted = pairs.map(([t, g]) => `${t}:${g}`).sort();
+        expect(sorted).toEqual(['a:x', 'b:x', 'b:y']);
+    });
 });
 
 describe('Db — tag_defs', () => {

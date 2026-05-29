@@ -3,7 +3,7 @@ import { COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { mergeTagDefs } from './lib/tags-config';
-import { buildFindInFilesArgs, tagsToPickItems } from './lib/tags-find-logic';
+import { buildFindInFilesArgs, countTasksByTag, tagsToPickItems } from './lib/tags-find-logic';
 import type { TagsLoader } from './tags-loader';
 
 /**
@@ -37,10 +37,11 @@ export function registerFindAllTasksByTagCommand(
                 logger.info(`${COMMANDS.findAllTasksByTag}: aborted — no tags available.`);
                 return;
             }
-            const items = tagsToPickItems(merged);
+            const counts = countTasksByTag(cache.listAllTaskTags());
+            const items = tagsToPickItems(merged, counts);
             const picked = await vscode.window.showQuickPick(items, {
                 title: 'Tsk: Find All Tasks by Tag',
-                placeHolder: 'Search tags by name or description…',
+                placeHolder: 'Search tags by name, count, or description…',
                 matchOnDescription: true,
             });
             if (!picked) return;

@@ -111,6 +111,7 @@ interface PreparedStatements {
     insertTag: StatementSync;
     listTagsForTask: StatementSync;
     listAllTags: StatementSync;
+    listAllTaskTags: StatementSync;
     upsertTagDef: StatementSync;
     getTagDef: StatementSync;
     listTagDefs: StatementSync;
@@ -170,6 +171,7 @@ export class Db {
             insertTag: p('INSERT INTO tags (task_id, tag) VALUES (?, ?)'),
             listTagsForTask: p('SELECT tag FROM tags WHERE task_id = ? ORDER BY tag'),
             listAllTags: p('SELECT DISTINCT tag FROM tags ORDER BY tag'),
+            listAllTaskTags: p('SELECT task_id, tag FROM tags'),
 
             upsertTagDef: p(
                 `INSERT INTO tag_defs (tag, description, parent) VALUES (?, ?, ?)
@@ -257,6 +259,16 @@ export class Db {
 
     listAllTags(): string[] {
         return this.stmts.listAllTags.all().map((r) => r.tag as string);
+    }
+
+    /**
+     * Every `(taskId, tag)` pair across the workspace, unordered. Feeds
+     * the hierarchical task-count computation in `tags-find-logic`. One
+     * query (no per-task fan-out) so the whole picker count is a single
+     * round-trip.
+     */
+    listAllTaskTags(): Array<[taskId: string, tag: string]> {
+        return this.stmts.listAllTaskTags.all().map((r) => [r.task_id as string, r.tag as string]);
     }
 
     // ── Tag defs ────────────────────────────────────────────────────────────

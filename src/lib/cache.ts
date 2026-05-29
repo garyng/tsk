@@ -200,6 +200,15 @@ export class CacheService {
         return this.db.listAllTags();
     }
 
+    /**
+     * Flat `(taskId, tag)` pairs for every tagged task. Consumed by
+     * `countTasksByTag` (tags-find-logic) to build the picker's per-tag
+     * task counts.
+     */
+    listAllTaskTags(): Array<[taskId: string, tag: string]> {
+        return this.db.listAllTaskTags();
+    }
+
     counts(): CacheCounts {
         return this.db.counts();
     }

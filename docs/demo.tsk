@@ -229,10 +229,14 @@ Tags participate in two surfaces beyond M2's parser:
     implicit `/`-separated parents (so `#project/tsk` contributes
     `#project` to the list automatically).
 - **`Alt+T` find-all-tasks-by-tag** — opens a QuickPick of every known
-  tag (searchable by name and yaml description), then drops you into
-  VSCode's built-in Find-in-Files Search Editor with `#<tag>` already
-  populated and scoped to `*.tsk`. Ctrl+Click any result to jump to
-  the line.
+  tag (searchable by name, task count, and yaml description), then drops
+  you into VSCode's built-in Find-in-Files Search Editor with `#<tag>`
+  already populated and scoped to `*.tsk`. Ctrl+Click any result to jump
+  to the line. Each row shows a task count: `5 tasks · <description>`.
+  The count is **hierarchical** — `#project` reports every task under it
+  (including `#project/tsk` ones), matching what the `#project` search
+  returns. A tag declared in `tags.yml` but carried by no task shows
+  `0 tasks`, so you can see it exists but is empty.
 
 The sibling `docs/.vscode/tsk/tags.yml` ships with descriptions for
 every tag below, so the dev host has autocompletion + find-by-tag
@@ -273,8 +277,11 @@ M8 plan (`#JIRAID-123`, `#project/test`, `#inventory/homelab/nas1`):
 
 Place your cursor anywhere in this file and press `Alt+T`. The
 QuickPick lists every tag (including implicit parents like `project`
-and `inventory/homelab`). Pick one → Search Editor opens with results
-pre-populated.
+and `inventory/homelab`), each annotated with its hierarchical task
+count. Note that `project` and `inventory/homelab` show non-zero
+counts even though no task carries them literally — they inherit the
+counts of their `/`-children. Pick one → Search Editor opens with
+results pre-populated.
 
 **Keybinding caveats.** `Alt+T` follows the same convention as the
 other Alt-letter bindings — gated to `editorLangId == 'tsk' &&
