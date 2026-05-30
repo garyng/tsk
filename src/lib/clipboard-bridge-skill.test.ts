@@ -4,6 +4,7 @@ import {
     buildClipboardBridgeSkillContent,
     CLIPBOARD_BRIDGE_SKILL_NAME,
     CLIPBOARD_BRIDGE_SKILL_REL_PATH,
+    resolveSkillInstallPath,
 } from './clipboard-bridge-skill';
 
 describe('clipboard-bridge skill', () => {
@@ -59,5 +60,21 @@ describe('bridgeDisplayPath', () => {
 
     it('falls back to the default relative path when the setting is blank', () => {
         expect(bridgeDisplayPath('', '/work')).toBe('.vscode/tsk/clipboard-bridge.txt');
+    });
+});
+
+describe('resolveSkillInstallPath', () => {
+    it('joins a relative entry onto the workspace folder', () => {
+        expect(resolveSkillInstallPath('.claude/skills/x/SKILL.md', '/work')).toBe(
+            '/work/.claude/skills/x/SKILL.md',
+        );
+    });
+
+    it('uses an absolute entry verbatim', () => {
+        expect(resolveSkillInstallPath('/abs/where/SKILL.md', '/work')).toBe('/abs/where/SKILL.md');
+    });
+
+    it('trims surrounding whitespace before resolving', () => {
+        expect(resolveSkillInstallPath('  sub/SKILL.md  ', '/work')).toBe('/work/sub/SKILL.md');
     });
 });

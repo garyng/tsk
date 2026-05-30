@@ -1,4 +1,4 @@
-import { isAbsolute, relative } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { resolveBridgePath } from './clipboard-bridge-path';
 
 /**
@@ -27,6 +27,16 @@ export const CLIPBOARD_BRIDGE_SKILL_REL_PATH = `.claude/skills/${CLIPBOARD_BRIDG
  * has no discovery surface, so Claude has to be told the path + the
  * write-the-file protocol. This document is that telling.
  */
+/**
+ * Resolve the user-entered install path (from the command's input box)
+ * into an absolute path. A relative entry is joined onto the workspace
+ * folder; an absolute entry is used verbatim. Pure — no I/O.
+ */
+export function resolveSkillInstallPath(input: string, workspaceFolder: string): string {
+    const trimmed = input.trim();
+    return isAbsolute(trimmed) ? trimmed : join(workspaceFolder, trimmed);
+}
+
 /**
  * Display form of the configured bridge path to bake into the skill:
  * workspace-relative when the resolved path lives under the workspace
