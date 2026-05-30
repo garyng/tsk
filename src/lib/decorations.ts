@@ -140,9 +140,9 @@ const METADATA_COMMENT_RE = /<!--[\s\S]*?-->/g;
  * including the brackets and dashes).
  *
  * The activation layer applies a single dimmed decoration type to this
- * flat list so metadata recedes into the editor background. Phase 2's
- * hover-on-task surface will display the parsed values; until then the
- * comment text is present-but-quiet.
+ * flat list so metadata recedes into the editor background. The
+ * hover-on-task surface displays those parsed values on demand; the
+ * dimmed comment text is present-but-quiet bookkeeping.
  *
  * Unclosed `<!--` is silently dropped — non-greedy matching just won't
  * fire without a closing `-->`. Pure — no `vscode` import.

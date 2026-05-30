@@ -17,7 +17,7 @@ export function isTskDocument(doc: vscode.TextDocument): boolean {
  * Predicate: is this document suitable for cache writes? True when the
  * document survives across sessions (i.e. is backed by a real file on
  * disk). False for untitled buffers — those participate in live features
- * (decorations, codelens, completion, toggles, Enter/Tab) but their tasks
+ * (decorations, completion, toggles, Enter/Tab) but their tasks
  * never reach the SQLite cache. See M18 for the local-only scope.
  *
  * Distinct from {@link isTskDocument}: that one gates on language id;

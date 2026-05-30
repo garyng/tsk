@@ -7,8 +7,8 @@
  *
  * **What lives here**
  *   - The language id (`tsk`) used by VSCode's language registry.
- *   - Setting keys + their defaults (`tsk.cache.path`, `tsk.tags.path`,
- *     `tsk.log.level`, `tsk.decorations.priority.opacity`).
+ *   - Setting keys (`tsk.cache.path`, `tsk.tags.path`, `tsk.log.level`,
+ *     … — defaults live only in `package.json`, not here).
  *   - Theme color ids (`tsk.metadata.foreground`, `tsk.navigation.highlight`).
  *   - Debounce / timing defaults that are intentionally tweakable.
  *   - Command ids (`tsk.toggleTodo`, `tsk.goToParent`, …) — added in M13/C

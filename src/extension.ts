@@ -334,7 +334,7 @@ function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
  *
  * Persistable vs non-persistable: cache writes are gated by
  * `isPersistableDocument` (false for untitled buffers). Untitled docs
- * still drive decoration / codelens / completion live, but their tasks
+ * still drive decoration / completion live, but their tasks
  * never reach SQLite — see M18 for the local-only scope.
  */
 function attachDocumentListeners(context: vscode.ExtensionContext): void {
