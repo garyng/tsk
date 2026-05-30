@@ -93,6 +93,9 @@ export const CLIPBOARD_BRIDGE_ENABLED_KEY = 'clipboard.bridgeEnabled';
 export const CLIPBOARD_BRIDGE_PATH_SETTING = 'tsk.clipboard.bridgePath';
 export const CLIPBOARD_BRIDGE_PATH_KEY = 'clipboard.bridgePath';
 
+export const PASTE_IMAGE_BASE_DIRECTORY_SETTING = 'tsk.pasteImage.baseDirectory';
+export const PASTE_IMAGE_BASE_DIRECTORY_KEY = 'pasteImage.baseDirectory';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every

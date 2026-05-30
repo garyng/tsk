@@ -322,6 +322,11 @@
                     "type": "string",
                     "default": "${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt",
                     "description": "Path to the clipboard-bridge watch file. Supports ${workspaceFolder} substitution. Only used when tsk.clipboard.bridgeEnabled is true. When blank or no workspace folder is open, the bridge stays inactive."
+                },
+                "tsk.pasteImage.baseDirectory": {
+                    "type": "string",
+                    "default": "./images",
+                    "description": "Base directory for images saved when pasting an image into a .tsk, Markdown, or Jupyter markdown-cell document. The saved path is <document directory>/<base directory>/<selection>.<ext>; a selection may itself contain path separators (subdirectories), and any intermediate directories are created. Relative base directories resolve against the document's parent directory (for notebook cells, the notebook's directory); an absolute base directory is used as-is. Leave blank to save directly beside the document."
                 }
             }
         }
@@ -359,6 +364,7 @@
     "dependencies": {
         "date-fns": "^4.3.0",
         "nanoid": "^5.1.11",
+        "pathe": "^2.0.3",
         "yaml": "^2.9.0"
     }
 }

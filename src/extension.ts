@@ -39,6 +39,7 @@ import { PRIORITIES, type PriorityLevel } from './lib/priorities';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
+import { registerPasteImageProvider } from './paste-image';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
 import {
@@ -191,6 +192,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
 
     registerClipboardBridge(context, logger);
     registerInstallClipboardBridgeSkillCommand(context, logger);
+    registerPasteImageProvider(context, logger);
 
     logger.info('tsk extension activated.');
 
