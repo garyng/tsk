@@ -20,10 +20,11 @@ const SEARCH_EDITOR_COMMAND = 'search.action.openNewEditor';
  *      openNewEditor`) with `#<tag>` pre-queried + scoped to `*.tsk`.
  *   5. On cancel → no-op.
  *
- * The Search Editor (a full-tab result document, not the side panel)
- * gives users grammar-highlighted `.tsk` result lines, Ctrl+Click
- * navigation, and the usual regex / case toggles "for free" — we
- * deliberately do NOT build a custom result document.
+ * The Search Editor (a full-tab result document, not the side panel) gives
+ * users Ctrl+Click navigation and the usual regex / case toggles "for free" —
+ * we deliberately do NOT build a custom result document. Its `search-result`
+ * grammar doesn't highlight tsk rows (it only embeds built-in languages), so
+ * the extension decorates the match rows itself (M30/B).
  */
 export function registerFindAllTasksByTagCommand(
     context: vscode.ExtensionContext,

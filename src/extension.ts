@@ -37,6 +37,7 @@ import { Logger, type LogLevel } from './lib/logger';
 import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
+import { computeSearchResultRanges } from './lib/search-result-decorations';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
@@ -344,9 +345,15 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
             applyDecorationsForDoc(doc);
         }),
         vscode.workspace.onDidChangeTextDocument((event) => {
-            if (!isTskDocument(event.document)) return;
-            if (isPersistableDocument(event.document)) scheduleDebouncedRescan(event.document);
-            scheduleDebouncedDecorate(event.document);
+            const doc = event.document;
+            if (isTskDocument(doc)) {
+                if (isPersistableDocument(doc)) scheduleDebouncedRescan(doc);
+                scheduleDebouncedDecorate(doc);
+            } else if (doc.languageId === 'search-result') {
+                // Search Editor results populate (and re-populate on re-search)
+                // via document edits — re-decorate the match rows when they do.
+                scheduleDebouncedDecorate(doc);
+            }
         }),
         vscode.window.onDidChangeActiveTextEditor((editor) => {
             if (editor) applyDecorationsToEditor(editor);
@@ -556,7 +563,14 @@ function rebuildPriorityDecorationTypes(): void {
 }
 
 function applyDecorationsToEditor(editor: vscode.TextEditor): void {
-    if (!state || !isTskDocument(editor.document)) return;
+    if (!state) return;
+    // The find-by-tag Search Editor renders results in a `search-result`
+    // document — decorate its tsk match rows too (M30/B), offset by the gutter.
+    if (editor.document.languageId === 'search-result') {
+        applySearchResultDecorations(editor);
+        return;
+    }
+    if (!isTskDocument(editor.document)) return;
     const {
         markerDecorationTypes,
         priorityDecorationTypes,
@@ -592,6 +606,34 @@ function applyDecorationsToEditor(editor: vscode.TextEditor): void {
         priorities: prioritySnapshot,
         metadata: metadataRanges,
     });
+}
+
+/**
+ * Apply tsk decorations to a Search Editor (`search-result`) document — the
+ * find-by-tag result view. Reuses the same decoration types as `.tsk` editors,
+ * but the ranges come from {@link computeSearchResultRanges}, which strips each
+ * result row's `␣␣<lineNo>:␣` gutter and shifts the columns onto the row. No
+ * snapshot is stored: `search-result` URIs are ephemeral, and the snapshot map
+ * is the tsk-editor restore/GC concern.
+ */
+function applySearchResultDecorations(editor: vscode.TextEditor): void {
+    if (!state) return;
+    const { markerDecorationTypes, priorityDecorationTypes, metadataDecorationType } = state;
+    const { markers, priorities, metadata } = computeSearchResultRanges(editor.document.getText());
+
+    for (const def of MARKERS) {
+        editor.setDecorations(
+            markerDecorationTypes[def.name],
+            (markers.get(def.name) ?? []).map(toVscodeRange),
+        );
+    }
+    for (const def of PRIORITIES) {
+        editor.setDecorations(
+            priorityDecorationTypes[def.level],
+            (priorities.get(def.level) ?? []).map(toVscodeRange),
+        );
+    }
+    editor.setDecorations(metadataDecorationType, metadata.map(toVscodeRange));
 }
 
 function applyDecorationsForDoc(doc: vscode.TextDocument): void {

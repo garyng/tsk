@@ -118,10 +118,13 @@ export function tagsToPickItems(
  *   (default 1) for tsk tag searches specifically.
  *
  * **Why the Search Editor over `findInFiles` (the side panel).** Search-
- * editor results render in a real editor tab with the source language's
- * grammar highlighting (so `.tsk` rows get tsk syntax colors) and
- * inherit Ctrl+Click-to-jump, regex/case toggles, and result folding
- * for free. The side panel offers none of the grammar highlighting.
+ * editor results render in a real editor tab that inherits Ctrl+Click-to-jump,
+ * regex/case toggles, and result folding for free, and (unlike the side panel)
+ * is a `vscode.TextEditor` we can decorate. Note: the result document's
+ * `search-result` grammar only embeds ~50 built-in languages, so it does NOT
+ * apply tsk's *grammar* to result rows — instead the extension paints tsk
+ * *decorations* onto the match rows itself (see `applySearchResultDecorations`
+ * / `computeSearchResultRanges`, M30/B).
  *
  * Substring semantics (intended): searching `#project` also surfaces
  * `#project/tsk` lines — finding tasks under a parent tag naturally
