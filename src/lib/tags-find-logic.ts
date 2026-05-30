@@ -112,6 +112,10 @@ export function tagsToPickItems(
  *   / arrow-navigation works without a manual focus shift.
  * - `showIncludesExcludes: true` — reveal the include/exclude inputs so
  *   the `*.tsk` scope is visible (and tweakable) rather than hidden.
+ * - `contextLines: 0` — show only the matching task lines, no surrounding
+ *   context. A tag search wants the tasks, not their neighbours; this also
+ *   overrides the user's `search.searchEditor.defaultNumberOfContextLines`
+ *   (default 1) for tsk tag searches specifically.
  *
  * **Why the Search Editor over `findInFiles` (the side panel).** Search-
  * editor results render in a real editor tab with the source language's
@@ -132,6 +136,7 @@ export interface SearchEditorArgs {
     triggerSearch: boolean;
     focusResults: boolean;
     showIncludesExcludes: boolean;
+    contextLines: number;
 }
 
 export function buildSearchEditorArgs(tagName: string): SearchEditorArgs {
@@ -142,5 +147,6 @@ export function buildSearchEditorArgs(tagName: string): SearchEditorArgs {
         triggerSearch: true,
         focusResults: true,
         showIncludesExcludes: true,
+        contextLines: 0,
     };
 }

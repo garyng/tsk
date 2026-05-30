@@ -130,6 +130,7 @@ describe('buildSearchEditorArgs', () => {
             triggerSearch: true,
             focusResults: true,
             showIncludesExcludes: true,
+            contextLines: 0,
         });
     });
 
@@ -139,5 +140,9 @@ describe('buildSearchEditorArgs', () => {
 
     it('never enables regex (substring semantics are intentional)', () => {
         expect(buildSearchEditorArgs('project').isRegexp).toBe(false);
+    });
+
+    it('defaults to 0 context lines (just the matching task rows)', () => {
+        expect(buildSearchEditorArgs('project').contextLines).toBe(0);
     });
 });
