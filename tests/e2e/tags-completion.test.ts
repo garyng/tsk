@@ -1,4 +1,5 @@
 import * as assert from 'node:assert';
+import * as fs from 'node:fs';
 import * as vscode from 'vscode';
 import type { TskExtensionApi } from '../../src/extension';
 
@@ -14,6 +15,9 @@ const TAGS_PATH_KEY = 'tags.path';
 suite('tags completion', () => {
     let api: TskExtensionApi;
     let sampleUri: vscode.Uri;
+    let settingsPath: string;
+    /** Raw `.vscode/settings.json` bytes at suite start; `null` = file absent. */
+    let originalSettings: string | null;
 
     suiteSetup(async () => {
         const ext = vscode.extensions.getExtension<TskExtensionApi>(EXTENSION_ID);
@@ -24,11 +28,30 @@ suite('tags completion', () => {
         assert.ok(firstFolder, 'expected a workspace folder');
         sampleUri = vscode.Uri.joinPath(firstFolder.uri, 'sample.tsk');
 
+        // Snapshot the fixture's settings.json so suiteTeardown can restore it
+        // verbatim — the safety net for the tags.path-mutating test below.
+        settingsPath = vscode.Uri.joinPath(firstFolder.uri, '.vscode', 'settings.json').fsPath;
+        originalSettings = fs.existsSync(settingsPath)
+            ? fs.readFileSync(settingsPath, 'utf8')
+            : null;
+
         // Force a tags reload so the fixture yaml is loaded before any
         // assertion runs (the loader does an initial reload during
         // activation, but a redundant reload is cheap and makes the suite
         // robust against test reorderings).
         await api.reloadTags();
+    });
+
+    // Synchronously restore the fixture's settings.json after the suite — even
+    // if the tags.path-mutating test is killed by a mocha timeout before its
+    // async `finally` runs, this guarantees the file can't stay dirty and break
+    // the next run's first tags assertion. (M31/B — bit the project 3× in Phase 3.)
+    suiteTeardown(() => {
+        if (originalSettings === null) {
+            if (fs.existsSync(settingsPath)) fs.rmSync(settingsPath);
+        } else {
+            fs.writeFileSync(settingsPath, originalSettings);
+        }
     });
 
     async function completionAt(
