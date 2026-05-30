@@ -4,7 +4,7 @@ import { isTskDocument, requireTskEditor } from './editor-guards';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { parseLine } from './lib/parser';
-import { removeMetadataEntry, setMetadataEntry, swapMarker } from './lib/toggle';
+import { contentCursorCol, removeMetadataEntry, setMetadataEntry, swapMarker } from './lib/toggle';
 import {
     defaultToggleDeps,
     type ToggleDeps,
@@ -31,14 +31,15 @@ type LineMutator = (line: string) => string;
  * doesn't double-apply and cancel itself. Cursors whose mutator returns
  * the unchanged line are skipped + logged at debug.
  *
- * **Cursor positioning on freshly-created empty tasks.** When a mutator
- * turns a non-task line into an empty-content task (the wrap path in
- * `wrapAsTask`), the output is `- [m]··<!-- @id:… -->` with two spaces
- * between marker and metadata. Post-edit, every cursor on such a line is
- * moved to column `prefix.length + 1` — between the two spaces — so the
- * next keystroke produces a well-spaced `- [m] foo <!-- … -->`. Cursors
- * on other lines (including same-line cursors when applying to multiple
- * cursors at once) are unaffected.
+ * **Cursor positioning on freshly-wrapped tasks.** When a mutator turns a
+ * non-task line into a task (the wrap path in `wrapAsTask`), the cursor is
+ * moved to `contentCursorCol` of the new line — between the two spacer spaces
+ * for an empty wrap (`- [m]··<!-- … -->`), or just past the content and before
+ * the ` <!--` for a wrap with content (`- [m] buy milk <!-- … -->`). Either
+ * way the cursor lands where the user keeps typing the task text, never
+ * stranded inside/after the metadata. Promote / state / priority toggles
+ * don't trip this (their pre-edit line already parses as a task), so their
+ * cursor is left untouched. Cursors on other lines are unaffected.
  *
  * Returns the number of line replacements applied (0 = no edits, useful
  * for callers that want to know whether the action was a complete no-op).
@@ -58,8 +59,8 @@ export async function applyEdit(
         uniqueLines.add(selection.active.line);
     }
     const edit = new vscode.WorkspaceEdit();
-    /** Lines where the mutator just *created* a fresh empty task. */
-    const newlyEmptyTaskCursor = new Map<number, number>();
+    /** Lines where the mutator just *wrapped* a non-task line into a task. */
+    const newlyWrappedTaskCursor = new Map<number, number>();
     let applied = 0;
     for (const lineNumber of uniqueLines) {
         const lineText = doc.lineAt(lineNumber).text;
@@ -68,27 +69,23 @@ export async function applyEdit(
             logger?.debug(`applyEdit: line ${lineNumber + 1} no-op (mutator returned unchanged)`);
             continue;
         }
-        // Detect the "wrap to empty task" transition — line wasn't a task
-        // before, is now a parsed empty-content task. Capture the
-        // between-spaces cursor column so we can move selections after the
-        // edit lands. Promote-on-existing-task (M19/A) doesn't trip this
-        // because the pre-edit line already parses as a task.
+        // Detect the "wrap to task" transition — the line wasn't a task before
+        // and is now. Capture where the cursor should land (end of content,
+        // before the metadata) so we can move selections after the edit lands.
+        // Promote-on-existing-task (M19/A) doesn't trip this because the
+        // pre-edit line already parses as a task.
         if (parseLine(lineText) === null) {
-            const nextParsed = parseLine(next);
-            if (nextParsed && nextParsed.content === '') {
-                const bracketEnd = next.indexOf(']', nextParsed.indent.length);
-                // After `]` + 1 space → cursor between the two spaces.
-                newlyEmptyTaskCursor.set(lineNumber, bracketEnd + 2);
-            }
+            const col = contentCursorCol(next);
+            if (col !== null) newlyWrappedTaskCursor.set(lineNumber, col);
         }
         edit.replace(doc.uri, new vscode.Range(lineNumber, 0, lineNumber, lineText.length), next);
         applied++;
     }
     if (applied === 0) return 0;
     await vscode.workspace.applyEdit(edit);
-    if (newlyEmptyTaskCursor.size > 0) {
+    if (newlyWrappedTaskCursor.size > 0) {
         editor.selections = editor.selections.map((sel) => {
-            const col = newlyEmptyTaskCursor.get(sel.active.line);
+            const col = newlyWrappedTaskCursor.get(sel.active.line);
             if (col === undefined) return sel;
             const pos = new vscode.Position(sel.active.line, col);
             return new vscode.Selection(pos, pos);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    contentCursorCol,
     promoteMissingMetadata,
     removeMetadataEntry,
     setMetadataEntry,
@@ -107,6 +108,29 @@ describe('wrapAsTask', () => {
         expect(wrapAsTask('- ', 'todo', FIXED_OPTS)).toBe(
             '- [ ]  <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
         );
+    });
+});
+
+describe('contentCursorCol', () => {
+    it('returns the spacer column for an empty wrapped task', () => {
+        expect(contentCursorCol('- [ ]  <!-- @id:x -->')).toBe(6);
+    });
+
+    it('returns the end of content (before the metadata) for a content task', () => {
+        // `- [ ] buy milk <!-- … -->` — cursor right after "milk".
+        expect(contentCursorCol('- [ ] buy milk <!-- @id:x -->')).toBe(14);
+    });
+
+    it('accounts for indent', () => {
+        expect(contentCursorCol('    - [ ] foo <!-- @id:x -->')).toBe(13);
+    });
+
+    it('falls back to the trimmed line end when there is no metadata', () => {
+        expect(contentCursorCol('- [ ] foo')).toBe(9);
+    });
+
+    it('returns null for a non-task line', () => {
+        expect(contentCursorCol('plain text')).toBeNull();
     });
 });
 

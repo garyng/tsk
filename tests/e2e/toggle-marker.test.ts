@@ -90,6 +90,37 @@ suite('toggle marker commands', () => {
         assert.strictEqual(cursor.character, 6);
     });
 
+    test('toggleTodo on a content line lands the cursor at the end of content, before metadata', async () => {
+        // Alt+A on `buy milk` → `- [ ] buy milk <!-- … -->`. The cursor should
+        // sit right after "milk" (the space before `<!--`), ready to keep
+        // editing the task text — not stranded after the metadata.
+        const doc = await vscode.workspace.openTextDocument({
+            content: 'buy milk',
+            language: 'tsk',
+        });
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selections = [new vscode.Selection(0, 0, 0, 0)];
+        await new Promise((resolve) => setImmediate(resolve));
+        await vscode.commands.executeCommand('tsk.toggleTodo');
+        const text = doc.lineAt(0).text;
+        assert.match(text, /^- \[ \] buy milk <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
+        assert.strictEqual(editor.selection.active.character, text.indexOf(' <!--'));
+    });
+
+    test('toggleTodo on a bare bullet lands the cursor after the content', async () => {
+        const doc = await vscode.workspace.openTextDocument({
+            content: '- water the plants',
+            language: 'tsk',
+        });
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selections = [new vscode.Selection(0, 0, 0, 0)];
+        await new Promise((resolve) => setImmediate(resolve));
+        await vscode.commands.executeCommand('tsk.toggleTodo');
+        const text = doc.lineAt(0).text;
+        assert.match(text, /^- \[ \] water the plants <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
+        assert.strictEqual(editor.selection.active.character, text.indexOf(' <!--'));
+    });
+
     test('toggleInprogress flips todo to in-progress with @started', async () => {
         const [first] = await runToggle('- [ ] thing', 'tsk.toggleInprogress', [0]);
         assert.match(first ?? '', /^- \[\/\] thing <!-- @started:[\d\-T:+]+ -->$/);

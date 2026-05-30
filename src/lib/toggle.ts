@@ -102,6 +102,36 @@ export function wrapAsTask(line: string, marker: Marker, opts: WrapOpts): string
 }
 
 /**
+ * Column where the cursor should land after a line is freshly wrapped into a
+ * task — the start of where the user types content next, kept *before* the
+ * trailing `<!-- … -->` metadata.
+ *
+ * - Empty-content task (`- [m]··<!-- … -->`) → between the two spacer spaces
+ *   (`prefixEnd`), so the first keystroke yields a well-spaced
+ *   `- [m] foo <!-- … -->`. (Matches the long-standing empty-wrap behavior.)
+ * - Content task (`- [m] foo <!-- … -->`) → just past the content, before the
+ *   space that precedes `<!--`, so Alt+A on `buy milk` leaves the cursor ready
+ *   to keep editing the task text rather than stranded after the metadata.
+ *
+ * Returns null for a non-task line. Pure — pairs with `applyEdit`'s post-edit
+ * cursor move and mirrors the Enter-continuation target in `computeEnterEdit`.
+ */
+export function contentCursorCol(line: string): number | null {
+    const parsed = parseLine(line);
+    if (!parsed) return null;
+    const bracketStart = parsed.raw.indexOf('[', parsed.indent.length);
+    if (bracketStart < 0) return null;
+    const prefixEnd = bracketStart + 4;
+    if (parsed.content === '') return prefixEnd;
+    const metadataStart = parsed.raw.indexOf('<!--', prefixEnd);
+    let contentEnd = metadataStart >= 0 ? metadataStart : parsed.raw.length;
+    while (contentEnd > prefixEnd && /\s/.test(parsed.raw.charAt(contentEnd - 1))) {
+        contentEnd--;
+    }
+    return contentEnd;
+}
+
+/**
  * Convert an empty task line back into a (possibly indented) blank line.
  * Tasks with any content pass through unchanged — we never blow away user
  * text. Non-task lines pass through too.
