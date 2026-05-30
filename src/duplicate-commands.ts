@@ -4,6 +4,7 @@ import { isTskDocument } from './editor-guards';
 import type { Logger } from './lib/logger';
 import { refreshTaskIdentity } from './lib/toggle';
 import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
+import { replaceLine } from './range-helpers';
 
 /**
  * Register `tsk.duplicateLineDown` / `tsk.duplicateLineUp`, bound to
@@ -67,7 +68,7 @@ async function duplicateAndRefresh(
         const lineText = doc.lineAt(lineNumber).text;
         const next = refreshTaskIdentity(lineText, deps);
         if (next === lineText) continue;
-        edit.replace(doc.uri, new vscode.Range(lineNumber, 0, lineNumber, lineText.length), next);
+        replaceLine(edit, doc.uri, lineNumber, lineText, next);
         rewritten++;
     }
     if (rewritten > 0) {

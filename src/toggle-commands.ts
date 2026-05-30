@@ -18,6 +18,7 @@ import {
     toggleTodoMutator,
 } from './lib/toggle-mutators';
 import { pickTaskId } from './picker';
+import { replaceLine } from './range-helpers';
 
 type LineMutator = (line: string) => string;
 
@@ -78,7 +79,7 @@ export async function applyEdit(
             const col = contentCursorCol(next);
             if (col !== null) newlyWrappedTaskCursor.set(lineNumber, col);
         }
-        edit.replace(doc.uri, new vscode.Range(lineNumber, 0, lineNumber, lineText.length), next);
+        replaceLine(edit, doc.uri, lineNumber, lineText, next);
         applied++;
     }
     if (applied === 0) return 0;

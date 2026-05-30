@@ -1,27 +1,12 @@
 import * as vscode from 'vscode';
 import { INTERNAL_COMMANDS, TSK_LANGUAGE_ID } from './constants';
 import type { CacheService } from './lib/cache';
-import { generateId } from './lib/ids';
 import type { Logger } from './lib/logger';
 import { parseLine } from './lib/parser';
-import { localTimestamp } from './lib/time';
 import { promoteMissingMetadata, removeMetadataEntry, setMetadataEntry } from './lib/toggle';
+import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
 import { pickTaskId } from './picker';
-
-/**
- * Dependencies the code-action provider needs to mint fresh `@id` and
- * `@created` values. Injectable so tests can pass deterministic factories;
- * the activation layer wires in the real `nanoid` + `localTimestamp`.
- */
-export interface CodeActionDeps {
-    generateId: () => string;
-    now: () => string;
-}
-
-const defaultDeps: CodeActionDeps = {
-    generateId,
-    now: localTimestamp,
-};
+import { replaceLine } from './range-helpers';
 
 type BrokenRefKey = 'parent' | 'dependsOn' | 'relatedTo';
 
@@ -54,7 +39,7 @@ export function registerCodeActionsProvider(
     context: vscode.ExtensionContext,
     cache: CacheService,
     logger: Logger,
-    deps: CodeActionDeps = defaultDeps,
+    deps: ToggleDeps = defaultToggleDeps,
 ): void {
     const provider: vscode.CodeActionProvider = {
         provideCodeActions(document, range, codeActionContext) {
@@ -74,11 +59,7 @@ export function registerCodeActionsProvider(
                         : 'Tsk: Add missing id + created';
                     const action = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
                     const edit = new vscode.WorkspaceEdit();
-                    edit.replace(
-                        document.uri,
-                        new vscode.Range(lineNumber, 0, lineNumber, lineText.length),
-                        next,
-                    );
+                    replaceLine(edit, document.uri, lineNumber, lineText, next);
                     action.edit = edit;
                     actions.push(action);
                 }
@@ -100,11 +81,7 @@ export function registerCodeActionsProvider(
                             vscode.CodeActionKind.QuickFix,
                         );
                         const edit = new vscode.WorkspaceEdit();
-                        edit.replace(
-                            document.uri,
-                            new vscode.Range(lineNumber, 0, lineNumber, lineText.length),
-                            removed,
-                        );
+                        replaceLine(edit, document.uri, lineNumber, lineText, removed);
                         action.edit = edit;
                         action.diagnostics = [diagnostic];
                         actions.push(action);
@@ -155,7 +132,7 @@ export function registerCodeActionsProvider(
                 const next = setMetadataEntry(lineText, key, picked);
                 if (next === lineText) return;
                 const edit = new vscode.WorkspaceEdit();
-                edit.replace(uri, new vscode.Range(line, 0, line, lineText.length), next);
+                replaceLine(edit, uri, line, lineText, next);
                 await vscode.workspace.applyEdit(edit);
             },
         ),

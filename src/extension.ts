@@ -38,6 +38,7 @@ import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
 import { computeSearchResultRanges } from './lib/search-result-decorations';
+import { clampPriorityOpacity, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
@@ -418,16 +419,10 @@ function registerAllCommands(
 
 function readLogLevel(): LogLevel {
     // Throwaway '' fallback — VSCode returns the package.json default ('info')
-    // for this contributed setting; '' only occurs if the manifest entry were
-    // missing, and fails validation below anyway.
+    // for this contributed setting; the parser recovers anything malformed
+    // (only reachable via a hand-edited settings.json) to the safe level.
     const value = vscode.workspace.getConfiguration('tsk').get<string>(LOG_LEVEL_KEY, '');
-    if (value === 'debug' || value === 'info' || value === 'warn' || value === 'error') {
-        return value;
-    }
-    // Malformed configured value (only reachable via a hand-edited
-    // settings.json — the manifest enum blocks it in the Settings UI):
-    // recover to the safe default level.
-    return 'info';
+    return parseLogLevel(value);
 }
 
 async function runInitialScan(): Promise<void> {
@@ -535,12 +530,10 @@ function applyWarnings(uri: vscode.Uri, warnings: CacheWarning[]): void {
 
 function readPriorityOpacity(): number {
     // Throwaway 0 fallback — VSCode returns the package.json default (0.15)
-    // for this contributed setting; 0 only occurs if the manifest entry were
-    // missing, degrading sanely to invisible priority tints.
+    // for this contributed setting; the parser clamps a hand-edited value to
+    // [0, 1] (the schema enforces it in the UI but settings.json can smuggle).
     const value = vscode.workspace.getConfiguration('tsk').get<number>(PRIORITY_OPACITY_KEY, 0);
-    // Clamp defensively — the settings JSON schema enforces 0..1 but a
-    // hand-edited settings.json could still smuggle anything in.
-    return Math.max(0, Math.min(1, value));
+    return clampPriorityOpacity(value);
 }
 
 function buildMarkerDecorationTypes(): Record<Marker, vscode.TextEditorDecorationType> {
