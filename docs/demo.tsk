@@ -392,3 +392,23 @@ M9; the parser already extracts these into the metadata Map.
 - [x] a task whose value-less flag survives round-trip <!-- @id:v2p7g5wu @flag -->
 - [x] a task whose empty-value entry survives round-trip <!-- @id:w3q8h6xv @flag: -->
 - [x] **bold** and *italic* and `code` inside content render via the embedded markdown grammar <!-- @id:x4r9i7yw -->
+
+## Paste image (M23)
+
+With an image on the clipboard, paste (`Ctrl+V` / `Cmd+V`) anywhere in a `.tsk`
+or Markdown file (or a Jupyter markdown cell) and tsk saves the bytes to disk
+and inserts a Markdown image link at the cursor — the alt text lands selected
+so you can immediately retype it. The file goes under
+`tsk.pasteImage.baseDirectory` (default `./images`, relative to this document;
+blank means "beside the document").
+
+To name it, **select some text first** and paste over it: the selection becomes
+the path verbatim and may include subfolders, e.g. selecting `diagrams/flow`
+saves `./images/diagrams/flow.png` (the extension is forced to match the image
+type). With no selection you're prompted for the path, pre-filled with a
+timestamp. If the target already exists you're re-prompted, then asked to
+confirm an overwrite. The save rides the paste's undo step — `Ctrl+Z` removes
+the inserted link and deletes the just-saved file in one go.
+
+<!-- Try it: put an image on the clipboard, then paste on the blank line below. -->
+
