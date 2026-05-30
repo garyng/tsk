@@ -40,6 +40,7 @@ export interface Task extends ParsedTask {
 
 const TASK_LINE_RE = new RegExp(`^(\\s*)[-*+]\\s+\\[([${MARKER_SYMBOL_CHAR_CLASS}])\\]\\s*(.*)$`);
 const TAG_RE = /(?:^|\s)#([A-Za-z][A-Za-z0-9_/-]*)/g;
+const BULLET_LINE_RE = /^(\s*)([-*+])(\s+)(.*)$/;
 
 /**
  * Parse a single line. Returns `null` if the line is not a recognizable task.
@@ -81,4 +82,47 @@ export function parseDocument(text: string): Task[] {
         }
     }
     return tasks;
+}
+
+export interface ParsedBullet {
+    /** Literal leading whitespace (spaces and/or tabs), preserved verbatim. */
+    indent: string;
+    /** The list-marker character — `-`, `*`, or `+`. */
+    bullet: string;
+    /**
+     * Text after the marker and its trailing spaces, right-trimmed. Empty for a
+     * bare `- ` with no content. **Not** metadata-stripped: a bare bullet carries
+     * no tsk metadata, so the raw remainder *is* the content.
+     */
+    content: string;
+    /** Column in `raw` where `content` begins (past the marker + its spaces). */
+    contentStart: number;
+    /** The original line text (minus a trailing `\r` if the caller passed one). */
+    raw: string;
+}
+
+/**
+ * Parse a *bare* markdown list item: a `-`/`*`/`+` bullet followed by at least
+ * one space, that is **not** a tsk task (`parseLine` returns null for it).
+ *
+ * Returns null for task lines (`- [ ] foo`), non-list lines, and a lone marker
+ * with no following space (`-`). Bare bullets are the checkbox-less nested list
+ * items a user writes under a task; the list-edit + wrap helpers give them
+ * Markdown-All-in-One semantics. Pure — no I/O, no side effects.
+ */
+export function parseBullet(line: string): ParsedBullet | null {
+    const normalized = line.endsWith('\r') ? line.slice(0, -1) : line;
+    // A task is also a bullet syntactically; exclude it so "bare bullet" and
+    // "task" stay disjoint and callers can branch on one helper at a time.
+    if (parseLine(normalized) !== null) return null;
+    const match = BULLET_LINE_RE.exec(normalized);
+    if (!match) return null;
+    const [, indent, bullet, spaces, rest] = match;
+    return {
+        indent: indent as string,
+        bullet: bullet as string,
+        content: (rest as string).trimEnd(),
+        contentStart: (indent as string).length + 1 + (spaces as string).length,
+        raw: normalized,
+    };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Marker, parseDocument, parseLine } from './parser';
+import { type Marker, parseBullet, parseDocument, parseLine } from './parser';
 
 describe('parseLine — non-task lines', () => {
     it.each([
@@ -236,5 +236,83 @@ describe('parseDocument', () => {
         expect(tasks[0]?.metadata.get('created')).toBe('2026-05-24T15:00:00+08:00');
         expect(tasks[1]?.metadata.get('starred')).toBeNull();
         expect(tasks[2]?.tags).toEqual(['project/tsk']);
+    });
+});
+
+describe('parseBullet — non-bullet lines', () => {
+    it.each([
+        ['empty', ''],
+        ['plain text', 'hello world'],
+        ['markdown heading', '# heading'],
+        ['a todo task', '- [ ] foo'],
+        ['a completed task', '- [x] foo'],
+        ['an indented task', '    - [/] foo'],
+        ['a `*` task', '* [x] foo'],
+        ['lone dash, no following space', '-'],
+        ['dash with no space before content', '-foo'],
+    ])('returns null for %s', (_label, line) => {
+        expect(parseBullet(line)).toBeNull();
+    });
+});
+
+describe('parseBullet — bare bullets', () => {
+    it('parses a simple bullet', () => {
+        expect(parseBullet('- milk')).toMatchObject({
+            indent: '',
+            bullet: '-',
+            content: 'milk',
+            contentStart: 2,
+            raw: '- milk',
+        });
+    });
+
+    it.each([
+        ['-', '- milk'],
+        ['*', '* milk'],
+        ['+', '+ milk'],
+    ])('accepts %s as a bullet char', (bullet, line) => {
+        expect(parseBullet(line)).toMatchObject({ bullet, content: 'milk' });
+    });
+
+    it('captures indent and shifts contentStart accordingly', () => {
+        const b = parseBullet('    - nested note');
+        expect(b?.indent).toBe('    ');
+        expect(b?.content).toBe('nested note');
+        expect(b?.contentStart).toBe(6); // 4 indent + '-' + 1 space
+    });
+
+    it('handles a tab indent', () => {
+        const b = parseBullet('\t- note');
+        expect(b?.indent).toBe('\t');
+        expect(b?.content).toBe('note');
+        expect(b?.contentStart).toBe(3); // '\t' + '-' + ' '
+    });
+
+    it('folds multiple spaces after the marker into contentStart', () => {
+        const b = parseBullet('-   spaced');
+        expect(b?.content).toBe('spaced');
+        expect(b?.contentStart).toBe(4); // '-' + 3 spaces
+    });
+
+    it('right-trims trailing whitespace from content', () => {
+        expect(parseBullet('- milk   ')?.content).toBe('milk');
+    });
+
+    it('treats a bare `- ` as an empty bullet', () => {
+        expect(parseBullet('- ')?.content).toBe('');
+    });
+
+    it('treats a marker with only trailing spaces as empty', () => {
+        expect(parseBullet('-    ')?.content).toBe('');
+    });
+
+    it('keeps content raw — no metadata stripping', () => {
+        expect(parseBullet('- note <!-- @x -->')?.content).toBe('note <!-- @x -->');
+    });
+
+    it('tolerates a trailing \\r and drops it from raw', () => {
+        const b = parseBullet('- milk\r');
+        expect(b?.content).toBe('milk');
+        expect(b?.raw).toBe('- milk');
     });
 });
