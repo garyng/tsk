@@ -106,15 +106,15 @@ export const DEFAULT_PRIORITY_OPACITY = 0.15;
 export const DEFAULT_LOG_LEVEL = 'info';
 
 /**
- * Default watch-file path for the clipboard bridge. Mirrors the `default`
- * in `package.json`; `${workspaceFolder}` is expanded at runtime by
- * `resolveBridgePath` (VSCode doesn't auto-expand it in plain settings).
- * Lives under `.vscode/tsk/` alongside `cache.db` + `tags.yml` so all of
- * tsk's workspace-local artifacts share one folder.
+ * The clipboard bridge is opt-in — off unless the user enables it.
+ *
+ * Scalar defaults like this one stay as constants (cf. `DEFAULT_LOG_LEVEL`
+ * / `DEFAULT_PRIORITY_OPACITY`). Path defaults do NOT — `bridgePath`,
+ * `cache.path`, and `tags.path` all live solely in `package.json` and are
+ * read with a throwaway `.get(key, '')` fallback (VSCode returns the
+ * manifest default for a contributed setting anyway). Keeping the path
+ * default in one place avoids a code/manifest mirror that can drift.
  */
-export const DEFAULT_CLIPBOARD_BRIDGE_PATH = '${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt';
-
-/** The clipboard bridge is opt-in — off unless the user enables it. */
 export const DEFAULT_CLIPBOARD_BRIDGE_ENABLED = false;
 
 // ── Theme color ids ─────────────────────────────────────────────────────────

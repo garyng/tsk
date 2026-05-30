@@ -16,7 +16,6 @@ import {
     CLIPBOARD_BRIDGE_PATH_SETTING,
     CLIPBOARD_BRIDGE_POLL_INTERVAL_MS,
     DEFAULT_CLIPBOARD_BRIDGE_ENABLED,
-    DEFAULT_CLIPBOARD_BRIDGE_PATH,
 } from './constants';
 import { resolveBridgePath } from './lib/clipboard-bridge-path';
 import type { Logger } from './lib/logger';
@@ -66,10 +65,10 @@ class ClipboardBridge {
         );
         if (!enabled) return;
 
-        const rawPath = config.get<string>(
-            CLIPBOARD_BRIDGE_PATH_KEY,
-            DEFAULT_CLIPBOARD_BRIDGE_PATH,
-        );
+        // Throwaway '' fallback: VSCode returns the package.json default for
+        // this contributed setting, so the manifest is the single source of
+        // truth for the path (same pattern as cache.path / tags.path).
+        const rawPath = config.get<string>(CLIPBOARD_BRIDGE_PATH_KEY, '');
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         const resolved = resolveBridgePath(rawPath, workspaceFolder);
         if (!resolved) {

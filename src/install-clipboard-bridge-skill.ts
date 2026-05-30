@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import * as vscode from 'vscode';
-import { CLIPBOARD_BRIDGE_PATH_KEY, COMMANDS, DEFAULT_CLIPBOARD_BRIDGE_PATH } from './constants';
+import { CLIPBOARD_BRIDGE_PATH_KEY, COMMANDS } from './constants';
 import {
     bridgeDisplayPath,
     buildClipboardBridgeSkillContent,
@@ -36,9 +36,11 @@ export function registerInstallClipboardBridgeSkillCommand(
                 return;
             }
 
+            // Throwaway '' fallback — the package.json default is returned for
+            // this contributed setting (single source of truth for the path).
             const rawPath = vscode.workspace
                 .getConfiguration('tsk')
-                .get<string>(CLIPBOARD_BRIDGE_PATH_KEY, DEFAULT_CLIPBOARD_BRIDGE_PATH);
+                .get<string>(CLIPBOARD_BRIDGE_PATH_KEY, '');
             const content = buildClipboardBridgeSkillContent(
                 bridgeDisplayPath(rawPath, workspaceFolder),
             );
