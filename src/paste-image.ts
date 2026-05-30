@@ -91,15 +91,18 @@ async function promptForPath(
  * intermediate directories, and `overwrite: true` lets the caller's
  * overwrite-anyway decision stick.
  *
- * Overwrite-undo caveat: VSCode applies an undo's file operations in forward
- * order (not reversed), so the `deleteFile`+`createFile` "snapshot the
- * original for restore" trick throws on undo (it re-creates the snapshot
- * before deleting the new file, hitting "already exists"). A single
- * `createFile(overwrite)` undoes cleanly to a delete — so undoing a paste
- * that *overwrote* an existing image removes the file rather than restoring
- * the original. Undo of a paste that created a *new* file removes it as
- * expected. Restoring an overwritten original isn't reliably expressible
- * through the `WorkspaceEdit` API, so we don't attempt it.
+ * Overwrite-undo caveat: VSCode replays an undo's file operations in their
+ * collection order (each op inverted, but the list is NOT reordered — see
+ * `bulkFileEdits.ts._reverse()`). So the `deleteFile`+`createFile` "snapshot
+ * the original for restore" trick throws on undo: it re-creates the snapshot
+ * (a create with no overwrite flag) before deleting the new file, hitting
+ * "already exists". A single `createFile(overwrite)` undoes cleanly to a
+ * delete — so undoing a paste that *overwrote* an existing image removes the
+ * file rather than restoring the original; undo of a paste that created a
+ * *new* file removes it as expected. Restoring an overwritten original isn't
+ * reliably expressible through the `WorkspaceEdit` API today — that's the
+ * open upstream bug microsoft/vscode#182573 ("createFile with overwrite
+ * deletes file completely on undo"); re-check it if a fix lands.
  */
 export function buildPastedImageEdit(
     docDir: string,
