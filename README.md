@@ -144,7 +144,8 @@ src/
   diagnostics-manager.ts      # DiagnosticsManager — merges scan warnings + graph dup + broken-ref reports per-file
   hover.ts                    # registerHoverProvider — task metadata popup (wraps lib/hover-logic)
   code-actions.ts             # registerCodeActionsProvider — add-missing-id + broken-ref Remove/Replace quick-fixes
-  clipboard-bridge.ts         # registerClipboardBridge — fs.watch → host clipboard (devcontainer escape hatch)
+  clipboard-bridge.ts         # registerClipboardBridge — fs.watchFile → host clipboard (devcontainer escape hatch)
+  install-clipboard-bridge-skill.ts  # tsk.installClipboardBridgeSkill — writes the bridge skill into .claude/skills/
   lib/                        # pure logic — unit-tested
     markers.ts                # MARKERS registry — single source of truth for marker name/symbols/color/scope
     priorities.ts             # PRIORITIES registry — level/rgb/label
@@ -164,6 +165,7 @@ src/
     tags-find-logic.ts        # tagsToPickItems, countTasksByTag, buildSearchEditorArgs
     hover-logic.ts            # buildTaskHoverMarkdown — pure hover markdown builder (date-fns relative time)
     clipboard-bridge-path.ts  # resolveBridgePath — ${workspaceFolder} substitution for the bridge watch file
+    clipboard-bridge-skill.ts # buildClipboardBridgeSkillContent + bridgeDisplayPath — pure skill generator
     graph.ts                  # buildGraph, GraphNode, DuplicateIdReport — pure relationship graph + dup detection
     graph-service.ts          # GraphService — scoped invalidation over the pure builder + occurrences index
     codelens-logic.ts         # computeLensesForTask + CODICONS + LensDescriptor (discriminated union)
@@ -310,13 +312,17 @@ Inside a devcontainer, no host clipboard tool is reachable — `xclip` / `wl-cop
 | Setting | Default | Meaning |
 |---|---|---|
 | `tsk.clipboard.bridgeEnabled` | `false` | Master switch. Silently watching a file and pushing it to the clipboard is surprising to enable by default. |
-| `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk-clipboard.txt` | The watched file. `${workspaceFolder}` is expanded at runtime; an absolute path is used verbatim. Blank / no-workspace-folder ⇒ bridge inactive. |
+| `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched file (under `.vscode/tsk/` with `cache.db` + `tags.yml`). `${workspaceFolder}` is expanded at runtime; an absolute path is used verbatim. Blank / no-workspace-folder ⇒ bridge inactive. The parent dir is created if missing. |
 
-Enable it, then `echo "hello" > .vscode/tsk-clipboard.txt` — `"hello"` lands on your host clipboard. Implementation in `src/clipboard-bridge.ts` (stat-polling watcher); path resolution is the pure, unit-tested `src/lib/clipboard-bridge-path.ts`.
+Enable it, then `echo "hello" > .vscode/tsk/clipboard-bridge.txt` — `"hello"` lands on your host clipboard. Implementation in `src/clipboard-bridge.ts` (stat-polling watcher); path resolution is the pure, unit-tested `src/lib/clipboard-bridge-path.ts`.
 
 **Why stat-polling, not `fs.watch`.** The bridge uses `fs.watchFile` (re-stats the path every 300 ms) rather than `fs.watch` (inotify). VS Code's own editor save writes a temp file and renames it over the target, which **swaps the inode** — an inode-bound `fs.watch` follows the old inode and goes silent after the first save. Stat-polling follows the rename, and also works on devcontainer / WSL2 mounts where inotify is unreliable. The trade-off is up to ~300 ms of latency before the clipboard updates (imperceptible for paste-after-write). So any writer works: `echo >`, the editor's Save, the `git-commit-phase` skill's `Write`.
 
 **`git-commit-phase` integration.** When the bridge is enabled, the `git-commit-phase` skill's manual mode drops the generated commit message to the watch file (in addition to printing it in chat), so the message is on your clipboard ready to paste into the SCM input — no manual select-and-copy. If the watch file doesn't exist (bridge disabled) the skill skips the drop silently and the chat block remains the copy source.
+
+**Teaching Claude to use it — `Tsk: Install Clipboard Bridge Skill`.** A watched file has no self-describing schema the way an MCP tool does, so Claude has to be *told* the path and the write-the-file protocol. The command palette entry **Tsk: Install Clipboard Bridge Skill** writes a ready-made skill to `.claude/skills/tsk-clipboard-bridge/SKILL.md` in your workspace (Claude Code's per-workspace skill directory), with *your* configured `tsk.clipboard.bridgePath` baked into the instructions. Run it, reload Claude Code, and you can ask Claude to "put X on my clipboard" — it writes the watch file and the bridge does the rest. Re-run it after changing the path setting to regenerate the skill. Implementation: command in `src/install-clipboard-bridge-skill.ts`; the skill body + path-display logic are the pure, unit-tested `src/lib/clipboard-bridge-skill.ts`.
+
+> **Path vs MCP — why a watched file here.** Clipboard hand-off is a single, fire-and-forget side effect with no return value, so the watch-file pattern (Claude already has a `Write` tool; no server, no client config, no transport to reach into the devcontainer) is the right weight. An MCP server earns its keep when Claude needs *structured, bidirectional* access — typed params and **return values** (read the clipboard back, query the cache, list tasks by tag, resolve the graph) — and benefits from schema-driven discovery across a growing set of verbs. Rule of thumb: **need a result back, or many verbs → MCP; fire one side effect → a watched file + a skill that documents the contract.** See the M22 design notes in `plans/2026-05-27_tsk-phase-3.md` for the full comparison.
 
 ## Constants & helpers (Phase 2)
 

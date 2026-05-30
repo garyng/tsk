@@ -130,6 +130,11 @@
                 "command": "tsk.handleShiftTab",
                 "title": "Handle Shift+Tab (outdent task)",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.installClipboardBridgeSkill",
+                "title": "Install Clipboard Bridge Skill",
+                "category": "Tsk"
             }
         ],
         "keybindings": [
@@ -315,7 +320,7 @@
                 },
                 "tsk.clipboard.bridgePath": {
                     "type": "string",
-                    "default": "${workspaceFolder}/.vscode/tsk-clipboard.txt",
+                    "default": "${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt",
                     "description": "Path to the clipboard-bridge watch file. Supports ${workspaceFolder} substitution. Only used when tsk.clipboard.bridgeEnabled is true. When blank or no workspace folder is open, the bridge stays inactive."
                 }
             }

@@ -109,8 +109,10 @@ export const DEFAULT_LOG_LEVEL = 'info';
  * Default watch-file path for the clipboard bridge. Mirrors the `default`
  * in `package.json`; `${workspaceFolder}` is expanded at runtime by
  * `resolveBridgePath` (VSCode doesn't auto-expand it in plain settings).
+ * Lives under `.vscode/tsk/` alongside `cache.db` + `tags.yml` so all of
+ * tsk's workspace-local artifacts share one folder.
  */
-export const DEFAULT_CLIPBOARD_BRIDGE_PATH = '${workspaceFolder}/.vscode/tsk-clipboard.txt';
+export const DEFAULT_CLIPBOARD_BRIDGE_PATH = '${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt';
 
 /** The clipboard bridge is opt-in — off unless the user enables it. */
 export const DEFAULT_CLIPBOARD_BRIDGE_ENABLED = false;
@@ -174,6 +176,7 @@ export const COMMANDS = {
     handleEnter: 'tsk.handleEnter',
     handleTab: 'tsk.handleTab',
     handleShiftTab: 'tsk.handleShiftTab',
+    installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
 } as const satisfies Record<string, `tsk.${string}`>;
 
 /**

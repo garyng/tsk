@@ -3,6 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
+import {
+    DEFAULT_CLIPBOARD_BRIDGE_ENABLED,
+    DEFAULT_CLIPBOARD_BRIDGE_PATH,
+} from '../../src/constants';
 
 const EXTENSION_ID = 'garyng.tsk';
 const ENABLED_KEY = 'clipboard.bridgeEnabled';
@@ -104,7 +108,27 @@ suite('clipboard bridge', () => {
         assert.strictEqual(props['tsk.clipboard.bridgePath']?.type, 'string');
         assert.strictEqual(
             props['tsk.clipboard.bridgePath']?.default,
-            '${workspaceFolder}/.vscode/tsk-clipboard.txt',
+            '${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt',
+        );
+    });
+
+    test('package.json defaults match the mirrored DEFAULT_* constants (drift guard)', () => {
+        // The code keeps DEFAULT_* constants mirroring the manifest defaults
+        // (used as the .get() fallback). Assert they stay in sync so the two
+        // sources of truth can't silently drift.
+        const ext = vscode.extensions.getExtension(EXTENSION_ID);
+        assert.ok(ext);
+        const props = ext.packageJSON.contributes.configuration.properties as Record<
+            string,
+            { default: unknown }
+        >;
+        assert.strictEqual(
+            props['tsk.clipboard.bridgePath']?.default,
+            DEFAULT_CLIPBOARD_BRIDGE_PATH,
+        );
+        assert.strictEqual(
+            props['tsk.clipboard.bridgeEnabled']?.default,
+            DEFAULT_CLIPBOARD_BRIDGE_ENABLED,
         );
     });
 });

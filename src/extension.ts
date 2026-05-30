@@ -20,6 +20,7 @@ import { DiagnosticsManager } from './diagnostics-manager';
 import { isPersistableDocument, isTskDocument } from './editor-guards';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerHoverProvider } from './hover';
+import { registerInstallClipboardBridgeSkillCommand } from './install-clipboard-bridge-skill';
 import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
@@ -191,6 +192,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     registerAllCommands(context, cache, graph, tagsLoader, logger);
 
     registerClipboardBridge(context, logger);
+    registerInstallClipboardBridgeSkillCommand(context, logger);
 
     logger.info('tsk extension activated.');
 

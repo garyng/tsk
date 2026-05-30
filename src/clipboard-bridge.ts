@@ -1,4 +1,13 @@
-import { closeSync, openSync, readFileSync, type Stats, unwatchFile, watchFile } from 'node:fs';
+import {
+    closeSync,
+    mkdirSync,
+    openSync,
+    readFileSync,
+    type Stats,
+    unwatchFile,
+    watchFile,
+} from 'node:fs';
+import { dirname } from 'node:path';
 import * as vscode from 'vscode';
 import {
     CLIPBOARD_BRIDGE_ENABLED_KEY,
@@ -75,6 +84,10 @@ class ClipboardBridge {
 
     private start(path: string): void {
         try {
+            // The default path lives under `.vscode/tsk/`, which may not
+            // exist yet (cache.db is the usual creator). Make the parent
+            // dir before touching the file.
+            mkdirSync(dirname(path), { recursive: true });
             // Touch the file so `watchFile` has a baseline to poll. Append
             // mode creates-if-missing without truncating existing content
             // (and without bumping mtime when it already exists, so no
