@@ -167,6 +167,8 @@ export const COMMANDS = {
     handleTab: 'tsk.handleTab',
     handleShiftTab: 'tsk.handleShiftTab',
     handleBackspace: 'tsk.handleBackspace',
+    duplicateLineDown: 'tsk.duplicateLineDown',
+    duplicateLineUp: 'tsk.duplicateLineUp',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
 } as const satisfies Record<string, `tsk.${string}`>;
 

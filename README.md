@@ -250,6 +250,8 @@ Enter / Tab / Shift+Tab / Backspace inside a `.tsk` file are intercepted to mimi
 
 **Bare bullets** — a `-`/`*`/`+` list item *without* a `[ ]` marker (the checkbox-less notes a user nests under a task) gets the same Enter / Tab / Shift+Tab treatment as a task, minus the metadata: Enter continues the bullet (preserving the original marker char), and the empty-bullet / indent rules match the task paths. Backspace closes the loop — `task → bare bullet → (indent →) empty line`, the inverse of Alt+A's `bare bullet → task` wrap (M26). Bullets are recognised by `parseBullet` in `src/lib/parser.ts`.
 
+**Duplicating tasks (M28)** — Shift+Alt+Down / Shift+Alt+Up wrap VS Code's built-in line duplication (`editor.action.copyLines*`) in `.tsk` files: the copy is stamped with a fresh `@id` + `@created` so it can't collide with its source on the cache primary key, while lifecycle stamps (`@started` / `@completed`) are preserved. Implemented as a thin post-pass in `src/duplicate-commands.ts` (`refreshTaskIdentity` per copied line) — two undo steps by design (the duplicate, then the id rewrite), which also makes multi-cursor duplication work for free.
+
 ## Tags (M8)
 
 Tags use the `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files (per the M2 parser). M8 plugs two user surfaces on top:

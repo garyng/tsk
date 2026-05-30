@@ -137,6 +137,16 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.duplicateLineDown",
+                "title": "Duplicate Line Down (fresh @id for task copies)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.duplicateLineUp",
+                "title": "Duplicate Line Up (fresh @id for task copies)",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.installClipboardBridgeSkill",
                 "title": "Install Clipboard Bridge Skill",
                 "category": "Tsk"
@@ -232,6 +242,16 @@
                 "command": "tsk.handleBackspace",
                 "key": "backspace",
                 "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.duplicateLineDown",
+                "key": "shift+alt+down",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
+            {
+                "command": "tsk.duplicateLineUp",
+                "key": "shift+alt+up",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
             }
         ],
         "colors": [

@@ -15,6 +15,7 @@ import {
     PRIORITY_OPACITY_SETTING,
 } from './constants';
 import { DiagnosticsManager } from './diagnostics-manager';
+import { registerDuplicateCommands } from './duplicate-commands';
 import { isPersistableDocument, isTskDocument } from './editor-guards';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerHoverProvider } from './hover';
@@ -374,6 +375,7 @@ function registerAllCommands(
     registerCopyTaskIdCommand(context, logger);
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
+    registerDuplicateCommands(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
     registerCodeActionsProvider(context, cache, logger);
