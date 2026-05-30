@@ -92,6 +92,32 @@ suite('list-edit (Enter / Tab / Shift+Tab)', () => {
         assert.strictEqual(result.cursorCol, 6);
     });
 
+    test('Enter continues a bare bullet with a fresh empty bullet', async () => {
+        const result = await runKey('- foo', 'tsk.handleEnter', 0, 5);
+        assert.strictEqual(result.text, '- foo\n- ');
+        assert.strictEqual(result.cursorLine, 1);
+        assert.strictEqual(result.cursorCol, 2);
+    });
+
+    test('Enter on an empty bullet at column 0 clears the line', async () => {
+        const result = await runKey('- ', 'tsk.handleEnter', 0, 2);
+        assert.strictEqual(result.text, '');
+        assert.strictEqual(result.cursorLine, 0);
+        assert.strictEqual(result.cursorCol, 0);
+    });
+
+    test('Tab on an empty bullet indents one level', async () => {
+        const result = await runKey('- ', 'tsk.handleTab', 0, 2);
+        assert.strictEqual(result.text, '    - ');
+        assert.strictEqual(result.cursorCol, 6);
+    });
+
+    test('Shift+Tab on an indented bullet dedents one level', async () => {
+        const result = await runKey('    - foo', 'tsk.handleShiftTab', 0, 6);
+        assert.strictEqual(result.text, '- foo');
+        assert.strictEqual(result.cursorCol, 2);
+    });
+
     test('Enter on non-task line falls through to default (inserts newline)', async () => {
         const result = await runKey('plain text', 'tsk.handleEnter', 0, 5);
         const lines = result.text.split('\n');

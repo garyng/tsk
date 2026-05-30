@@ -1,4 +1,4 @@
-import { parseLine } from './parser';
+import { parseBullet, parseLine } from './parser';
 import type { ToggleDeps } from './toggle-mutators';
 
 /**
@@ -49,7 +49,7 @@ export function computeEnterEdit(
     deps: ToggleDeps,
 ): ListEditAction {
     const parsed = parseLine(line);
-    if (!parsed) return { kind: 'noop' };
+    if (!parsed) return computeBulletEnter(line, cursorCol, opts);
 
     const bracketStart = parsed.raw.indexOf('[', parsed.indent.length);
     if (bracketStart < 0) return { kind: 'noop' };
@@ -129,33 +129,92 @@ export function computeEnterEdit(
 }
 
 /**
- * Compute what Tab should do on the given task line.
+ * Enter handling for a *bare bullet* — a `-`/`*`/`+` list item without a `[ ]`
+ * marker. Mirrors the task Enter behavior, minus any metadata:
  *
- * Per the simplified spec, Tab only intercepts on **empty tasks** (indent
- * the whole line by one level). Tab on a non-empty task — or anything
- * outside a task — returns `noop` and the activation layer falls back to
- * the editor's default Tab (usually inserts a tab/spaces or triggers
- * indent if a multi-line selection).
+ *   - Cursor before the content → `noop` (default Enter).
+ *   - Empty bullet → outdent one level (indented) or clear the line (column 0).
+ *   - Cursor at/after the content end → empty continuation: a fresh `<bullet> `
+ *     on the next line, preserving the original marker char (`*` stays `*`).
+ *   - Mid-content → split into two bullets at the cursor.
+ *
+ * Returns `noop` for any non-bullet line. Pure — the activation layer applies
+ * the edit + moves the cursor, exactly as for the task path.
  */
-export function computeTabEdit(line: string, cursorCol: number, opts: EditorOpts): ListEditAction {
-    const parsed = parseLine(line);
-    if (!parsed) return { kind: 'noop' };
-    if (parsed.content !== '') return { kind: 'noop' };
+function computeBulletEnter(line: string, cursorCol: number, opts: EditorOpts): ListEditAction {
+    const bullet = parseBullet(line);
+    if (!bullet) return { kind: 'noop' };
 
-    const indented = indentString(parsed.raw, opts);
-    const added = indented.length - parsed.raw.length;
+    const prefixEnd = bullet.contentStart;
+    // Cursor in/before the marker prefix — default Enter.
+    if (cursorCol < prefixEnd) return { kind: 'noop' };
+
+    // Empty bullet: outdent or remove (mirrors the empty-task path).
+    if (bullet.content === '') {
+        if (bullet.indent.length === 0) {
+            return { kind: 'replace-line', text: '', cursorCol: 0 };
+        }
+        return dedentLineAction(bullet.raw, cursorCol, opts);
+    }
+
+    // The continuation marker normalises to a single space and reuses the same
+    // bullet char, so `* a` continues as `* ` and `-   a` as `- `.
+    const continuationPrefix = `${bullet.indent}${bullet.bullet} `;
+    const contentEnd = prefixEnd + bullet.content.length;
+
+    if (cursorCol >= contentEnd) {
+        // Empty continuation: a fresh empty bullet below.
+        return {
+            kind: 'split-line',
+            firstText: bullet.raw,
+            secondText: continuationPrefix,
+            cursorCol: continuationPrefix.length,
+        };
+    }
+
+    // Mid-content split into two bullets. An empty `before` collapses to the
+    // continuation prefix (`- `), which is a valid empty bullet.
+    const before = bullet.raw.slice(prefixEnd, cursorCol).trimEnd();
+    const after = bullet.raw.slice(cursorCol, contentEnd).trimStart();
     return {
-        kind: 'replace-line',
-        text: indented,
-        cursorCol: cursorCol + added,
+        kind: 'split-line',
+        firstText: `${bullet.indent}${bullet.bullet} ${before}`,
+        secondText: `${continuationPrefix}${after}`,
+        cursorCol: continuationPrefix.length,
     };
 }
 
 /**
- * Compute what Shift+Tab should do on the given task line.
+ * Compute what Tab should do on the given line.
  *
- * Shift+Tab on **any** task with indent outdents by one level. On a
- * column-0 task or non-task line, returns `noop`.
+ * Per the simplified spec, Tab only intercepts on **empty** task/bullet lines
+ * (indent the whole line by one level). Tab on a non-empty task or bullet — or
+ * anything that isn't a list line — returns `noop` and the activation layer
+ * falls back to the editor's default Tab. Bare bullets follow the same
+ * empty-only rule as tasks: a deliberate tsk-consistency choice over MAIO's
+ * "indent any list item".
+ */
+export function computeTabEdit(line: string, cursorCol: number, opts: EditorOpts): ListEditAction {
+    const parsed = parseLine(line);
+    if (parsed) {
+        return parsed.content === ''
+            ? indentLineAction(parsed.raw, cursorCol, opts)
+            : { kind: 'noop' };
+    }
+    const bullet = parseBullet(line);
+    if (bullet) {
+        return bullet.content === ''
+            ? indentLineAction(bullet.raw, cursorCol, opts)
+            : { kind: 'noop' };
+    }
+    return { kind: 'noop' };
+}
+
+/**
+ * Compute what Shift+Tab should do on the given line.
+ *
+ * Shift+Tab on **any** indented task or bare bullet outdents by one level. On a
+ * column-0 line (no indent) or a non-list line, returns `noop`.
  */
 export function computeShiftTabEdit(
     line: string,
@@ -163,16 +222,32 @@ export function computeShiftTabEdit(
     opts: EditorOpts,
 ): ListEditAction {
     const parsed = parseLine(line);
-    if (!parsed) return { kind: 'noop' };
-    if (parsed.indent.length === 0) return { kind: 'noop' };
+    if (parsed) {
+        return parsed.indent.length === 0
+            ? { kind: 'noop' }
+            : dedentLineAction(parsed.raw, cursorCol, opts);
+    }
+    const bullet = parseBullet(line);
+    if (bullet) {
+        return bullet.indent.length === 0
+            ? { kind: 'noop' }
+            : dedentLineAction(bullet.raw, cursorCol, opts);
+    }
+    return { kind: 'noop' };
+}
 
-    const dedented = dedentString(parsed.raw, opts);
-    const removed = parsed.raw.length - dedented.length;
-    return {
-        kind: 'replace-line',
-        text: dedented,
-        cursorCol: Math.max(0, cursorCol - removed),
-    };
+/** Indent `raw` one level and shift the cursor right by the added width. */
+function indentLineAction(raw: string, cursorCol: number, opts: EditorOpts): ListEditAction {
+    const indented = indentString(raw, opts);
+    const added = indented.length - raw.length;
+    return { kind: 'replace-line', text: indented, cursorCol: cursorCol + added };
+}
+
+/** Outdent `raw` one level and shift the cursor left by the removed width. */
+function dedentLineAction(raw: string, cursorCol: number, opts: EditorOpts): ListEditAction {
+    const dedented = dedentString(raw, opts);
+    const removed = raw.length - dedented.length;
+    return { kind: 'replace-line', text: dedented, cursorCol: Math.max(0, cursorCol - removed) };
 }
 
 /** Prepend one indent level (tabs honored when `insertSpaces` is false). */

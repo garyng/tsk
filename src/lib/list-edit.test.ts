@@ -146,6 +146,73 @@ describe('computeEnterEdit', () => {
     });
 });
 
+describe('computeEnterEdit — bare bullets', () => {
+    it('returns noop when the cursor is before the bullet content', () => {
+        expect(computeEnterEdit('- foo', 1, SPACE_OPTS, FIXED_DEPS)).toEqual({ kind: 'noop' });
+    });
+
+    it('clears an empty bullet at column 0', () => {
+        expect(computeEnterEdit('- ', 2, SPACE_OPTS, FIXED_DEPS)).toEqual({
+            kind: 'replace-line',
+            text: '',
+            cursorCol: 0,
+        });
+    });
+
+    it('outdents an empty indented bullet', () => {
+        expect(computeEnterEdit('    - ', 6, SPACE_OPTS, FIXED_DEPS)).toEqual({
+            kind: 'replace-line',
+            text: '- ',
+            cursorCol: 2,
+        });
+    });
+
+    it('continues a non-empty bullet with a fresh empty bullet (no metadata)', () => {
+        expect(computeEnterEdit('- foo', 5, SPACE_OPTS, FIXED_DEPS)).toEqual({
+            kind: 'split-line',
+            firstText: '- foo',
+            secondText: '- ',
+            cursorCol: 2,
+        });
+    });
+
+    it('preserves the original marker char on continuation', () => {
+        expect(computeEnterEdit('* foo', 5, SPACE_OPTS, FIXED_DEPS)).toEqual({
+            kind: 'split-line',
+            firstText: '* foo',
+            secondText: '* ',
+            cursorCol: 2,
+        });
+    });
+
+    it('continues an indented bullet at the same indent', () => {
+        expect(computeEnterEdit('    - foo', 9, SPACE_OPTS, FIXED_DEPS)).toEqual({
+            kind: 'split-line',
+            firstText: '    - foo',
+            secondText: '    - ',
+            cursorCol: 6,
+        });
+    });
+
+    it('splits a bullet mid-content into two bullets', () => {
+        expect(computeEnterEdit('- foo bar', 5, SPACE_OPTS, FIXED_DEPS)).toEqual({
+            kind: 'split-line',
+            firstText: '- foo',
+            secondText: '- bar',
+            cursorCol: 2,
+        });
+    });
+
+    it('splits at content start, leaving an empty bullet above', () => {
+        expect(computeEnterEdit('- foo', 2, SPACE_OPTS, FIXED_DEPS)).toEqual({
+            kind: 'split-line',
+            firstText: '- ',
+            secondText: '- foo',
+            cursorCol: 2,
+        });
+    });
+});
+
 describe('computeTabEdit', () => {
     it('returns noop on a non-task line', () => {
         expect(computeTabEdit('plain text', 0, SPACE_OPTS)).toEqual({ kind: 'noop' });
@@ -176,6 +243,26 @@ describe('computeTabEdit', () => {
             kind: 'replace-line',
             text: '    - [ ] <!-- @id:x -->',
             cursorCol: 10,
+        });
+    });
+
+    it('returns noop on a non-empty bullet (default Tab applies)', () => {
+        expect(computeTabEdit('- foo', 5, SPACE_OPTS)).toEqual({ kind: 'noop' });
+    });
+
+    it('indents an empty bullet with insertSpaces', () => {
+        expect(computeTabEdit('- ', 2, SPACE_OPTS)).toEqual({
+            kind: 'replace-line',
+            text: '    - ',
+            cursorCol: 6,
+        });
+    });
+
+    it('indents an empty bullet with tabs', () => {
+        expect(computeTabEdit('- ', 2, TAB_OPTS)).toEqual({
+            kind: 'replace-line',
+            text: '\t- ',
+            cursorCol: 3,
         });
     });
 });
@@ -210,6 +297,18 @@ describe('computeShiftTabEdit', () => {
             kind: 'replace-line',
             text: '- [x] done <!-- @id:x -->',
             cursorCol: 10,
+        });
+    });
+
+    it('returns noop on a bullet at column 0', () => {
+        expect(computeShiftTabEdit('- foo', 2, SPACE_OPTS)).toEqual({ kind: 'noop' });
+    });
+
+    it('dedents an indented bullet (empty or not)', () => {
+        expect(computeShiftTabEdit('    - foo', 6, SPACE_OPTS)).toEqual({
+            kind: 'replace-line',
+            text: '- foo',
+            cursorCol: 2,
         });
     });
 });
