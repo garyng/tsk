@@ -162,6 +162,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.cache.path` | `${workspaceFolder}/.vscode/tsk/cache.db` | On-disk SQLite cache (`${workspaceFolder}` expanded at runtime; in-memory when no workspace folder is open). |
 | `tsk.tags.path` | `${workspaceFolder}/.vscode/tsk/tags.yml` | Workspace `tags.yml` for tag descriptions + completion. Blank ⇒ no file loaded (tags discovered in `.tsk` files still complete). |
 | `tsk.log.level` | `info` | `tsk` Output-channel verbosity: `debug` / `info` / `warn` / `error`. |
+| `tsk.editor.changeDebounceMs` | `300` | Debounce (ms) before re-decorating / rescanning a `.tsk` document after a text change (range 0–5000). |
 | `tsk.decorations.priority.opacity` | `0.15` | Background opacity (0–1) of priority line tints; applies live. |
 | `tsk.clipboard.bridgeEnabled` | `false` | Master switch for the clipboard bridge (watch a file → host clipboard). |
 | `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched bridge file; only used when the bridge is enabled. |

@@ -31,5 +31,6 @@ suite('activation', () => {
         const config = vscode.workspace.getConfiguration('tsk');
         assert.strictEqual(config.get<string>('log.level'), 'info');
         assert.strictEqual(config.get<number>('decorations.priority.opacity'), 0.15);
+        assert.strictEqual(config.get<number>('editor.changeDebounceMs'), 300);
     });
 });

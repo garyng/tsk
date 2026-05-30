@@ -26,3 +26,14 @@ export function parseLogLevel(raw: string): LogLevel {
 export function clampPriorityOpacity(raw: number): number {
     return Math.max(0, Math.min(1, raw));
 }
+
+/**
+ * Validate a raw `tsk.editor.changeDebounceMs` value (ms). The manifest declares
+ * a default of 300 and a [0, 5000] integer range enforced in the Settings UI;
+ * this guards a hand-edited settings.json — a non-finite value degrades to 0 (no
+ * debounce), otherwise the value is clamped to [0, 5000] and rounded.
+ */
+export function parseChangeDebounceMs(raw: number): number {
+    if (!Number.isFinite(raw)) return 0;
+    return Math.max(0, Math.min(5000, Math.round(raw)));
+}

@@ -96,6 +96,9 @@ export const CLIPBOARD_BRIDGE_PATH_KEY = 'clipboard.bridgePath';
 export const PASTE_IMAGE_BASE_DIRECTORY_SETTING = 'tsk.pasteImage.baseDirectory';
 export const PASTE_IMAGE_BASE_DIRECTORY_KEY = 'pasteImage.baseDirectory';
 
+export const EDITOR_CHANGE_DEBOUNCE_SETTING = 'tsk.editor.changeDebounceMs';
+export const EDITOR_CHANGE_DEBOUNCE_KEY = 'editor.changeDebounceMs';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every
@@ -113,15 +116,6 @@ export const METADATA_FOREGROUND_COLOR_ID = 'tsk.metadata.foreground';
 export const NAVIGATION_HIGHLIGHT_COLOR_ID = 'tsk.navigation.highlight';
 
 // ── Timing ──────────────────────────────────────────────────────────────────
-
-/**
- * Debounce interval (ms) applied to per-URI cache rescans and decoration
- * refreshes on document change. Long enough to coalesce a typing burst,
- * short enough that a save-driven reflow feels immediate.
- *
- * TODO: configurable
- */
-export const DOC_CHANGE_DEBOUNCE_MS = 300;
 
 /**
  * Poll interval (ms) for the clipboard-bridge `fs.watchFile` watcher.

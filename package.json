@@ -336,6 +336,13 @@
                     "default": "info",
                     "description": "Verbosity of the tsk Output channel."
                 },
+                "tsk.editor.changeDebounceMs": {
+                    "type": "number",
+                    "default": 300,
+                    "minimum": 0,
+                    "maximum": 5000,
+                    "description": "Debounce (ms) before re-decorating and rescanning a .tsk document after a text change. Lower feels snappier; higher coalesces typing bursts on large files."
+                },
                 "tsk.decorations.priority.opacity": {
                     "type": "number",
                     "default": 0.15,

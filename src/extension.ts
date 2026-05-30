@@ -6,7 +6,7 @@ import {
     CACHE_PATH_KEY,
     COMMANDS,
     DIAGNOSTIC_SOURCE,
-    DOC_CHANGE_DEBOUNCE_MS,
+    EDITOR_CHANGE_DEBOUNCE_KEY,
     LOG_LEVEL_KEY,
     LOG_LEVEL_SETTING,
     METADATA_FOREGROUND_COLOR_ID,
@@ -38,7 +38,7 @@ import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
 import { computeSearchResultRanges } from './lib/search-result-decorations';
-import { clampPriorityOpacity, parseLogLevel } from './lib/settings';
+import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
@@ -425,6 +425,15 @@ function readLogLevel(): LogLevel {
     return parseLogLevel(value);
 }
 
+function readChangeDebounceMs(): number {
+    // Throwaway 0 fallback — VSCode returns the package.json default (300) for
+    // this contributed setting; the parser clamps a hand-edited value.
+    const value = vscode.workspace
+        .getConfiguration('tsk')
+        .get<number>(EDITOR_CHANGE_DEBOUNCE_KEY, 0);
+    return parseChangeDebounceMs(value);
+}
+
 async function runInitialScan(): Promise<void> {
     if (!state) return;
     const { cache, graph, codelens, logger, diagnosticsManager } = state;
@@ -504,7 +513,7 @@ function rescanFromDoc(doc: vscode.TextDocument): void {
 
 function scheduleDebouncedRescan(doc: vscode.TextDocument): void {
     if (!state) return;
-    scheduleDebounced(state.changeTimers, doc.uri.toString(), DOC_CHANGE_DEBOUNCE_MS, () =>
+    scheduleDebounced(state.changeTimers, doc.uri.toString(), readChangeDebounceMs(), () =>
         rescanFromDoc(doc),
     );
 }
@@ -653,7 +662,7 @@ function applyDecorationsForDoc(doc: vscode.TextDocument): void {
 
 function scheduleDebouncedDecorate(doc: vscode.TextDocument): void {
     if (!state) return;
-    scheduleDebounced(state.decorationTimers, doc.uri.toString(), DOC_CHANGE_DEBOUNCE_MS, () =>
+    scheduleDebounced(state.decorationTimers, doc.uri.toString(), readChangeDebounceMs(), () =>
         applyDecorationsForDoc(doc),
     );
 }
