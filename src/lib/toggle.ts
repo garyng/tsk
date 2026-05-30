@@ -194,3 +194,23 @@ export function toggleMetadataEntry(line: string, key: string, value: string | n
         }
     });
 }
+
+/**
+ * Refresh a *duplicated* task's identity: stamp a fresh `@id` and re-stamp
+ * `@created` to "now". Non-task lines (bare bullets, plain text, blanks) pass
+ * through unchanged.
+ *
+ * Used by the duplicate-line commands so a copied task doesn't collide with its
+ * source on `@id` (the cache primary key). Only `@id` + `@created` change —
+ * lifecycle stamps (`@started` / `@completed` / `@cancelled`) are preserved,
+ * since the copy inherits the original's state. A task missing `@created` gains
+ * one. `deps` is injected for purity/determinism, mirroring the toggle mutators.
+ */
+export function refreshTaskIdentity(
+    line: string,
+    deps: { generateId: () => string; now: () => string },
+): string {
+    if (parseLine(line) === null) return line;
+    const withId = setMetadataEntry(line, 'id', deps.generateId());
+    return setMetadataEntry(withId, 'created', deps.now());
+}

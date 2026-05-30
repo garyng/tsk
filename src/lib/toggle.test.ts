@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     contentCursorCol,
     promoteMissingMetadata,
+    refreshTaskIdentity,
     removeMetadataEntry,
     setMetadataEntry,
     swapMarker,
@@ -256,5 +257,39 @@ describe('toggleMetadataEntry', () => {
 
     it('passes a non-task line through unchanged', () => {
         expect(toggleMetadataEntry('not a task', 'priority', '1')).toBe('not a task');
+    });
+});
+
+describe('refreshTaskIdentity', () => {
+    it('stamps a fresh @id and re-stamps @created', () => {
+        expect(
+            refreshTaskIdentity(
+                '- [ ] foo <!-- @id:oldid @created:2026-01-01T00:00:00+08:00 -->',
+                FIXED_DEPS,
+            ),
+        ).toBe('- [ ] foo <!-- @id:newid @created:2026-05-27T10:00:00+08:00 -->');
+    });
+
+    it('preserves lifecycle stamps (@started / @completed)', () => {
+        expect(
+            refreshTaskIdentity(
+                '- [/] foo <!-- @id:oldid @created:2026-01-01T00:00:00+08:00 @started:2026-02-02T09:00:00+08:00 -->',
+                FIXED_DEPS,
+            ),
+        ).toBe(
+            '- [/] foo <!-- @id:newid @created:2026-05-27T10:00:00+08:00 @started:2026-02-02T09:00:00+08:00 -->',
+        );
+    });
+
+    it('adds @created when the source task lacks one', () => {
+        expect(refreshTaskIdentity('- [ ] foo <!-- @id:oldid -->', FIXED_DEPS)).toBe(
+            '- [ ] foo <!-- @id:newid @created:2026-05-27T10:00:00+08:00 -->',
+        );
+    });
+
+    it('passes non-task lines through unchanged', () => {
+        expect(refreshTaskIdentity('- a bare bullet', FIXED_DEPS)).toBe('- a bare bullet');
+        expect(refreshTaskIdentity('plain text', FIXED_DEPS)).toBe('plain text');
+        expect(refreshTaskIdentity('', FIXED_DEPS)).toBe('');
     });
 });
