@@ -94,21 +94,15 @@ export const CLIPBOARD_BRIDGE_PATH_SETTING = 'tsk.clipboard.bridgePath';
 export const CLIPBOARD_BRIDGE_PATH_KEY = 'clipboard.bridgePath';
 
 // ── Defaults ────────────────────────────────────────────────────────────────
-
-/**
- * Default priority opacity used when the user hasn't overridden the setting.
- * Mirrors the `default` in `package.json#contributes.configuration` so the
- * fallback in code stays consistent with the schema.
- */
-export const DEFAULT_PRIORITY_OPACITY = 0.15;
-
-/** Default log level used when the setting is missing or invalid. */
-export const DEFAULT_LOG_LEVEL = 'info';
-
-// `tsk.clipboard.bridgeEnabled` keeps its default solely in `package.json`
-// (read via `.get(key, false)` — VSCode returns the manifest default for a
-// contributed setting). No mirrored constant: a single source of truth, like
-// the path settings (`cache.path` / `tags.path` / `clipboard.bridgePath`).
+//
+// There are intentionally NO `DEFAULT_*` setting constants here. Every
+// `tsk.*` setting declares its `default` once, in
+// `package.json#contributes.configuration`, and code reads it with
+// `getConfiguration('tsk').get(key, <throwaway>)`. VSCode returns the manifest
+// default for a contributed setting, so the throwaway fallback is dead code —
+// it only guards the (impossible-for-a-contributed-setting) case of a missing
+// manifest entry, and degrades sanely there (empty path → inactive, etc.).
+// Keeping defaults in one place means there's no code/manifest mirror to drift.
 
 // ── Theme color ids ─────────────────────────────────────────────────────────
 

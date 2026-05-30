@@ -5,8 +5,6 @@ import { type CodelensHandle, registerCodelens } from './codelens';
 import {
     CACHE_PATH_KEY,
     COMMANDS,
-    DEFAULT_LOG_LEVEL,
-    DEFAULT_PRIORITY_OPACITY,
     DIAGNOSTIC_SOURCE,
     DOC_CHANGE_DEBOUNCE_MS,
     LOG_LEVEL_KEY,
@@ -394,12 +392,16 @@ function registerAllCommands(
 }
 
 function readLogLevel(): LogLevel {
-    const value = vscode.workspace
-        .getConfiguration('tsk')
-        .get<string>(LOG_LEVEL_KEY, DEFAULT_LOG_LEVEL);
+    // Throwaway '' fallback — VSCode returns the package.json default ('info')
+    // for this contributed setting; '' only occurs if the manifest entry were
+    // missing, and fails validation below anyway.
+    const value = vscode.workspace.getConfiguration('tsk').get<string>(LOG_LEVEL_KEY, '');
     if (value === 'debug' || value === 'info' || value === 'warn' || value === 'error') {
         return value;
     }
+    // Malformed configured value (only reachable via a hand-edited
+    // settings.json — the manifest enum blocks it in the Settings UI):
+    // recover to the safe default level.
     return 'info';
 }
 
@@ -507,9 +509,10 @@ function applyWarnings(uri: vscode.Uri, warnings: CacheWarning[]): void {
 }
 
 function readPriorityOpacity(): number {
-    const value = vscode.workspace
-        .getConfiguration('tsk')
-        .get<number>(PRIORITY_OPACITY_KEY, DEFAULT_PRIORITY_OPACITY);
+    // Throwaway 0 fallback — VSCode returns the package.json default (0.15)
+    // for this contributed setting; 0 only occurs if the manifest entry were
+    // missing, degrading sanely to invisible priority tints.
+    const value = vscode.workspace.getConfiguration('tsk').get<number>(PRIORITY_OPACITY_KEY, 0);
     // Clamp defensively — the settings JSON schema enforces 0..1 but a
     // hand-edited settings.json could still smuggle anything in.
     return Math.max(0, Math.min(1, value));
