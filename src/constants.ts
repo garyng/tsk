@@ -105,17 +105,10 @@ export const DEFAULT_PRIORITY_OPACITY = 0.15;
 /** Default log level used when the setting is missing or invalid. */
 export const DEFAULT_LOG_LEVEL = 'info';
 
-/**
- * The clipboard bridge is opt-in — off unless the user enables it.
- *
- * Scalar defaults like this one stay as constants (cf. `DEFAULT_LOG_LEVEL`
- * / `DEFAULT_PRIORITY_OPACITY`). Path defaults do NOT — `bridgePath`,
- * `cache.path`, and `tags.path` all live solely in `package.json` and are
- * read with a throwaway `.get(key, '')` fallback (VSCode returns the
- * manifest default for a contributed setting anyway). Keeping the path
- * default in one place avoids a code/manifest mirror that can drift.
- */
-export const DEFAULT_CLIPBOARD_BRIDGE_ENABLED = false;
+// `tsk.clipboard.bridgeEnabled` keeps its default solely in `package.json`
+// (read via `.get(key, false)` — VSCode returns the manifest default for a
+// contributed setting). No mirrored constant: a single source of truth, like
+// the path settings (`cache.path` / `tags.path` / `clipboard.bridgePath`).
 
 // ── Theme color ids ─────────────────────────────────────────────────────────
 

@@ -15,7 +15,6 @@ import {
     CLIPBOARD_BRIDGE_PATH_KEY,
     CLIPBOARD_BRIDGE_PATH_SETTING,
     CLIPBOARD_BRIDGE_POLL_INTERVAL_MS,
-    DEFAULT_CLIPBOARD_BRIDGE_ENABLED,
 } from './constants';
 import { resolveBridgePath } from './lib/clipboard-bridge-path';
 import type { Logger } from './lib/logger';
@@ -59,10 +58,11 @@ class ClipboardBridge {
         this.stop();
 
         const config = vscode.workspace.getConfiguration('tsk');
-        const enabled = config.get<boolean>(
-            CLIPBOARD_BRIDGE_ENABLED_KEY,
-            DEFAULT_CLIPBOARD_BRIDGE_ENABLED,
-        );
+        // The `false` fallback is the safe-off default if the setting is
+        // somehow absent; VSCode returns the package.json default (`false`)
+        // for this contributed setting, so the manifest stays the single
+        // source of truth — no mirrored constant in code.
+        const enabled = config.get<boolean>(CLIPBOARD_BRIDGE_ENABLED_KEY, false);
         if (!enabled) return;
 
         // Throwaway '' fallback: VSCode returns the package.json default for
