@@ -1,414 +1,116 @@
-<!-- demo file — every milestone updates this to exercise its features end-to-end -->
+<!-- A hands-on tour. Put your cursor on a task and press the key. Ctrl+Z undoes anything. -->
 
-# tsk demo
+# tsk — interactive tour
 
-This file is the living showcase of every implemented feature. Open it in the
-Extension Development Host (`F5` from this folder) to see grammar highlighting,
-decorations, code lenses, and commands in action.
+Every `- [ ]` line is a task; `Alt`+a key changes it and tsk fills in the id and timestamps. Press `F5` to open this in the dev host, then work down the page. One `Ctrl+Z` undoes any change.
 
-## Cache (M3)
+## 1. Status
 
-On activation, the extension scans every `**/*.tsk` file in the workspace
-(excluding `**/node_modules/**`) and indexes tasks, metadata, and tags into
-a SQLite cache at `${workspaceFolder}/.vscode/tsk/cache.db` (configurable
-via `tsk.cache.path`; opens in-memory when no workspace folder is open).
-The `tsk` Output channel logs a `initial scan: N scanned, … tasks indexed,
-… tags, …ms` line at completion.
+| Key | Status |
+|-----|--------|
+| `Alt+A` | todo `[ ]` |
+| `Alt+S` | in progress `[/]` |
+| `Alt+C` | done `[x]` |
+| `Alt+X` | cancelled `[!]` |
+| `Alt+N` | note `[n]` |
 
-Two surfaces report problems at scan time, per the **Warnings convention**:
+Same key toggles back. `Alt+A` turns a bare line into a task; on an empty `- [ ]` it removes it.
 
-- The Output channel — chronological log, click any `file:line` to navigate.
-- The Problems panel — `Warning` diagnostics squiggle the offending line.
+Try `Alt+A` on the bare line, then `Alt+S` / `Alt+C` on the tasks:
 
-Today's warning categories: duplicate `@id` across the workspace, and tasks
-with no `@id` at all. Both prevent the offending task from participating in
-codelens / tag-find / graph lookups.
+buy milk
 
-Open the Command Palette and run **Tsk: Rebuild Cache** to wipe and rescan
-(useful after editing files outside VSCode, or if anything ever drifts).
+- [ ] flip me with Alt+S <!-- @id:first-flip -->
+- [x] un-complete me with Alt+C <!-- @id:first-done @completed:2026-05-27T09:00:00+08:00 -->
 
-## Decorations (M4)
+## 2. Priority
 
-Two decoration layers on `.tsk` documents:
+| Key | Priority |
+|-----|----------|
+| `Alt+1` | high |
+| `Alt+2` | medium |
+| `Alt+3` | low |
 
-- **Marker triplet color** — each `[X]` lights up per-marker via the
-  `tsk.marker.{inprogress,completed,moved,cancelled,notes}` theme colors
-  contributed in `package.json`. `todo` (`[ ]`) deliberately uses the
-  editor's default foreground; the other five get distinct hues. `completed`
-  and `cancelled` also strike through their triplet to read as "done /
-  abandoned" at a glance. Override colors per workspace via
-  `workbench.colorCustomizations` if the defaults clash with your theme.
-- **Priority line background** — `@priority:1` paints the whole line red,
-  `:2` yellow, `:3` blue. Opacity is settable via
-  `tsk.decorations.priority.opacity` (default `0.15`); flipping it triggers
-  a live rebuild of the decoration types — no reload needed.
-- **Dimmed inline metadata** — every `<!-- @key:value -->` block is colored
-  via `tsk.metadata.foreground` (a dim gray with alpha) so the comments
-  recede into the editor background. The parsed values surface via
-  hover-on-task in Phase 2; for now the dimming is the "present but quiet"
-  hint that those comments are extension-managed bookkeeping, not content.
+Colors the whole line; the same number clears it.
 
-Decorations apply on editor focus, on save, and on a 300 ms debounce after
-text changes; the timer is independent of the cache rescan debounce.
+- [ ] ship the release <!-- @id:pri-a -->
+- [ ] water the plants <!-- @id:pri-b -->
 
-### Priority examples
+## 3. Tags
 
-- [ ] urgent — fix the data corruption #project/tsk <!-- @id:d4p1 @priority:1 -->
-- [ ] important — investigate the slow query #project/tsk <!-- @id:d4p2 @priority:2 -->
-- [ ] background — tidy up the readme #project/tsk <!-- @id:d4p3 @priority:3 -->
-- [ ] no priority — a normal task <!-- @id:d4none -->
+`#tag`, nest with `/`. Type `#` to autocomplete (from your tasks + this folder's `tags.yml`); try `proj`, `inv`, `decl`:
 
-Try editing the opacity in `settings.json` while these are visible:
+- [ ] sketch the architecture #
+- [ ] order the parts #
 
-```json
-{ "tsk.decorations.priority.opacity": 0.4 }
-```
+`Alt+T` → searchable tag list with counts → opens a search of matching tasks.
 
-The line backgrounds intensify (or fade) immediately.
+- [ ] chase the ticket #JIRAID-123 <!-- @id:tag-a -->
+- [ ] mount the NAS #inventory/homelab/nas1 <!-- @id:tag-b -->
 
-## Markdown still works
+## 4. Links
 
-Headings, **bold**, *italic*, `inline code`, and links all render via the embedded
-markdown grammar.
+| Key | Link |
+|-----|------|
+| `Alt+P` | `@parent` |
+| `Alt+D` | `@dependsOn` |
+| `Alt+R` | `@relatedTo` |
 
-```ts
-// Fenced code blocks are highlighted by the embedded TypeScript grammar.
-function hello(name: string): string {
-    return `hi ${name}`;
-}
-```
+Each opens a picker; the same key removes. Linked tasks grow code lenses (`parent: …`, `children: 2`) — click to jump or peek.
 
-```sh
-echo "shell blocks too"
-```
+Parent + two children — look at the lenses:
 
-> Block quotes also work — markdown features are not lost.
-
-## Task markers
-
-Every marker character is scoped distinctly, so themes can color them per-marker.
-Decorations on top of these scopes arrive in M4.
-
-- [ ] todo — the default empty marker
-- [/] in progress — work has started
-- [x] completed — done
-- [>] moved — relocated somewhere else
-- [!] cancelled — abandoned
-- [n] notes — informational sub-item
-
-Case tolerance: `[X]` and `[N]` are also accepted on read.
+- [ ] plan the launch <!-- @id:link-parent -->
+- [ ] book the venue <!-- @id:link-child-1 @parent:link-parent -->
+- [ ] send the invites <!-- @id:link-child-2 @parent:link-parent -->
 
-- [X] also completed
-- [N] also a note
-
-Indented tasks (nesting) work too:
-
-- [ ] parent task
-    - [/] indented child
-        - [x] deeply nested
-- [ ] sibling
-
-## Inline metadata
-
-Metadata lives inside an HTML comment after the task content. Each `@key:value`
-pair is scoped separately so themes can highlight the key, the separator, and
-the value.
-
-- [x] write the grammar <!-- @id:k3w8t9rx @created:2026-05-24T15:00:00+08:00 @completed:2026-05-24T17:30:42+08:00 -->
-- [/] try a value-less flag <!-- @id:m2x7v4qy @starred -->
-
-## Tags
-
-Tags use `#word` and support `/` for hierarchy. Markdown headings (which start
-with `# ` followed by a space) are *not* matched as tags.
-
-- [ ] ship the M1 milestone #project/tsk #JIRAID-123
-- [ ] wire up the homelab #inventory/homelab/nas1
-
-## Combined example
-
-A real task usually has a marker, content, tags, and metadata together:
-
-- [/] integrate `node:sqlite` cache layer #project/tsk #milestone/M3 <!-- @id:p4f8c2dh @created:2026-05-24T17:45:11+08:00 @started:2026-05-25T09:00:00+08:00 -->
-
-## Try these (M5 — toggle commands)
-
-Place your cursor on a task and press one of the keybindings below. Edits
-land as a single `WorkspaceEdit` — one Ctrl+Z reverts the whole operation.
-Multi-cursor works too; the toggle applies once per unique line.
-
-| Keybinding   | Command                                       | Behavior |
-|--------------|-----------------------------------------------|----------|
-| `Alt+A`      | `tsk.toggleTodo`                              | Wrap a plain/empty line as `[ ]` with `@id` + `@created`; unwrap an empty todo back to its indent; **or** promote a markered-but-no-`@id` todo by filling in the missing metadata. |
-| `Alt+S`      | `tsk.toggleInprogress`                        | Swap marker to `[/]` + `@started`; toggling again reverts to `[ ]`. |
-| `Alt+C`      | `tsk.toggleCompleted`                         | Same shape with `[x]` + `@completed`. |
-| `Alt+X`      | `tsk.toggleCancelled`                         | Same shape with `[!]` + `@cancelled`. |
-| `Alt+N`      | `tsk.toggleNote`                              | Wrap/unwrap as `[n]`, like `toggleTodo`; promotes a markered-but-no-`@id` note the same way. |
-| `Alt+M`      | `tsk.toggleMoved`                             | Picker → `[>]` + `@movedTo` + `@moved`. Empty submission writes only `@moved` ("moved elsewhere, no target"). |
-| `Alt+R`      | `tsk.toggleRelatedTo`                         | Absent → picker → write; present → silently remove. |
-| `Alt+D`      | `tsk.toggleDependsOn`                         | Same shape with `@dependsOn`. |
-| `Alt+P`      | `tsk.toggleParent`                            | Same shape with `@parent`. |
-| `Alt+1/2/3`  | `tsk.toggleP1` / `P2` / `P3`                  | Toggle `@priority:N` (switching levels overwrites in one step). |
-| `` Alt+` ``  | `tsk.copyTaskId`                              | Copy the current task's `@id` to the system clipboard. |
-
-Cursor on any of the lines below and try the matching keybinding:
-
-- [ ] flip me to in-progress with Alt+S <!-- @id:d5try1 -->
-- [/] flip me back to todo with Alt+S <!-- @id:d5try2 @started:2026-05-27T09:00:00+08:00 -->
-- [ ] complete me with Alt+C <!-- @id:d5try3 -->
-- [x] uncomplete me with Alt+C <!-- @id:d5try4 @completed:2026-05-27T09:00:00+08:00 -->
-- [ ] cancel me with Alt+X <!-- @id:d5try5 -->
-- [ ] move me with Alt+M — leave the picker empty to mark as moved-elsewhere <!-- @id:d5try6 -->
-- [ ] add a relatedTo with Alt+R <!-- @id:d5try7 -->
-- [ ] add a dependsOn with Alt+D <!-- @id:d5try8 -->
-- [ ] add a parent with Alt+P <!-- @id:d5try9 -->
-- [ ] toggle me to P1 with Alt+1, then to P2 with Alt+2 (overwrite) <!-- @id:d5try10 -->
-- [ ] copy my `@id` with `` Alt+` `` <!-- @id:d5try11 -->
-- [ ] promote me with Alt+A — I have no `@id` yet
-- [n] promote me with Alt+N — I have no `@id` yet
-- [x] promote me via the lightbulb (Ctrl+.) — Alt+A wouldn't fire here because the marker isn't `[ ]`
-
-**Keybinding caveats.** `Alt+1/2/3` are globally bound to "Focus N-th Editor
-Group"; the `when: editorLangId == 'tsk'` clause makes our binding win inside
-`.tsk` files only. `` Alt+` `` uses the backtick key, which varies by keyboard
-layout (UK / DE / FR users may need to rebind via Keyboard Shortcuts).
-
-**Code actions (M19/C).** Place the cursor on any markered task missing
-`@id` (including non-`[ ]` markers) and press Ctrl+. (or click the lightbulb).
-A "Tsk: Add missing id + created" (or "Tsk: Add missing id" if `@created`
-already exists) quick-fix surfaces. Applying it writes the same metadata
-Alt+A would, but works regardless of marker — handy for promoting a
-pre-existing `[x]` task you imported from somewhere else.
-
-**Broken-reference quick-fixes (M20/C).** When a task has `@parent`,
-`@dependsOn`, or `@relatedTo` pointing at an id with no canonical
-occurrence in the workspace, you'll see a yellow squiggle on the line.
-Open the lightbulb and pick **"Tsk: Remove broken @<key>"** to drop the
-bad reference, or **"Tsk: Replace @<key> via picker…"** to open the task
-picker and write a new id. Try the lines below — both reference ghost
-ids that don't exist anywhere in the workspace.
-
-- [ ] orphan with broken @parent <!-- @id:m20-demo-orphan @parent:m20-demo-ghost -->
-- [ ] orphan with broken @dependsOn <!-- @id:m20-demo-orphan-dep @dependsOn:m20-demo-ghost-dep -->
-
-## Try Enter / Tab here (M7)
-
-Place your cursor on one of these tasks and press Enter, Tab, or Shift+Tab.
-Edits land as a single `WorkspaceEdit` — one Ctrl+Z reverts everything.
-
-| Key       | Effect on a task line                                                                  |
-|-----------|----------------------------------------------------------------------------------------|
-| `Enter`   | At end of content → continue the list (new empty task below). Mid-content → split (metadata pins to line 1). On an empty task → outdent (or remove at col 0). |
-| `Tab`     | On an empty task → indent one level. Otherwise → default editor Tab.                   |
-| `Shift+Tab` | On any indented task → outdent one level.                                            |
-
-When suggest / snippet UI is visible, Enter and Tab go back to their default
-roles (accept suggestion, advance snippet placeholder) — the `when` clause
-on the keybinding gives priority back to VSCode in those cases.
-
-- [ ] press Enter at the end of this line to continue the list <!-- @id:m7try1 -->
-- [ ] no metadata here — Enter still continues the list, just without pinning
-- [ ] press Enter between `foo` and `bar` to see the split with metadata pinned to line 1 <!-- @id:m7try2 -->
-- [ ]
-- [ ] ↑ that's an empty task — Enter on it removes the marker (col 0) or outdents (col > 0)
-    - [ ] indented empty task — Enter outdents <!-- @id:m7try3 -->
-        - [ ] deeply nested — repeated Shift+Tab walks back to column 0 <!-- @id:m7try4 -->
-- [ ] Tab on this content task is a no-op (defers to default editor Tab)
-- [x] Enter at end of a completed task still continues with a fresh `[ ]` marker
-
-## Tags (M8)
-
-Tags participate in two surfaces beyond M2's parser:
-
-- **`#`-triggered autocompletion** — start typing `#` inside any `.tsk`
-  document and a CompletionItemProvider surfaces every tag known to the
-  workspace. Items come from two sources, merged into one list:
-  - declared in `${workspaceFolder}/.vscode/tsk/tags.yml` (configurable
-    via `tsk.tags.path`), and
-  - discovered from `.tsk` files via the M3 cache, plus all their
-    implicit `/`-separated parents (so `#project/tsk` contributes
-    `#project` to the list automatically).
-- **`Alt+T` find-all-tasks-by-tag** — opens a QuickPick of every known
-  tag (searchable by name, task count, and yaml description), then opens
-  VSCode's built-in **Search Editor** (a full result tab) with `#<tag>`
-  already queried and scoped to `*.tsk`. Result rows keep `.tsk` grammar
-  highlighting; Ctrl+Click any result to jump to the line. Each picker
-  row shows a task count: `5 tasks · <description>`.
-  The count is **hierarchical** — `#project` reports every task under it
-  (including `#project/tsk` ones), matching what the `#project` search
-  returns. A tag declared in `tags.yml` but carried by no task shows
-  `0 tasks`, so you can see it exists but is empty.
-
-The sibling `docs/.vscode/tsk/tags.yml` ships with descriptions for
-every tag below, so the dev host has autocompletion + find-by-tag
-working against this file out of the box.
-
-`tags.yml` schema — both forms are accepted in the same file:
-
-```yml
-<tag>: <description>            # string shorthand
-<tag>:                           # object form
-    description: <description>
-    parent: <tag>
-```
-
-`parent` is an explicit override; implicit parents (`project/tsk` →
-`project`) are computed automatically regardless of what `tags.yml`
-says.
-
-### Try autocompletion
-
-Cursor at the `#` below, then type a few letters — `proj`, `mile`,
-`JIRA` — to see the picker filter. The yaml-declared-but-unused entry
-(`declared-only-example`) should show up too.
-
-- [ ] sketch the parent-child viz #
-- [ ] file the next bug report #
-
-### Tasks exercising the spec'd tag set
-
-These three tasks together cover the three styles called out in the
-M8 plan (`#JIRAID-123`, `#project/test`, `#inventory/homelab/nas1`):
-
-- [ ] follow up on JIRA-123 #JIRAID-123 <!-- @id:m8try1 -->
-- [ ] write the M8 test suite #project/test <!-- @id:m8try2 -->
-- [ ] mount the NAS share #inventory/homelab/nas1 <!-- @id:m8try3 -->
-
-### Try Alt+T
-
-Place your cursor anywhere in this file and press `Alt+T`. The
-QuickPick lists every tag (including implicit parents like `project`
-and `inventory/homelab`), each annotated with its hierarchical task
-count. Note that `project` and `inventory/homelab` show non-zero
-counts even though no task carries them literally — they inherit the
-counts of their `/`-children. Pick one → Search Editor opens with
-results pre-populated.
-
-**Keybinding caveats.** `Alt+T` follows the same convention as the
-other Alt-letter bindings — gated to `editorLangId == 'tsk' &&
-editorTextFocus`, so it only fires when you're inside a `.tsk`
-editor. Third-party extensions with an equally specific `when` clause
-could shadow it; some EU keyboard layouts (where `Alt+letter` produces
-a typed character) may need a rebind via Keyboard Shortcuts.
-
-## Codelens (M9)
-
-Every task with relationship metadata grows code lenses showing forward
-edges (`parent: <id>`, `dependsOn: <id>`, `relatedTo: <id>`) and inverse
-edges (`children: N`, `dependents: N`, `related: N`). Each title is
-prefixed with a codicon glyph hinting the relationship type — the
-current mapping lives in `CODICONS` in `src/lib/codelens-logic.ts`,
-intended to graduate to a user setting later. Forward lenses navigate
-on click; inverse lenses open a peek view of every source pointing
-here. Dangling forward edges — where the referenced `@id` doesn't exist
-anywhere in the workspace — render with a warning glyph and a
-"(missing)" suffix, and pop an info toast on click.
-
-Lenses appear only on the **canonical occurrence** of an `@id` (the
-lex-lowest `(file, line)` in the workspace). A duplicate-`@id` task
-gets a diagnostic squiggle on its line instead, pointing at the
-canonical winner. The graph layer's `tsk` Output log line for each
-duplicate is the chronological record.
-
-Note on rendering: code-lens font is controlled by VSCode's
-`editor.codeLensFontFamily` setting, which in practice does not always
-match the editor font even when the option doc implies it should. We
-deliberately don't customize per-lens fonts — adding a `$(codicon)`
-prefix or other markup wouldn't help, only changing the global
-setting does.
-
-### Parent and children
-
-A parent with three children — first task lights up `children: 3`
-(peek), each child shows `parent: m9hub` (navigate):
-
-- [ ] design the cache schema <!-- @id:m9hub -->
-- [ ] write the DB wrapper <!-- @id:m9c1 @parent:m9hub -->
-- [ ] write the parser <!-- @id:m9c2 @parent:m9hub -->
-- [ ] write the rescan loop <!-- @id:m9c3 @parent:m9hub -->
-
-### Dependency chain
-
-Sequential work where each task blocks the next. Middle nodes carry
-*both* `dependsOn: <prev>` and `dependents: N` lenses:
-
-- [ ] specify the API <!-- @id:m9d1 -->
-- [ ] implement the API <!-- @id:m9d2 @dependsOn:m9d1 -->
-- [ ] test the API <!-- @id:m9d3 @dependsOn:m9d2 -->
-
-### Related cluster
-
-A central concept linked from two peripherals. Central node shows
-`related: 2`; peripherals each show `relatedTo: m9r0`:
-
-- [ ] core architecture notes <!-- @id:m9r0 -->
-- [ ] sketch the diagram <!-- @id:m9r1 @relatedTo:m9r0 -->
-- [ ] discuss with the team <!-- @id:m9r2 @relatedTo:m9r0 -->
-
-### Dangling forward edge
-
-The referenced `@id` doesn't exist anywhere — click the lens to see
-the "(missing)" info toast surface:
-
-- [ ] orphaned reference <!-- @id:m9dangle @parent:never-existed -->
-
-### Navigation highlight (M10)
-
-After clicking any forward-edge lens (the navigate ones, not the peek
-ones), the target line stays softly tinted via the
-`tsk.navigation.highlight` theme color until you do one of three
-things: click another navigate lens (the highlight follows the next
-jump), move the cursor with the keyboard or mouse, or switch to a
-different editor. There's no fade timer — the highlight sticks around
-so you can find your spot after scrolling, then clears itself the
-moment you start interacting again. Override the tint via
-`workbench.colorCustomizations` if the default soft yellow clashes
-with your theme.
-
-## Parser model (M2)
-
-The parser reads every line above into a `Task` record exposing `marker`,
-`indent`, `content`, an insertion-ordered `metadata` Map, a `tags` array, and
-a zero-indexed `line`. Nothing visible yet — M3 plugs this into a SQLite cache
-and surfaces it via commands — but the model is exercised by these examples.
-
-### Full lifecycle
-
-A task that has run through every status from creation to completion:
-
-- [x] ship M2 parser #project/tsk #milestone/M2 <!-- @id:r7p3v2qm @created:2026-05-24T09:00:00+08:00 @started:2026-05-24T11:00:00+08:00 @completed:2026-05-24T18:30:00+08:00 -->
-
-### Relationship metadata
-
-Relationships are inline `@key:<task-id>` references. Codelens wiring lands in
-M9; the parser already extracts these into the metadata Map.
-
-- [ ] design caching schema #project/tsk <!-- @id:s8m4d2tr @parent:p4f8c2dh @relatedTo:r7p3v2qm -->
-- [ ] write migration runner #project/tsk <!-- @id:t9n5e3us @dependsOn:s8m4d2tr -->
-- [>] explore alt SQLite bindings <!-- @id:u1o6f4vt @movedTo:s8m4d2tr @moved:2026-05-24T20:00:00+08:00 -->
-
-### Edge cases the parser must handle
-
-- [x] a task whose value-less flag survives round-trip <!-- @id:v2p7g5wu @flag -->
-- [x] a task whose empty-value entry survives round-trip <!-- @id:w3q8h6xv @flag: -->
-- [x] **bold** and *italic* and `code` inside content render via the embedded markdown grammar <!-- @id:x4r9i7yw -->
-
-## Paste image (M23)
-
-With an image on the clipboard, paste (`Ctrl+V` / `Cmd+V`) anywhere in a `.tsk`
-or Markdown file (or a Jupyter markdown cell) and tsk saves the bytes to disk
-and inserts a Markdown image link at the cursor — the alt text lands selected
-so you can immediately retype it. The file goes under
-`tsk.pasteImage.baseDirectory` (default `./images`, relative to this document;
-blank means "beside the document").
-
-To name it, **select some text first** and paste over it: the selection becomes
-the path verbatim and may include subfolders, e.g. selecting `diagrams/flow`
-saves `./images/diagrams/flow.png` (the extension is forced to match the image
-type). With no selection you're prompted for the path, pre-filled with a
-timestamp. If the target already exists you're re-prompted, then asked to
-confirm an overwrite. The save rides the paste's undo step — `Ctrl+Z` removes
-the inserted link and deletes the just-saved file in one go.
-
-<!-- Try it: put an image on the clipboard, then paste on the blank line below. -->
+Try `Alt+D` here, pick "plan the launch":
 
+- [ ] arrange the catering <!-- @id:link-dep -->
+
+## 5. Structure
+
+| Key | Effect |
+|-----|--------|
+| `Enter` (end of line) | new sibling task below |
+| `Enter` (empty task) | outdent, or remove at the margin |
+| `Tab` (empty task) | indent one level |
+| `Shift+Tab` | outdent |
+
+- [ ] first step <!-- @id:indent-a -->
+- [ ] Tab me under it <!-- @id:indent-b -->
+    - [ ] Shift+Tab walks me back out <!-- @id:indent-c -->
+
+## 6. Hover
+
+Hover a task to read its id, timestamps ("3 hours ago"), tags, and links.
+
+- [/] migrate the database #project/tsk <!-- @id:hover-demo @created:2026-05-24T09:00:00+08:00 @started:2026-05-25T11:00:00+08:00 -->
+
+## 7. Broken links
+
+A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or replace it.
+
+- [ ] dangling parent <!-- @id:broken-demo @parent:this-id-does-not-exist -->
+
+## 8. Move
+
+`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`.
+
+- [ ] belongs in another project <!-- @id:move-demo -->
+
+## 9. Copy id
+
+`` Alt+` `` copies the task's `@id`.
+
+- [ ] copy my id <!-- @id:copy-demo -->
+
+## 10. Paste image
+
+`Ctrl+V` an image → saved to disk + a Markdown link inserted (alt text selected). Select text first to name it (subfolders allowed). `Ctrl+Z` removes the link and the file together.
+
+<!-- paste an image on the line below -->
+
+## More
+
+The cache powers tag search and the lenses — run **Tsk: Rebuild Cache** if anything looks stale. Every `tsk.*` setting is documented in the README. It's all plain text you own.
