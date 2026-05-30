@@ -132,6 +132,11 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.handleBackspace",
+                "title": "Handle Backspace (degrade empty task to bullet)",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.installClipboardBridgeSkill",
                 "title": "Install Clipboard Bridge Skill",
                 "category": "Tsk"
@@ -221,6 +226,11 @@
             {
                 "command": "tsk.handleShiftTab",
                 "key": "shift+tab",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.handleBackspace",
+                "key": "backspace",
                 "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
             }
         ],

@@ -166,6 +166,7 @@ export const COMMANDS = {
     handleEnter: 'tsk.handleEnter',
     handleTab: 'tsk.handleTab',
     handleShiftTab: 'tsk.handleShiftTab',
+    handleBackspace: 'tsk.handleBackspace',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
 } as const satisfies Record<string, `tsk.${string}`>;
 

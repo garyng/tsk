@@ -118,6 +118,19 @@ suite('list-edit (Enter / Tab / Shift+Tab)', () => {
         assert.strictEqual(result.cursorCol, 2);
     });
 
+    test('Backspace on an empty task degrades it to a bare bullet', async () => {
+        const result = await runKey('- [ ]  <!-- @id:x -->', 'tsk.handleBackspace', 0, 6);
+        assert.strictEqual(result.text, '- ');
+        assert.strictEqual(result.cursorLine, 0);
+        assert.strictEqual(result.cursorCol, 2);
+    });
+
+    test('Backspace on an empty bare bullet strips it to an empty line', async () => {
+        const result = await runKey('- ', 'tsk.handleBackspace', 0, 2);
+        assert.strictEqual(result.text, '');
+        assert.strictEqual(result.cursorCol, 0);
+    });
+
     test('Enter on non-task line falls through to default (inserts newline)', async () => {
         const result = await runKey('plain text', 'tsk.handleEnter', 0, 5);
         const lines = result.text.split('\n');
@@ -128,7 +141,7 @@ suite('list-edit (Enter / Tab / Shift+Tab)', () => {
         assert.strictEqual(result.cursorLine, 1);
     });
 
-    test('contributes.keybindings registers Enter / Tab / Shift+Tab gated to tsk', () => {
+    test('contributes.keybindings registers Enter / Tab / Shift+Tab / Backspace gated to tsk', () => {
         const ext = vscode.extensions.getExtension(EXTENSION_ID);
         assert.ok(ext);
         const keybindings = ext.packageJSON.contributes.keybindings as ReadonlyArray<{
@@ -140,6 +153,7 @@ suite('list-edit (Enter / Tab / Shift+Tab)', () => {
             ['tsk.handleEnter', 'enter'],
             ['tsk.handleTab', 'tab'],
             ['tsk.handleShiftTab', 'shift+tab'],
+            ['tsk.handleBackspace', 'backspace'],
         ];
         for (const [command, key] of expected) {
             const found = keybindings.find((k) => k.command === command);

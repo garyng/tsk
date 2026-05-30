@@ -78,10 +78,15 @@ Try `Alt+D` here, pick "plan the launch":
 | `Enter` (empty task) | outdent, or remove at the margin |
 | `Tab` (empty task) | indent one level |
 | `Shift+Tab` | outdent |
+| `Backspace` (empty task) | degrade to a bare `- ` bullet |
+| `Backspace` (empty `- `) | strip the bullet, leaving the indent |
+
+Bare bullets (a `- ` item with no `[ ]`) get the same `Enter` / `Tab` / `Shift+Tab` treatment minus the checkbox — handy for notes nested under a task.
 
 - [ ] first step <!-- @id:indent-a -->
 - [ ] Tab me under it <!-- @id:indent-b -->
     - [ ] Shift+Tab walks me back out <!-- @id:indent-c -->
+    - a bare bullet (no checkbox) — try Enter / Backspace here
 
 ## 6. Hover
 

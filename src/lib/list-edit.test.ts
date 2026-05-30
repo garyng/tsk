@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    computeBackspaceEdit,
     computeEnterEdit,
     computeShiftTabEdit,
     computeTabEdit,
@@ -310,5 +311,71 @@ describe('computeShiftTabEdit', () => {
             text: '- foo',
             cursorCol: 2,
         });
+    });
+});
+
+describe('computeBackspaceEdit', () => {
+    it('degrades an empty task to a bare bullet, dropping the metadata', () => {
+        expect(computeBackspaceEdit('- [ ]  <!-- @id:x -->', 6)).toEqual({
+            kind: 'replace-line',
+            text: '- ',
+            cursorCol: 2,
+        });
+    });
+
+    it('degrades an empty task with no metadata', () => {
+        expect(computeBackspaceEdit('- [ ] ', 6)).toEqual({
+            kind: 'replace-line',
+            text: '- ',
+            cursorCol: 2,
+        });
+    });
+
+    it('preserves indent when degrading an indented empty task', () => {
+        expect(computeBackspaceEdit('    - [ ]  <!-- @id:x -->', 10)).toEqual({
+            kind: 'replace-line',
+            text: '    - ',
+            cursorCol: 6,
+        });
+    });
+
+    it('returns noop on a non-empty task', () => {
+        expect(computeBackspaceEdit('- [ ] foo', 6)).toEqual({ kind: 'noop' });
+    });
+
+    it('returns noop when the cursor is in/before the marker', () => {
+        expect(computeBackspaceEdit('- [ ]  <!-- @id:x -->', 2)).toEqual({ kind: 'noop' });
+    });
+
+    it('returns noop when the cursor is inside the metadata', () => {
+        expect(computeBackspaceEdit('- [ ]  <!-- @id:x -->', 12)).toEqual({ kind: 'noop' });
+    });
+
+    it('strips an empty bullet down to the indent', () => {
+        expect(computeBackspaceEdit('- ', 2)).toEqual({
+            kind: 'replace-line',
+            text: '',
+            cursorCol: 0,
+        });
+    });
+
+    it('strips an indented empty bullet down to its indent', () => {
+        expect(computeBackspaceEdit('    - ', 6)).toEqual({
+            kind: 'replace-line',
+            text: '    ',
+            cursorCol: 4,
+        });
+    });
+
+    it('returns noop on a non-empty bullet', () => {
+        expect(computeBackspaceEdit('- foo', 2)).toEqual({ kind: 'noop' });
+    });
+
+    it('returns noop when the cursor is before an empty bullet marker', () => {
+        expect(computeBackspaceEdit('- ', 1)).toEqual({ kind: 'noop' });
+    });
+
+    it('returns noop on a plain line', () => {
+        expect(computeBackspaceEdit('plain', 3)).toEqual({ kind: 'noop' });
     });
 });

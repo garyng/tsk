@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
 import { isTskDocument } from './editor-guards';
 import {
+    computeBackspaceEdit,
     computeEnterEdit,
     computeShiftTabEdit,
     computeTabEdit,
@@ -34,6 +35,7 @@ export function registerListEditCommands(
         vscode.commands.registerCommand(COMMANDS.handleEnter, () => handleEnter(logger, deps)),
         vscode.commands.registerCommand(COMMANDS.handleTab, () => handleTab(logger)),
         vscode.commands.registerCommand(COMMANDS.handleShiftTab, () => handleShiftTab(logger)),
+        vscode.commands.registerCommand(COMMANDS.handleBackspace, () => handleBackspace(logger)),
     );
 }
 
@@ -86,6 +88,25 @@ async function handleShiftTab(logger: Logger): Promise<void> {
     }
     await applyListEditAction(editor, cursor.line, action);
     logger.debug(`tsk.handleShiftTab: ${action.kind} at line ${cursor.line + 1}`);
+}
+
+async function handleBackspace(logger: Logger): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    // A non-empty selection means the user wants to delete the selection — let
+    // the default `deleteLeft` handle that rather than degrading a list item.
+    if (!editor || !isTskDocument(editor.document) || !editor.selection.isEmpty) {
+        await vscode.commands.executeCommand('deleteLeft');
+        return;
+    }
+    const cursor = editor.selection.active;
+    const lineText = editor.document.lineAt(cursor.line).text;
+    const action = computeBackspaceEdit(lineText, cursor.character);
+    if (action.kind === 'noop') {
+        await vscode.commands.executeCommand('deleteLeft');
+        return;
+    }
+    await applyListEditAction(editor, cursor.line, action);
+    logger.debug(`tsk.handleBackspace: ${action.kind} at line ${cursor.line + 1}`);
 }
 
 /**

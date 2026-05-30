@@ -185,6 +185,48 @@ function computeBulletEnter(line: string, cursorCol: number, opts: EditorOpts): 
 }
 
 /**
+ * Compute what Backspace should do on the given line — the Markdown-All-in-One
+ * "degrade" ladder for empty list items:
+ *
+ *   - Empty **task** (`- [m]··<!-- … -->`), cursor in the (empty) content area
+ *     → bare bullet `<indent>- `: the `[m]` marker **and all metadata** are
+ *     dropped. Cursor lands just after the `- `.
+ *   - Empty **bare bullet** (`<indent>- `), cursor at/after the marker → strip
+ *     the `- `, leaving just the indent. Cursor lands at the indent end (a
+ *     follow-up Backspace then eats the indent via the editor default).
+ *   - Anything else (non-empty item, cursor inside the marker or metadata, or a
+ *     non-list line) → `noop`, so the editor's default Backspace applies.
+ *
+ * So Backspace walks `task → bullet → (indent →) empty`, the inverse of Alt+A's
+ * `bullet → task`. Pure — no `vscode` import.
+ */
+export function computeBackspaceEdit(line: string, cursorCol: number): ListEditAction {
+    const parsed = parseLine(line);
+    if (parsed) {
+        if (parsed.content !== '') return { kind: 'noop' };
+        const bracketEnd = parsed.raw.indexOf(']', parsed.indent.length);
+        // Cursor in/before the marker → let the default Backspace edit it.
+        if (bracketEnd < 0 || cursorCol <= bracketEnd) return { kind: 'noop' };
+        // Cursor inside the metadata block → default Backspace.
+        const metadataStart = parsed.raw.indexOf('<!--', bracketEnd);
+        if (metadataStart >= 0 && cursorCol > metadataStart) return { kind: 'noop' };
+        return {
+            kind: 'replace-line',
+            text: `${parsed.indent}- `,
+            cursorCol: parsed.indent.length + 2,
+        };
+    }
+    const bullet = parseBullet(line);
+    if (bullet) {
+        // Only an empty bullet degrades, and only from the content position
+        // (cursor before the marker → default Backspace nibbles the marker).
+        if (bullet.content !== '' || cursorCol < bullet.contentStart) return { kind: 'noop' };
+        return { kind: 'replace-line', text: bullet.indent, cursorCol: bullet.indent.length };
+    }
+    return { kind: 'noop' };
+}
+
+/**
  * Compute what Tab should do on the given line.
  *
  * Per the simplified spec, Tab only intercepts on **empty** task/bullet lines

@@ -233,19 +233,22 @@ Thirteen palette-registered commands operate on the cursor line (or every unique
 - `` Alt+` `` uses the backtick key, which varies by keyboard layout — UK / DE / FR users may need to rebind via the Keyboard Shortcuts editor.
 - Other Alt-letter combos depend on installed extensions and themes; the language-scoped `when` clause prevents `.tsk` toggles from leaking outside, but third-party extensions binding the same chord with an equally specific `when` clause could clash.
 
-## List editing (M7)
+## List editing (M7, M27)
 
-Enter / Tab / Shift+Tab inside a `.tsk` file are intercepted to mimic MD-AIO's list semantics with one tsk-specific extension: inline metadata never gets pushed to the next line. Pure logic in `src/lib/list-edit.ts`; activation handlers in `src/list-edit-commands.ts`.
+Enter / Tab / Shift+Tab / Backspace inside a `.tsk` file are intercepted to mimic MD-AIO's list semantics with one tsk-specific extension: inline metadata never gets pushed to the next line. Pure logic in `src/lib/list-edit.ts`; activation handlers in `src/list-edit-commands.ts`.
 
 | Key       | Behavior                                                                                              |
 |-----------|-------------------------------------------------------------------------------------------------------|
 | `Enter`   | Cursor at end-of-content (before `<!--` or end of line) → continue the list with a fresh empty task (new `@id` + `@created`). Cursor mid-content → split at the cursor; **metadata stays on the original line**. On an empty task → outdent (col > 0) or remove the whole task (col 0). |
 | `Tab`     | On an empty task → indent one level (spaces or tab per editor settings). Otherwise → default editor Tab.   |
 | `Shift+Tab` | On any task with indent → outdent one level. Otherwise → default editor outdent.                    |
+| `Backspace` | On an empty task (cursor in the content area) → degrade to a bare `- ` bullet, dropping the `[m]` marker and all metadata. On an empty `- ` bullet → strip the marker, leaving the indent. Otherwise → default editor delete. |
 
 **`when` clause** on every keybinding: `editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`. So Enter accepts an IntelliSense suggestion when one is visible, and Tab advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
 **Continuation marker is always `[ ]`** — pressing Enter at the end of a `[x]` completed task still creates a fresh `[ ]` todo on the next line. Matches MD-AIO.
+
+**Bare bullets** — a `-`/`*`/`+` list item *without* a `[ ]` marker (the checkbox-less notes a user nests under a task) gets the same Enter / Tab / Shift+Tab treatment as a task, minus the metadata: Enter continues the bullet (preserving the original marker char), and the empty-bullet / indent rules match the task paths. Backspace closes the loop — `task → bare bullet → (indent →) empty line`, the inverse of Alt+A's `bare bullet → task` wrap (M26). Bullets are recognised by `parseBullet` in `src/lib/parser.ts`.
 
 ## Tags (M8)
 
