@@ -1,6 +1,6 @@
 import { MARKERS, type Marker } from './markers';
 import { replaceMetadata } from './metadata';
-import { parseLine } from './parser';
+import { parseBullet, parseLine } from './parser';
 
 /**
  * Marker → canonical write-back symbol (the first entry in `symbols`).
@@ -74,6 +74,10 @@ export function promoteMissingMetadata(
  *   `- [m] foo <!-- ... -->` — well-spaced — instead of `- [m] foo<!--...`.
  *   The Enter-continuation path in `list-edit.ts:computeEnterEdit` emits the
  *   same shape for the same reason.
+ * - Bare bullet (`- foo`, `* foo`, indented) → `- [m] foo <!-- … -->`: the
+ *   existing list marker is **stripped, not doubled** (so `- milk` becomes
+ *   `- [ ] milk`, never `- [ ] - milk`) and canonicalised to `-`. An empty
+ *   bullet (`- `) wraps to the empty-task shape above.
  * - Non-empty plain line → `- [m] <content> <!-- … -->` with the original
  *   content preserved verbatim (trimmed only on the right) and the line's
  *   leading whitespace preserved as indent.
@@ -84,9 +88,12 @@ export function promoteMissingMetadata(
  */
 export function wrapAsTask(line: string, marker: Marker, opts: WrapOpts): string {
     if (parseLine(line) !== null) return line;
-    const indentMatch = /^\s*/.exec(line);
-    const indent = indentMatch ? indentMatch[0] : '';
-    const content = line.slice(indent.length).trimEnd();
+    // A bare bullet wraps by its content only — strip the existing marker so
+    // `- milk` → `- [ ] milk` (not `- [ ] - milk`). Otherwise the indent is the
+    // leading whitespace and the content is the rest of the line.
+    const bullet = parseBullet(line);
+    const indent = bullet ? bullet.indent : (/^\s*/.exec(line)?.[0] ?? '');
+    const content = bullet ? bullet.content : line.slice(indent.length).trimEnd();
     const metadataComment = `<!-- @id:${opts.id} @created:${opts.timestamp} -->`;
     const prefix = `${indent}- [${CANONICAL_SYMBOL[marker]}]`;
     return content === ''

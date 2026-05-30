@@ -81,6 +81,33 @@ describe('wrapAsTask', () => {
         const existing = '- [/] in flight <!-- @id:zz -->';
         expect(wrapAsTask(existing, 'todo', FIXED_OPTS)).toBe(existing);
     });
+
+    it('wraps a bare bullet by its content, not doubling the marker', () => {
+        expect(wrapAsTask('- milk', 'todo', FIXED_OPTS)).toBe(
+            '- [ ] milk <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
+        );
+    });
+
+    it('canonicalizes * and + bullets to - when wrapping', () => {
+        expect(wrapAsTask('* milk', 'todo', FIXED_OPTS)).toBe(
+            '- [ ] milk <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
+        );
+        expect(wrapAsTask('+ milk', 'todo', FIXED_OPTS)).toBe(
+            '- [ ] milk <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
+        );
+    });
+
+    it('preserves indent when wrapping an indented bare bullet', () => {
+        expect(wrapAsTask('    - nested note', 'todo', FIXED_OPTS)).toBe(
+            '    - [ ] nested note <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
+        );
+    });
+
+    it('wraps an empty bare bullet into an empty todo', () => {
+        expect(wrapAsTask('- ', 'todo', FIXED_OPTS)).toBe(
+            '- [ ]  <!-- @id:abcd1234 @created:2026-05-27T09:00:00+08:00 -->',
+        );
+    });
 });
 
 describe('promoteMissingMetadata', () => {

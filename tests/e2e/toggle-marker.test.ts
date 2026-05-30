@@ -42,6 +42,13 @@ suite('toggle marker commands', () => {
         );
     });
 
+    test('toggleTodo wraps a bare bullet without doubling the marker', async () => {
+        // `- milk` (a checkbox-less list item) becomes `- [ ] milk`, never
+        // `- [ ] - milk`. The existing bullet is stripped, not re-bulleted.
+        const [first] = await runToggle('- milk', 'tsk.toggleTodo', [0]);
+        assert.match(first ?? '', /^- \[ \] milk <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
+    });
+
     test('toggleTodo unwraps an empty todo', async () => {
         const [first] = await runToggle('- [ ] <!-- @id:abc -->', 'tsk.toggleTodo', [0]);
         assert.strictEqual(first, '');
