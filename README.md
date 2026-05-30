@@ -2,7 +2,7 @@
 
 A markdown-based task manager VSCode extension. Works on `.tsk` files, enriching markdown task lists with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.
 
-**Phase 1 complete (M0–M12)** — the extension activates against `.tsk` files, applies its TextMate grammar, parses tasks/metadata/tags into a queryable SQLite cache, surfaces scan-time warnings as both Output channel logs and editor diagnostics, decorates marker triplets and priority lines, provides 13 toggle/copy commands with keybindings, replicates MD-AIO's Enter/Tab/Shift+Tab list semantics with metadata-preserving splits, offers tag autocompletion + find-all-tasks-by-tag driven by a workspace-local `tags.yml`, renders relationship code lenses (parent/children/dependsOn/dependents/relatedTo/related) on every canonical task with navigate + peek commands, and tints the target line after every navigate until you move the cursor or jump again. Functionally shippable; clean-profile `.vsix` smoke install + Marketplace screenshots tracked as pre-publication polish. The implementation plan lives at [`plans/2026-05-24_tsk.md`](../../plans/2026-05-24_tsk.md).
+**Status — Phases 1–3 substantially complete.** Phase 1 (M0–M12) brought activation, the TextMate grammar, the SQLite cache with scan-time diagnostics, marker/priority/metadata decorations, the toggle + list-edit command set, tag autocompletion and find-by-tag, and the relationship code-lens graph. Phase 2 (M13–M16) was a structural refactor — the `lib/` pure-core split, the constants registry, and the package.json drift tests. Phase 3 (M17–M25) adds untitled-buffer support, add-missing-id code actions, a metadata hover, broken-reference diagnostics with quick-fixes, richer tag search, the clipboard bridge for devcontainers, and the paste-image helper; the remaining tail is this docs overhaul and a public-repo sync skill. Plans: [Phase 1](../../plans/2026-05-24_tsk.md) · [Phase 2](../../plans/2026-05-27_tsk-phase-2-refactor.md) · [Phase 3](../../plans/2026-05-27_tsk-phase-3.md).
 
 ## Supported VS Code versions
 
@@ -21,7 +21,7 @@ Open a new buffer (Ctrl+N), set the language to `tsk`, and the following work lo
 - **Tag completion** (`#`) — surfaces workspace-known tags
 - **Code action** "Tsk: Add missing id + created"
 - **Enter / Tab / Shift+Tab** list-edit semantics
-- **Hover** and **diagnostics** (when added in M20)
+- **Hover** and **diagnostics** — document-local, so they work without the cache
 
 These do NOT work on untitled buffers (they require the SQLite cache, which is file-only):
 
@@ -303,6 +303,17 @@ Programmatic selection changes (`TextEditorSelectionChangeKind.Command`) are del
 
 Theme the tint via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id — defaults are soft yellow with alpha so it works on both light and dark themes without overwhelming the text underneath.
 
+## Hover (M20)
+
+Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't decode the dimmed `<!-- … -->` comment by eye. It lists the `@id`, each timestamp rendered both absolutely and as friendly relative time (`… (3 days ago)`, via `date-fns/formatDistance`), the tags, and any relationship links — each link is a clickable command URI that jumps to the referenced task. The task content itself is deliberately *not* repeated (it's already under your cursor). Implementation: `src/hover.ts` registers the provider; the markdown is the pure, unit-tested `src/lib/hover-logic.ts`. Document-local, so it works on untitled buffers.
+
+## Code actions & broken-reference diagnostics (M19–M20)
+
+Two `Ctrl+.` helpers, both in `src/code-actions.ts`:
+
+- **Add missing id (M19).** A markered task with no `@id` (any marker, not only `[ ]`) offers *"Tsk: Add missing id + created"* (or *"…Add missing id"* when `@created` is already present), writing the same metadata `Alt+A` would. Unlike the `Alt+A` / `Alt+N` toggles — which only fire on their own target marker — the quick-fix is marker-agnostic, so you can promote a hand-typed `- [x] done` imported from elsewhere.
+- **Broken references (M20).** When a task's `@parent` / `@dependsOn` / `@relatedTo` points at an `@id` with no canonical occurrence in the workspace, the line gets a `Warning` squiggle (the same broken-forward-edge the code lens flags with `(missing)`). The lightbulb offers *"Tsk: Remove broken @parent"* to drop it, or *"Tsk: Replace @parent via picker…"* to pick a real task. The backing command `tsk.replaceBrokenReference` lives in `INTERNAL_COMMANDS` — it takes `(uri, line, key)` args only a code action can supply, so it stays out of the palette.
+
 ## Clipboard bridge (devcontainer) (M22)
 
 Inside a devcontainer, no host clipboard tool is reachable — `xclip` / `wl-copy` / `clip.exe` / `pbcopy` aren't installed or can't see the host, OSC 52 escape sequences don't survive Claude Code's TUI, and the bundled `code` remote-CLI has no clipboard subcommand. But the **extension host** runs with `vscode.env.clipboard` access. The clipboard bridge exploits that: it watches a file and copies the file's contents to the host clipboard on every change, so any process that can write a file (a shell, a Claude Code skill) can push text to the host clipboard.
@@ -324,6 +335,31 @@ Enable it, then `echo "hello" > .vscode/tsk/clipboard-bridge.txt` — `"hello"` 
 
 > **Path vs MCP — why a watched file here.** Clipboard hand-off is a single, fire-and-forget side effect with no return value, so the watch-file pattern (Claude already has a `Write` tool; no server, no client config, no transport to reach into the devcontainer) is the right weight. An MCP server earns its keep when Claude needs *structured, bidirectional* access — typed params and **return values** (read the clipboard back, query the cache, list tasks by tag, resolve the graph) — and benefits from schema-driven discovery across a growing set of verbs. Rule of thumb: **need a result back, or many verbs → MCP; fire one side effect → a watched file + a skill that documents the contract.** See the M22 design notes in `plans/2026-05-27_tsk-phase-3.md` for the full comparison.
 
+## Paste image (M23)
+
+Pasting an image (`Ctrl+V`) into a `.tsk`, Markdown, or Jupyter markdown-cell document saves the bytes to disk and inserts a relative Markdown image link at the cursor, the alt text a snippet placeholder so it lands selected. Implementation: `src/paste-image.ts` registers a `DocumentPasteEditProvider` for the image MIME types; the pure path/snippet logic is the unit-tested `src/lib/paste-image-logic.ts`.
+
+- **Where it saves.** `<document directory>/<tsk.pasteImage.baseDirectory>/<name>.<ext>`. The base directory defaults to `./images` (relative to the document; blank ⇒ beside it). The extension comes from the clipboard MIME, not from any typed name (so a JPEG named `diagram` is saved as `diagram.jpg`, never `diagram.png`).
+- **Naming.** Select text before pasting and the selection is the path verbatim — it may include subfolders, which are created. With no selection an input box prompts (prefilled with a timestamp). On a collision you're re-prompted, then asked to confirm an overwrite.
+- **Undo.** The write rides the paste's `additionalEdit` (`WorkspaceEdit.createFile`), so one `Ctrl+Z` removes the link and the saved file together. Caveat: undoing an *overwrite* deletes the file rather than restoring the original — `createFile`'s undo is a plain delete, and the delete-then-create workaround throws because VSCode replays an undo's file ops in collection order ([microsoft/vscode#182573](https://github.com/microsoft/vscode/issues/182573)).
+- **Paths** use [`pathe`](https://github.com/unjs/pathe) so the Markdown link is forward-slashed on every platform.
+
+## Settings reference
+
+Every user-facing setting (`package.json#contributes.configuration`). Defaults live in the manifest only — see the Constants section for why the code keeps no mirror.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `tsk.cache.path` | `${workspaceFolder}/.vscode/tsk/cache.db` | On-disk SQLite cache (`${workspaceFolder}` expanded at runtime; in-memory when no workspace folder is open). |
+| `tsk.tags.path` | `${workspaceFolder}/.vscode/tsk/tags.yml` | Workspace `tags.yml` for tag descriptions + completion. Blank ⇒ no file loaded (tags discovered in `.tsk` files still complete). |
+| `tsk.log.level` | `info` | `tsk` Output-channel verbosity: `debug` / `info` / `warn` / `error`. |
+| `tsk.decorations.priority.opacity` | `0.15` | Background opacity (0–1) of priority line tints; applies live. |
+| `tsk.clipboard.bridgeEnabled` | `false` | Master switch for the clipboard bridge (watch a file → host clipboard). |
+| `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched bridge file; only used when the bridge is enabled. |
+| `tsk.pasteImage.baseDirectory` | `./images` | Base directory (under the document) for pasted images. Blank ⇒ beside the document. |
+
+Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`.
+
 ## Constants & helpers (Phase 2)
 
 Cross-cutting strings, defaults, and small glue helpers live in dedicated modules so a future rename touches one file.
@@ -333,9 +369,9 @@ Cross-cutting strings, defaults, and small glue helpers live in dedicated module
 - **Identifiers** — `TSK_LANGUAGE_ID`, `OUTPUT_CHANNEL_NAME`, `DIAGNOSTIC_SOURCE`. All happen to be the literal `'tsk'` today but stay as separate names; future renames of any one don't drag the others.
 - **Settings** — each setting has *two* constants kept side-by-side: `*_SETTING` is the full dotted name (`tsk.cache.path`, used with `affectsConfiguration` and matched against `package.json#contributes.configuration.properties`) and `*_KEY` is the sub-key (`cache.path`, used with `getConfiguration('tsk').get`).
 - **Theme color ids** — `METADATA_FOREGROUND_COLOR_ID`, `NAVIGATION_HIGHLIGHT_COLOR_ID`. The marker color ids (`tsk.marker.X`) stay in `lib/markers.ts` because they're registry-internal — properties of the MARKERS definitions, not free-standing constants.
-- **Defaults** — `DEFAULT_LOG_LEVEL`, `DEFAULT_PRIORITY_OPACITY`. Mirror the `default` in `package.json#contributes.configuration` so the code fallback stays consistent with the schema.
-- **Timing** — `DOC_CHANGE_DEBOUNCE_MS`. Marked `// TODO: configurable` for a future user setting.
-- **Commands** — `COMMANDS` (18 entries, palette-contributed) and `INTERNAL_COMMANDS` (7 entries, lens-only). The split keeps `constants.test.ts`'s cross-check against `package.json` sharp: every `COMMANDS` value must appear in the manifest, no `INTERNAL_COMMANDS` value may.
+- **Defaults live only in `package.json`** — there are deliberately *no* `DEFAULT_*` setting constants. Each `tsk.*` setting declares its `default` once in `package.json#contributes.configuration`, and code reads it with `getConfiguration('tsk').get(key, <throwaway>)`; VSCode returns the manifest default for a contributed setting, so the fallback argument is dead code (it only degrades sanely were the manifest entry ever missing). One source of truth, nothing to drift. (`readLogLevel` additionally recovers a malformed hand-edited value to `'info'` — a distinct concern from a default.)
+- **Timing** — `DOC_CHANGE_DEBOUNCE_MS`, `CLIPBOARD_BRIDGE_POLL_INTERVAL_MS`. Tunable timing values; the former is marked `// TODO: configurable` for a future user setting.
+- **Commands** — `COMMANDS` (19 entries, palette-contributed) and `INTERNAL_COMMANDS` (8 entries, lens-/code-action-only). The split keeps `constants.test.ts`'s cross-check against `package.json` sharp: every `COMMANDS` value must appear in the manifest, no `INTERNAL_COMMANDS` value may.
 
 The `// TODO: configurable` marker is the convention for entries that are plausible future user settings. When a setting lands, the constant here becomes the *default* and the lookup site reads `getConfiguration('tsk').get(..., DEFAULT)` instead.
 
