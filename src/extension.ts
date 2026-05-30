@@ -361,6 +361,20 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
         vscode.window.onDidChangeVisibleTextEditors((editors) => {
             for (const editor of editors) applyDecorationsToEditor(editor);
         }),
+        vscode.workspace.onDidCloseTextDocument((doc) => {
+            // Evict the decoration snapshot for a closed buffer so the Map
+            // doesn't grow unbounded across untitled docs (Untitled-1, …),
+            // which never reach the on-disk delete watcher. (M31/A — the leak
+            // flagged in M18.) Also clear any pending decorate timer for it.
+            if (!state) return;
+            const key = doc.uri.toString();
+            state.decorationSnapshots.delete(key);
+            const timer = state.decorationTimers.get(key);
+            if (timer) {
+                clearTimeout(timer);
+                state.decorationTimers.delete(key);
+            }
+        }),
     );
 }
 

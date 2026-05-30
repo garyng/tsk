@@ -127,4 +127,30 @@ suite('decorations', () => {
     test('getDecorations returns undefined for an unknown URI', () => {
         assert.strictEqual(api.getDecorations('file:///nope-never-touched.tsk'), undefined);
     });
+
+    test('closing an untitled `.tsk` buffer evicts its decoration snapshot (M31/A)', async () => {
+        // Untitled buffers are the M18 leak: they never reach the on-disk
+        // delete watcher (which evicts file-backed snapshots), but they DO fire
+        // onDidCloseTextDocument reliably on close. revert-and-close discards
+        // the unsaved content without a save prompt.
+        const doc = await vscode.workspace.openTextDocument({
+            content: '- [ ] gc me <!-- @id:gc1 -->',
+            language: 'tsk',
+        });
+        await vscode.window.showTextDocument(doc);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const key = doc.uri.toString();
+        assert.ok(api.getDecorations(key), 'snapshot should exist while the buffer is open');
+
+        await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+        // onDidCloseTextDocument can lag the editor close by a tick — poll.
+        for (let i = 0; i < 40 && api.getDecorations(key); i++) {
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        assert.strictEqual(
+            api.getDecorations(key),
+            undefined,
+            'snapshot should be evicted after the buffer is closed',
+        );
+    });
 });
