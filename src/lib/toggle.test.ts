@@ -6,6 +6,7 @@ import {
     removeMetadataEntry,
     setMetadataEntry,
     swapMarker,
+    taskContentRange,
     toggleMetadataEntry,
     unwrapTask,
     type WrapOpts,
@@ -132,6 +133,30 @@ describe('contentCursorCol', () => {
 
     it('returns null for a non-task line', () => {
         expect(contentCursorCol('plain text')).toBeNull();
+    });
+});
+
+describe('taskContentRange', () => {
+    it('spans the content of a task with trailing metadata', () => {
+        expect(taskContentRange('- [ ] buy milk <!-- @id:x -->')).toEqual({ start: 6, end: 14 });
+    });
+
+    it('spans content with no metadata (trimmed to the last char)', () => {
+        expect(taskContentRange('- [ ] buy milk')).toEqual({ start: 6, end: 14 });
+    });
+
+    it('returns a zero-width range at the content start for an empty task', () => {
+        expect(taskContentRange('- [ ] <!-- @id:x -->')).toEqual({ start: 6, end: 6 });
+    });
+
+    it('accounts for indentation and a wider marker', () => {
+        // 4 indent + "- " + "[/]" → bracket at col 6, content "do it" at 10..15
+        expect(taskContentRange('    - [/] do it <!-- @id:x -->')).toEqual({ start: 10, end: 15 });
+    });
+
+    it('returns null for non-task lines', () => {
+        expect(taskContentRange('- a bare bullet')).toBeNull();
+        expect(taskContentRange('plain text')).toBeNull();
     });
 });
 

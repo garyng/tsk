@@ -102,33 +102,41 @@ export function wrapAsTask(line: string, marker: Marker, opts: WrapOpts): string
 }
 
 /**
- * Column where the cursor should land after a line is freshly wrapped into a
- * task — the start of where the user types content next, kept *before* the
- * trailing `<!-- … -->` metadata.
+ * The content span of a task line — the columns `[start, end)` between the
+ * marker and the trailing `<!-- … -->` metadata. `start` is the content-start
+ * column (`prefixEnd`, just past `- [m] `); `end` walks back over trailing
+ * whitespace to the last content character, or `=== start` for an empty-content
+ * task. Returns null for a non-task line. Pure.
  *
- * - Empty-content task (`- [m]··<!-- … -->`) → between the two spacer spaces
- *   (`prefixEnd`), so the first keystroke yields a well-spaced
- *   `- [m] foo <!-- … -->`. (Matches the long-standing empty-wrap behavior.)
- * - Content task (`- [m] foo <!-- … -->`) → just past the content, before the
- *   space that precedes `<!--`, so Alt+A on `buy milk` leaves the cursor ready
- *   to keep editing the task text rather than stranded after the metadata.
- *
- * Returns null for a non-task line. Pure — pairs with `applyEdit`'s post-edit
- * cursor move and mirrors the Enter-continuation target in `computeEnterEdit`.
+ * Used to *select* a freshly-duplicated task's content (so the user can retype
+ * it — M37), and, via {@link contentCursorCol}, to place the cursor after a
+ * fresh wrap.
  */
-export function contentCursorCol(line: string): number | null {
+export function taskContentRange(line: string): { start: number; end: number } | null {
     const parsed = parseLine(line);
     if (!parsed) return null;
     const bracketStart = parsed.raw.indexOf('[', parsed.indent.length);
     if (bracketStart < 0) return null;
-    const prefixEnd = bracketStart + 4;
-    if (parsed.content === '') return prefixEnd;
-    const metadataStart = parsed.raw.indexOf('<!--', prefixEnd);
-    let contentEnd = metadataStart >= 0 ? metadataStart : parsed.raw.length;
-    while (contentEnd > prefixEnd && /\s/.test(parsed.raw.charAt(contentEnd - 1))) {
-        contentEnd--;
+    const start = bracketStart + 4;
+    if (parsed.content === '') return { start, end: start };
+    const metadataStart = parsed.raw.indexOf('<!--', start);
+    let end = metadataStart >= 0 ? metadataStart : parsed.raw.length;
+    while (end > start && /\s/.test(parsed.raw.charAt(end - 1))) {
+        end--;
     }
-    return contentEnd;
+    return { start, end };
+}
+
+/**
+ * Column where the cursor lands after a line is freshly wrapped into a task —
+ * the end of the content, before the trailing `<!-- … -->` metadata (or the
+ * content-start column for an empty-content task, so the first keystroke yields
+ * a well-spaced `- [m] foo <!-- … -->`). The `end` of {@link taskContentRange};
+ * null for a non-task line. Pairs with `applyEdit`'s post-edit cursor move and
+ * mirrors the Enter-continuation target in `computeEnterEdit`.
+ */
+export function contentCursorCol(line: string): number | null {
+    return taskContentRange(line)?.end ?? null;
 }
 
 /**

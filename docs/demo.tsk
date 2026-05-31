@@ -80,9 +80,9 @@ Try `Alt+D` here, pick "plan the launch":
 | `Shift+Tab` | outdent |
 | `Backspace` (empty task) | degrade to a bare `- ` bullet |
 | `Backspace` (empty `- `) | strip the bullet, leaving the indent |
-| `Shift+Alt+↓` / `Shift+Alt+↑` | duplicate the line; a copied task gets a fresh `@id` |
+| `Shift+Alt+↓` / `Shift+Alt+↑` | duplicate the line; the copy gets a fresh `@id`, content selected to retype |
 
-Bare bullets (a `- ` item with no `[ ]`) get the same `Enter` / `Tab` / `Shift+Tab` treatment minus the checkbox — handy for notes nested under a task. Duplicate any task above with `Shift+Alt+↓`: the copy is stamped with a new `@id` so it doesn't shadow the original.
+Bare bullets (a `- ` item with no `[ ]`) get the same `Enter` / `Tab` / `Shift+Tab` treatment minus the checkbox — handy for notes nested under a task. Duplicate any task above with `Shift+Alt+↓`: the copy is stamped with a new `@id` (so it doesn't shadow the original) and its content lands selected — just type to rename it.
 
 - [ ] first step <!-- @id:indent-a -->
 - [ ] Enter here for a fresh task, then Tab to indent it <!-- @id:indent-b -->

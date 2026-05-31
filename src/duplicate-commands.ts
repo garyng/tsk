@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
 import { isTskDocument } from './editor-guards';
 import type { Logger } from './lib/logger';
-import { refreshTaskIdentity } from './lib/toggle';
+import { refreshTaskIdentity, taskContentRange } from './lib/toggle';
 import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
 import { replaceLine } from './range-helpers';
 
@@ -74,5 +74,23 @@ async function duplicateAndRefresh(
     if (rewritten > 0) {
         await vscode.workspace.applyEdit(edit);
     }
+
+    // Select each copied task's content so "duplicate then retype" is one
+    // gesture. Build the selections from `uniqueLines` (a whole-line replace can
+    // scramble the post-edit `editor.selections`), and only retarget when *every*
+    // copy is a task — a mixed/block copy keeps the built-in's cursors.
+    const contentSelections: vscode.Selection[] = [];
+    for (const lineNumber of uniqueLines) {
+        const range = taskContentRange(doc.lineAt(lineNumber).text);
+        if (range) {
+            contentSelections.push(
+                new vscode.Selection(lineNumber, range.start, lineNumber, range.end),
+            );
+        }
+    }
+    if (contentSelections.length > 0 && contentSelections.length === uniqueLines.size) {
+        editor.selections = contentSelections;
+    }
+
     logger.debug(`${commandId}: refreshed @id on ${rewritten} duplicated task line(s)`);
 }

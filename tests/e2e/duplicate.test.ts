@@ -84,6 +84,38 @@ suite('duplicate-line commands', () => {
         assert.deepStrictEqual(lines, ['just a paragraph', 'just a paragraph']);
     });
 
+    test('duplicating a task selects the copy content for easy editing (M37)', async () => {
+        const doc = await vscode.workspace.openTextDocument({ content: SRC, language: 'tsk' });
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+        await new Promise((resolve) => setImmediate(resolve));
+        await vscode.commands.executeCommand('tsk.duplicateLineDown');
+        await new Promise((resolve) => setImmediate(resolve));
+        // The post-duplicate selection covers the copy's content ("task"), ready to retype.
+        assert.strictEqual(editor.selections.length, 1);
+        assert.ok(
+            !editor.selection.isEmpty,
+            'selection should cover the content, not a bare cursor',
+        );
+        assert.strictEqual(doc.getText(editor.selection), 'task');
+    });
+
+    test('multi-cursor duplicate selects each copy content (M37)', async () => {
+        const content = [
+            '- [ ] a <!-- @id:srcaaa00 @created:2026-01-01T00:00:00+08:00 -->',
+            '- [ ] b <!-- @id:srcbbb00 @created:2026-01-01T00:00:00+08:00 -->',
+        ].join('\n');
+        const doc = await vscode.workspace.openTextDocument({ content, language: 'tsk' });
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selections = [new vscode.Selection(0, 0, 0, 0), new vscode.Selection(1, 0, 1, 0)];
+        await new Promise((resolve) => setImmediate(resolve));
+        await vscode.commands.executeCommand('tsk.duplicateLineDown');
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.strictEqual(editor.selections.length, 2);
+        const selected = editor.selections.map((s) => doc.getText(s)).sort();
+        assert.deepStrictEqual(selected, ['a', 'b']);
+    });
+
     test('contributes.keybindings registers Shift+Alt+Down/Up gated to tsk', () => {
         const ext = vscode.extensions.getExtension(EXTENSION_ID);
         assert.ok(ext);
