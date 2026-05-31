@@ -27,9 +27,10 @@ suite('cache', () => {
         const counts = api.counts();
         // sample.tsk (4 tasks) + dup.tsk (4 tasks, but one is a duplicate-id
         // that the cache skips → 3 inserted) + broken-ref.tsk (3 tasks; M20/B
-        // fixture). Tags only come from sample.tsk.
-        assert.strictEqual(counts.files, 3, 'expected three fixture files scanned');
-        assert.strictEqual(counts.tasks, 10, 'expected ten tasks indexed');
+        // fixture) + moved.tsk (3 tasks; M39 movedTo-lens fixture). Tags only
+        // come from sample.tsk.
+        assert.strictEqual(counts.files, 4, 'expected four fixture files scanned');
+        assert.strictEqual(counts.tasks, 13, 'expected thirteen tasks indexed');
         assert.ok(counts.tags >= 3, `expected at least three tags, got ${counts.tags}`);
     });
 
