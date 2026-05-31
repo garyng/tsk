@@ -2,17 +2,22 @@ import * as vscode from 'vscode';
 import { METADATA_FOREGROUND_COLOR_ID } from './constants';
 import { isTskDocument } from './editor-guards';
 import { scheduleDebounced } from './lib/debounce';
-import {
-    computeMarkerRanges,
-    computeMetadataRanges,
-    computePriorityRanges,
-    priorityBackgroundColor,
-    type RangeLike,
-} from './lib/decorations';
+import { computePriorityRanges, priorityBackgroundColor, type RangeLike } from './lib/decorations';
 import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
 import { PRIORITIES, type PriorityLevel } from './lib/priorities';
 import { computeSearchResultRanges } from './lib/search-result-decorations';
+
+/**
+ * `.tsk` marker triplets *and* inline `<!-- ... -->` metadata are colored by the
+ * semantic-tokens provider (`registerSemanticTokens`), not decorations — so the
+ * `.tsk` decoration pass supplies these empty ranges to clear/skip the marker +
+ * metadata types and applies only the priority line backgrounds. The Search
+ * Editor `search-result` path still emits real marker / metadata ranges
+ * (semantic tokens don't apply there).
+ */
+const NO_MARKER_RANGES: ReadonlyMap<Marker, RangeLike[]> = new Map();
+const NO_METADATA_RANGES: readonly RangeLike[] = [];
 
 /**
  * Last-applied decoration ranges for a `.tsk` document, captured right after
@@ -82,9 +87,9 @@ export class DecorationsController {
 
     /**
      * Decorate one editor. Dispatches: a `search-result` document gets the
-     * gutter-offset tag-search decorations; a `.tsk` document gets the full
-     * marker / priority / metadata pass plus a stored snapshot; anything else is
-     * skipped.
+     * gutter-offset tag-search decorations; a `.tsk` document gets the priority
+     * pass plus a stored snapshot (markers + metadata are colored by the
+     * semantic-tokens provider, not decorations); anything else is skipped.
      */
     applyToEditor(editor: vscode.TextEditor): void {
         if (editor.document.languageId === 'search-result') {
@@ -94,22 +99,24 @@ export class DecorationsController {
         if (!isTskDocument(editor.document)) return;
 
         const tasks = parseDocument(editor.document.getText());
-        const markerRanges = computeMarkerRanges(tasks);
         const priorityRanges = computePriorityRanges(tasks);
-        const metadataRanges = computeMetadataRanges(tasks);
 
-        this.applyRangeTriple(editor, markerRanges, priorityRanges, metadataRanges);
+        // Markers + metadata are colored by the semantic-tokens provider; the
+        // `.tsk` pass applies only priority line backgrounds. The empty marker +
+        // metadata ranges also clear those types on this editor.
+        this.applyRangeTriple(editor, NO_MARKER_RANGES, priorityRanges, NO_METADATA_RANGES);
 
-        // Snapshot every marker / priority bucket (empty arrays included) so the
-        // e2e API mirrors exactly what was set — the clears included.
+        // Snapshot: marker + metadata buckets are empty here (semantic tokens, not
+        // decorations); priority mirrors exactly what was set, empty buckets
+        // included so the e2e API and the decoration clears stay exact.
         const markers = {} as Record<Marker, RangeLike[]>;
-        for (const def of MARKERS) markers[def.name] = markerRanges.get(def.name) ?? [];
+        for (const def of MARKERS) markers[def.name] = [];
         const priorities = {} as Record<PriorityLevel, RangeLike[]>;
         for (const def of PRIORITIES) priorities[def.level] = priorityRanges.get(def.level) ?? [];
         this.snapshots.set(editor.document.uri.toString(), {
             markers,
             priorities,
-            metadata: metadataRanges,
+            metadata: [],
         });
     }
 

@@ -46,10 +46,12 @@ export const MARKERS = [
     {
         name: 'todo',
         symbols: [' '],
-        // Explicit `color: undefined` (rather than omitting the key) keeps
-        // the `color` field present in the literal type, so `m.color?.id`
-        // and `m.color !== undefined` type-check across the whole union.
-        color: undefined,
+        color: {
+            id: 'tsk.marker.todo',
+            description: 'Foreground color of the [ ] todo task marker triplet.',
+            light: '#b8860b',
+            dark: '#e5c07b',
+        },
         strikethrough: false,
         scopeName: 'markup.task-marker.todo.tsk',
         label: 'Todo',

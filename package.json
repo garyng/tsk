@@ -40,6 +40,59 @@
                 "path": "./syntaxes/tsk.tmLanguage.json"
             }
         ],
+        "semanticTokenTypes": [
+            {
+                "id": "taskMarker",
+                "description": "A tsk task's status-marker triplet ([ ], [/], [x], …), colored per status via its modifier."
+            },
+            {
+                "id": "taskMetadata",
+                "description": "A tsk task's inline <!-- ... --> metadata block, dimmed so it recedes."
+            }
+        ],
+        "semanticTokenModifiers": [
+            {
+                "id": "todo",
+                "description": "The [ ] todo marker."
+            },
+            {
+                "id": "inprogress",
+                "description": "The [/] in-progress marker."
+            },
+            {
+                "id": "completed",
+                "description": "The [x] completed marker."
+            },
+            {
+                "id": "moved",
+                "description": "The [>] moved marker."
+            },
+            {
+                "id": "cancelled",
+                "description": "The [!] cancelled marker."
+            },
+            {
+                "id": "notes",
+                "description": "The [n] note marker."
+            }
+        ],
+        "configurationDefaults": {
+            "editor.semanticTokenColorCustomizations": {
+                "enabled": true,
+                "rules": {
+                    "taskMarker.todo": "#e5c07b",
+                    "taskMarker.inprogress": "#3794ff",
+                    "taskMarker.completed": "#67c23a",
+                    "taskMarker.moved": "#ff9d00",
+                    "taskMarker.cancelled": {
+                        "foreground": "#9e9e9e",
+                        "fontStyle": "strikethrough"
+                    },
+                    "taskMarker.notes": "#bb6dd9",
+                    "taskMetadata": "#808080"
+                }
+            }
+        },
         "commands": [
             {
                 "command": "tsk.rebuildCache",
@@ -255,6 +308,14 @@
             }
         ],
         "colors": [
+            {
+                "id": "tsk.marker.todo",
+                "description": "Foreground color of the [ ] todo task marker triplet.",
+                "defaults": {
+                    "light": "#b8860b",
+                    "dark": "#e5c07b"
+                }
+            },
             {
                 "id": "tsk.marker.inprogress",
                 "description": "Foreground color of the [/] in-progress task marker triplet.",
