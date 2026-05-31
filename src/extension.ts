@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { registerClipboardBridge } from './clipboard-bridge';
 import { registerCodeActionsProvider } from './code-actions';
-import { type CodelensHandle, registerCodelens } from './codelens';
+import { registerCodelens } from './codelens';
 import {
     CACHE_PATH_KEY,
     COMMANDS,
@@ -20,10 +20,9 @@ import { isPersistableDocument, isTskDocument } from './editor-guards';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerHoverProvider } from './hover';
 import { registerInstallClipboardBridgeSkillCommand } from './install-clipboard-bridge-skill';
-import { CacheService, type CacheWarning } from './lib/cache';
+import { CacheService } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
-import { scheduleDebounced } from './lib/debounce';
 import type { GraphNode } from './lib/graph';
 import { GraphService } from './lib/graph-service';
 import { Logger, type LogLevel } from './lib/logger';
@@ -32,6 +31,7 @@ import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerPasteImageProvider } from './paste-image';
+import { ScanController } from './scan-controller';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
 import {
@@ -98,17 +98,11 @@ export interface TskExtensionApi {
 let state: ActivationState | undefined;
 
 interface ActivationState {
-    db: Db;
-    cache: CacheService;
-    graph: GraphService;
-    codelens: CodelensHandle;
     logger: Logger;
-    diagnostics: vscode.DiagnosticCollection;
-    diagnosticsManager: DiagnosticsManager;
-    /** Per-URI debounce timers for cache rescan on doc change. */
-    changeTimers: Map<string, NodeJS.Timeout>;
     /** Decoration engine — owns the decoration types, debounce timers, snapshots. */
     decorations: DecorationsController;
+    /** Scan engine — owns the cache-rescan orchestration + change-debounce timers. */
+    scan: ScanController;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<TskExtensionApi> {
@@ -118,7 +112,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     const logger = new Logger(channel, readLogLevel());
     logger.info('tsk extension activating.');
 
-    const { db, cache } = openCache(context, logger);
+    const { cache } = openCache(context, logger);
     const decorations = new DecorationsController(context, readPriorityOpacity());
 
     const diagnostics = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
@@ -129,22 +123,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     const navigationHighlight = new NavigationHighlight();
     context.subscriptions.push(navigationHighlight);
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
+    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger);
 
     state = {
-        db,
-        cache,
-        graph,
-        codelens,
         logger,
-        diagnostics,
-        diagnosticsManager,
-        changeTimers: new Map(),
         decorations,
+        scan,
     };
 
     attachConfigListener(context, logger);
 
-    await runInitialScan();
+    await scan.runInitialScan();
     // workspaceContains activation can fire with `.tsk` editors already visible
     // (e.g. when restoring a previous session). Decorate them right after the
     // initial scan finishes.
@@ -179,8 +168,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
 export function deactivate(): void {
     state?.logger.info('tsk extension deactivated.');
     if (state) {
-        for (const timer of state.changeTimers.values()) clearTimeout(timer);
-        state.changeTimers.clear();
+        state.scan.clearTimers();
         state.decorations.clearTimers();
     }
     state = undefined;
@@ -236,25 +224,21 @@ function attachConfigListener(context: vscode.ExtensionContext, logger: Logger):
 }
 
 /**
- * Wire the workspace `**\/*.tsk` FileSystemWatcher. Create / change
- * events delegate to {@link rescanFromFs}; delete events clear the
- * URI's cache / graph / diagnostics / decoration state in one shot.
+ * Wire the workspace `**\/*.tsk` FileSystemWatcher. Create / change events
+ * delegate to the scan controller's `rescanFromFs`; delete clears the URI's
+ * cache / graph / diagnostics via `scan.removeFile` and its decoration
+ * snapshot via `decorations.evict`.
  */
 function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.tsk');
     context.subscriptions.push(
         watcher,
-        watcher.onDidCreate((uri) => void rescanFromFs(uri)),
-        watcher.onDidChange((uri) => void rescanFromFs(uri)),
+        watcher.onDidCreate((uri) => void state?.scan.rescanFromFs(uri)),
+        watcher.onDidChange((uri) => void state?.scan.rescanFromFs(uri)),
         watcher.onDidDelete((uri) => {
             if (!state) return;
             const key = uri.toString();
-            state.cache.removeFile(key);
-            state.graph.removeFile(key);
-            state.diagnosticsManager.deleteFile(key);
-            state.diagnosticsManager.setGraphDuplicates(state.graph.getDuplicates());
-            state.diagnosticsManager.setBrokenReferences(state.graph.getBrokenForwardEdges());
-            state.codelens.refresh();
+            state.scan.removeFile(key);
             state.decorations.evict(key);
         }),
     );
@@ -276,13 +260,14 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument((doc) => {
             if (!isTskDocument(doc)) return;
-            if (isPersistableDocument(doc)) rescanFromDoc(doc);
+            if (isPersistableDocument(doc)) state?.scan.rescanFromDoc(doc);
             state?.decorations.applyForDoc(doc);
         }),
         vscode.workspace.onDidChangeTextDocument((event) => {
             const doc = event.document;
             if (isTskDocument(doc)) {
-                if (isPersistableDocument(doc)) scheduleDebouncedRescan(doc);
+                if (isPersistableDocument(doc))
+                    state?.scan.scheduleRescan(doc, readChangeDebounceMs());
                 state?.decorations.scheduleDecorate(doc, readChangeDebounceMs());
             } else if (doc.languageId === 'search-result') {
                 // Search Editor results populate (and re-populate on re-search)
@@ -334,11 +319,7 @@ function registerAllCommands(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {
             if (!state) return;
             state.logger.info(`${COMMANDS.rebuildCache} invoked.`);
-            state.diagnosticsManager.clear();
-            state.cache.purge();
-            state.graph.purge();
-            await runInitialScan();
-            state.codelens.refresh();
+            await state.scan.rebuild();
             void vscode.window.showInformationMessage('Tsk: cache rebuilt.');
         }),
     );
@@ -359,109 +340,6 @@ function readChangeDebounceMs(): number {
         .getConfiguration('tsk')
         .get<number>(EDITOR_CHANGE_DEBOUNCE_KEY, 0);
     return parseChangeDebounceMs(value);
-}
-
-async function runInitialScan(): Promise<void> {
-    if (!state) return;
-    const { cache, graph, codelens, logger, diagnosticsManager } = state;
-    const start = Date.now();
-
-    const uris = await vscode.workspace.findFiles('**/*.tsk', '**/node_modules/**');
-    let scanned = 0;
-    let skipped = 0;
-
-    for (const uri of uris) {
-        try {
-            const stat = await vscode.workspace.fs.stat(uri);
-            const cached = cache.getFileMtime(uri.toString());
-            if (cached === stat.mtime) {
-                // Cache on disk is current, but the in-memory graph is
-                // fresh on every activation. Hydrate the graph from the
-                // persisted cache so codelens / lookups work without
-                // needing a rebuildCache invocation.
-                const relationships = cache.getRelationshipsForFile(uri.toString());
-                graph.applyFileTasks(uri.toString(), relationships);
-                skipped++;
-                continue;
-            }
-            await rescanFromFs(uri);
-            scanned++;
-        } catch (err) {
-            logger.error(`scan failed for ${uri}: ${(err as Error).message}`);
-        }
-    }
-
-    // After the loop, ensure dup + broken-ref diagnostics + codelens
-    // reflect the final graph state. Per-file rescans already fire these,
-    // but the all-files-skipped case (every file's mtime matched on cold
-    // start) needs the explicit refresh here or the lenses stay empty.
-    diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
-    diagnosticsManager.setBrokenReferences(graph.getBrokenForwardEdges());
-    codelens.refresh();
-
-    const elapsed = Date.now() - start;
-    const counts = cache.counts();
-    logger.info(
-        `initial scan: ${scanned} scanned, ${skipped} unchanged, ${counts.tasks} tasks indexed, ${counts.tags} tags, ${elapsed}ms.`,
-    );
-}
-
-async function rescanFromFs(uri: vscode.Uri): Promise<void> {
-    if (!state) return;
-    const { cache, graph, codelens, logger, diagnosticsManager } = state;
-    try {
-        const stat = await vscode.workspace.fs.stat(uri);
-        const bytes = await vscode.workspace.fs.readFile(uri);
-        const text = new TextDecoder().decode(bytes);
-        const result = cache.rescanFile(uri.toString(), text, stat.mtime);
-        graph.applyFileTasks(uri.toString(), result.relationships);
-        applyWarnings(uri, result.warnings);
-        diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
-        diagnosticsManager.setBrokenReferences(graph.getBrokenForwardEdges());
-        codelens.refresh();
-    } catch (err) {
-        logger.error(`rescan failed for ${uri}: ${(err as Error).message}`);
-    }
-}
-
-function rescanFromDoc(doc: vscode.TextDocument): void {
-    if (!state) return;
-    const { cache, graph, codelens, diagnosticsManager } = state;
-    // In-memory edits don't have a meaningful disk mtime; use `Date.now()`
-    // so this rescan supersedes any future on-disk mtime read (mtimes are
-    // milliseconds since epoch, so wall-clock time is always >= disk mtime).
-    const result = cache.rescanFile(doc.uri.toString(), doc.getText(), Date.now());
-    graph.applyFileTasks(doc.uri.toString(), result.relationships);
-    applyWarnings(doc.uri, result.warnings);
-    diagnosticsManager.setGraphDuplicates(graph.getDuplicates());
-    diagnosticsManager.setBrokenReferences(graph.getBrokenForwardEdges());
-    codelens.refresh();
-}
-
-function scheduleDebouncedRescan(doc: vscode.TextDocument): void {
-    if (!state) return;
-    scheduleDebounced(state.changeTimers, doc.uri.toString(), readChangeDebounceMs(), () =>
-        rescanFromDoc(doc),
-    );
-}
-
-function applyWarnings(uri: vscode.Uri, warnings: CacheWarning[]): void {
-    if (!state) return;
-    const { logger, diagnosticsManager } = state;
-    // Log every warning so the chronological record is complete. Note:
-    // duplicate-id warnings still log here (cache-internal signal); the
-    // diagnostics-side dedup that hides them from the Problems panel
-    // happens inside DiagnosticsManager.setScanWarnings so the Output
-    // channel keeps its full trace while the Problems panel stays free
-    // of the soon-to-be-superseded "graph-owned" copy.
-    for (const warning of warnings) {
-        logger.warn(`${warning.fileUri}:${warning.line + 1}: ${warning.message}`);
-    }
-    const uriString = uri.toString();
-    diagnosticsManager.setScanWarnings(
-        uriString,
-        warnings.filter((w) => w.fileUri === uriString),
-    );
 }
 
 function readPriorityOpacity(): number {
