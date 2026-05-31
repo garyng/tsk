@@ -40,15 +40,15 @@ The four picker-driven commands (move + the three relationships) open an input b
 - `` Alt+` `` uses the backtick key, which varies by keyboard layout — UK / DE / FR users may need to rebind via the Keyboard Shortcuts editor.
 - Other `Alt`-letter combos depend on installed extensions and themes; the language-scoped `when` clause prevents `.tsk` toggles from leaking outside, but a third-party extension binding the same chord with an equally specific `when` clause could clash.
 
-## Priorities & decorations
+## Marker, priority & metadata coloring
 
-Two layers of editor decorations on `.tsk` documents:
+Three visual layers on `.tsk` documents. Two run through VS Code's **semantic tokens** — the same pipeline as syntax highlighting, so they recolor *instantly* with the text — and one stays a decoration:
 
-- **Marker color.** Each `[X]` is colored per marker — `[/]` blue, `[x]` green, `[>]` orange, `[!]` gray (struck through), `[n]` purple; `[ ]` keeps the editor's default foreground. Hues come from `contributes.colors` entries (`tsk.marker.{inprogress,completed,moved,cancelled,notes}`); override per workspace via `workbench.colorCustomizations`.
-- **Priority line background.** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); changes apply live without a reload.
-- **Dimmed inline metadata.** Every `<!-- @key:value -->` block is dimmed via `tsk.metadata.foreground` so the comments recede into the background. The hover-on-task popup surfaces the parsed values when you need them; the dim keeps those comments present-but-quiet as extension-managed bookkeeping.
+- **Marker color (semantic token).** Each `[X]` triplet is colored per status — `[ ]` yellow, `[/]` blue, `[x]` green, `[>]` orange, `[!]` gray (struck through), `[n]` purple. Colors ship as defaults under token type `taskMarker` (one modifier per status); recolor any via `editor.semanticTokenColorCustomizations`, e.g. `"taskMarker.completed": "#9ece6a"`. Toggling a status recolors with no delay.
+- **Inline metadata dim (semantic token).** Every `<!-- @key:value -->` block is dimmed (token type `taskMetadata`) so the comments recede; the hover popup surfaces the parsed values when you need them. Recolor via `"taskMetadata"` in the same setting.
+- **Priority line background (decoration).** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); applies live. This stays a decoration — nothing else paints a whole-line background — so it refreshes on editor focus, after save, and on a short post-change debounce rather than instantly.
 
-Decorations apply on editor focus, after save, and on a short debounce after text changes.
+The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via `workbench.colorCustomizations`) still drive the **Search Editor result rows** from `Alt+T`, which can't carry semantic tokens and are painted as decorations instead.
 
 ## List editing
 
@@ -163,13 +163,13 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.cache.path` | `${workspaceFolder}/.vscode/tsk/cache.db` | On-disk SQLite cache (`${workspaceFolder}` expanded at runtime; in-memory when no workspace folder is open). |
 | `tsk.tags.path` | `${workspaceFolder}/.vscode/tsk/tags.yml` | Workspace `tags.yml` for tag descriptions + completion. Blank ⇒ no file loaded (tags discovered in `.tsk` files still complete). |
 | `tsk.log.level` | `info` | `tsk` Output-channel verbosity: `debug` / `info` / `warn` / `error`. |
-| `tsk.editor.changeDebounceMs` | `300` | Debounce (ms) before re-decorating / rescanning a `.tsk` document after a text change (range 0–5000). |
+| `tsk.editor.changeDebounceMs` | `300` | Debounce (ms) before re-applying priority decorations / rescanning a `.tsk` document after a text change (range 0–5000). Marker + metadata colors are semantic tokens and update independently of this. |
 | `tsk.decorations.priority.opacity` | `0.15` | Background opacity (0–1) of priority line tints; applies live. |
 | `tsk.clipboard.bridgeEnabled` | `false` | Master switch for the clipboard bridge (watch a file → host clipboard). |
 | `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched bridge file; only used when the bridge is enabled. |
 | `tsk.pasteImage.baseDirectory` | `./images` | Base directory (under the document) for pasted images. Blank ⇒ beside the document. |
 
-Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`.
+Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`. These drive the Search Editor result rows; in `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 
 ## Limitations
 
@@ -177,7 +177,7 @@ Themable colors are also contributed (override via `workbench.colorCustomization
 
 Open a new buffer (`Ctrl+N`), set the language to `tsk`, and these work locally — they're document-local and don't need the cache:
 
-- Marker / priority / metadata **decorations**
+- Marker + metadata **semantic-token coloring** and priority **decorations**
 - **Toggle commands** and **list-edit** semantics (`Enter` / `Tab` / `Shift+Tab` / `Backspace`)
 - **Tag completion** (`#`) — surfaces workspace-known tags
 - The **Add missing id** code action
