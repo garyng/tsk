@@ -27,7 +27,7 @@ Thirteen commands operate on the cursor line (or every unique cursor line in a m
 | `Alt+S`      | `tsk.toggleInprogress`                        | Swap marker to `[/]` + `@started`; toggling again reverts. |
 | `Alt+C`      | `tsk.toggleCompleted`                        | `[x]` + `@completed`. |
 | `Alt+X`      | `tsk.toggleCancelled`                        | `[!]` + `@cancelled`. |
-| `Alt+N`      | `tsk.toggleNote`                             | Wrap/unwrap as `[n]`. |
+| `Alt+N`      | `tsk.toggleNote`                             | Wrap a plain line as `[n]`; flip any task to/from `[n]` (reversible). |
 | `Alt+M`      | `tsk.toggleMoved`                            | Picker → `[>]` + `@movedTo` + `@moved`. Empty submission writes only `@moved` (moved-elsewhere). Toggling again reverts. |
 | `Alt+R / D / P` | `tsk.toggleRelatedTo` / `DependsOn` / `Parent` | Absent → picker → write; present → silently remove. |
 | `Alt+1 / 2 / 3` | `tsk.toggleP1` / `P2` / `P3`                | Toggle `@priority:N`; switching levels overwrites in one step. |
@@ -118,7 +118,7 @@ Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't
 
 Two `Ctrl+.` helpers:
 
-- **Add missing id.** A markered task with no `@id` (any marker, not only `[ ]`) offers *"Tsk: Add missing id + created"* (or *"…Add missing id"* when `@created` is already present), writing the same metadata `Alt+A` would. Unlike the `Alt+A` / `Alt+N` toggles — which fire only on their own target marker — the quick-fix is marker-agnostic, so you can promote a hand-typed `- [x] done` imported from elsewhere.
+- **Add missing id.** A markered task with no `@id` (any marker, not only `[ ]`) offers *"Tsk: Add missing id + created"* (or *"…Add missing id"* when `@created` is already present), writing the same metadata `Alt+A` would. Unlike the `Alt+A` toggle — which fires only on its own target marker — the quick-fix is marker-agnostic, so you can promote a hand-typed `- [x] done` imported from elsewhere.
 - **Broken references.** When a task's `@parent` / `@dependsOn` / `@relatedTo` points at an `@id` with no canonical occurrence in the workspace, the line gets a `Warning` squiggle. The lightbulb offers *"Tsk: Remove broken @parent"* to drop it, or *"Tsk: Replace @parent via picker…"* to pick a real task.
 
 Warnings surface in both the `tsk` Output channel and the Problems panel: today's categories are duplicate `@id` and task-without-`@id`.

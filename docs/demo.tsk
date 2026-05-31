@@ -16,7 +16,7 @@ Every `- [ ]` line is a task; `Alt`+a key changes it and tsk fills in the id and
 
 Same key toggles back. `Alt+A` turns a bare line — or a checkbox-less `- bullet` — into a task; on an empty `- [ ]` it removes it.
 
-Try `Alt+A` on the bare line and the bare bullet (it becomes `- [ ] …`, the marker is never doubled), then `Alt+S` / `Alt+C` on the tasks:
+Try `Alt+A` on the bare line and the bare bullet (it becomes `- [ ] …`, the marker is never doubled), then `Alt+S` / `Alt+C` / `Alt+N` on the tasks — `Alt+S`/`C`/`N` flip any task's marker (same key flips back):
 
 buy milk
 
