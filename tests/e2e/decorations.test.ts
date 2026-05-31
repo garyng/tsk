@@ -35,30 +35,27 @@ suite('decorations', () => {
         await new Promise((resolve) => setImmediate(resolve));
     });
 
-    test('marker snapshot reflects the markers used in the fixture', () => {
+    test('marker buckets are empty in the .tsk snapshot — markers moved to semantic tokens (M41)', () => {
         const snapshot = api.getDecorations(sampleUri.toString());
         assert.ok(snapshot, 'snapshot should exist after opening sample.tsk');
 
-        // Lines per the fixture (0-indexed): m3task1=5, m3task2=6, m3task3=7,
-        // m3task4=8. The markdown header occupies lines 0..4.
-        assert.deepStrictEqual(
-            snapshot.markers.todo.map((r) => r.startLine),
-            [5, 8],
-        );
-        assert.deepStrictEqual(
-            snapshot.markers.inprogress.map((r) => r.startLine),
-            [6],
-        );
-        assert.deepStrictEqual(
-            snapshot.markers.completed.map((r) => r.startLine),
-            [7],
-        );
-
-        // The other three markers don't appear in the fixture — snapshot
-        // keeps them present but empty so stale decorations get cleared.
-        assert.strictEqual(snapshot.markers.moved.length, 0);
-        assert.strictEqual(snapshot.markers.cancelled.length, 0);
-        assert.strictEqual(snapshot.markers.notes.length, 0);
+        // Markers are now colored by the semantic-tokens provider, not
+        // decorations, so the decoration snapshot carries no marker ranges for
+        // `.tsk`. Marker coloring is asserted in tests/e2e/semantic-tokens.test.ts.
+        for (const status of [
+            'todo',
+            'inprogress',
+            'completed',
+            'moved',
+            'cancelled',
+            'notes',
+        ] as const) {
+            assert.strictEqual(
+                snapshot.markers[status].length,
+                0,
+                `${status} bucket should be empty`,
+            );
+        }
     });
 
     test('priority snapshot reflects @priority metadata on the right lines', () => {
@@ -79,11 +76,16 @@ suite('decorations', () => {
         );
     });
 
-    test('metadata snapshot covers the <!-- ... --> block on every task that has one', () => {
+    test('metadata bucket is empty in the .tsk snapshot — metadata moved to semantic tokens (M41)', () => {
         const snapshot = api.getDecorations(sampleUri.toString());
         assert.ok(snapshot);
-        // All four fixture tasks carry inline metadata (lines 5-8).
-        assert.deepStrictEqual(snapshot.metadata.map((r) => r.startLine).sort(), [5, 6, 7, 8]);
+        // Inline <!-- ... --> metadata is now dimmed via the semantic-tokens
+        // provider, not a decoration — see tests/e2e/semantic-tokens.test.ts.
+        assert.strictEqual(
+            snapshot.metadata.length,
+            0,
+            'metadata decoration bucket should be empty',
+        );
     });
 
     test('flipping tsk.decorations.priority.opacity stays consistent', async () => {

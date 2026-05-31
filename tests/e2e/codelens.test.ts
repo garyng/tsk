@@ -20,6 +20,7 @@ const EXTENSION_ID = 'garyng.tsk';
 suite('codelens', () => {
     let api: TskExtensionApi;
     let dupUri: vscode.Uri;
+    let movedUri: vscode.Uri;
 
     suiteSetup(async () => {
         const ext = vscode.extensions.getExtension<TskExtensionApi>(EXTENSION_ID);
@@ -29,17 +30,19 @@ suite('codelens', () => {
         const firstFolder = vscode.workspace.workspaceFolders?.[0];
         assert.ok(firstFolder, 'expected a workspace folder');
         dupUri = vscode.Uri.joinPath(firstFolder.uri, 'dup.tsk');
+        movedUri = vscode.Uri.joinPath(firstFolder.uri, 'moved.tsk');
         // Touch the API so the unused-variable lint doesn't trip when
         // we add more reliance later.
         void api;
     });
 
-    test('all six navigate/peek commands + the missing handler are registered', async () => {
+    test('all seven navigate/peek commands + the missing handler are registered', async () => {
         const registered = await vscode.commands.getCommands(true);
         for (const command of [
             'tsk.goToParent',
             'tsk.goToDependsOn',
             'tsk.goToRelated',
+            'tsk.goToMovedTo',
             'tsk.findAllChildren',
             'tsk.findAllDependents',
             'tsk.findAllRelated',
@@ -106,5 +109,42 @@ suite('codelens', () => {
             after,
             'missing-id navigate should not change the active editor',
         );
+    });
+
+    test('movedTo lenses: forward codicon for a real target, (missing) for a dangling one', async () => {
+        const doc = await vscode.workspace.openTextDocument(movedUri);
+        await vscode.window.showTextDocument(doc);
+        const lenses = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+            'vscode.executeCodeLensProvider',
+            movedUri,
+        );
+        assert.ok(lenses, 'codelens provider returned lenses');
+        const byTitle = new Map(lenses.map((l) => [l.command?.title, l]));
+
+        const movedLens = byTitle.get(`$(${CODICONS.movedTo}) movedTo: e2e-moved-target`);
+        assert.ok(movedLens, 'moved task should expose `movedTo: e2e-moved-target`');
+        assert.strictEqual(movedLens.command?.command, 'tsk.goToMovedTo');
+        assert.deepStrictEqual(movedLens.command?.arguments, ['e2e-moved-target']);
+
+        const missingLens = byTitle.get(`$(${CODICONS.missing}) movedTo: e2e-moved-gone (missing)`);
+        assert.ok(missingLens, 'dangling movedTo should render the (missing) lens');
+        assert.strictEqual(missingLens.command?.command, 'tsk.codelens.missing');
+        assert.deepStrictEqual(missingLens.command?.arguments, ['e2e-moved-gone', 'movedTo']);
+    });
+
+    test('tsk.goToMovedTo opens the target file at the target line', async () => {
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        await vscode.commands.executeCommand('tsk.goToMovedTo', 'e2e-moved-target');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        const editor = vscode.window.activeTextEditor;
+        assert.ok(editor, 'navigate should leave an editor active');
+        assert.strictEqual(editor.document.uri.toString(), movedUri.toString());
+
+        const targetNode = api.lookupGraph('e2e-moved-target');
+        assert.ok(targetNode);
+        assert.strictEqual(editor.selection.active.line, targetNode.line);
     });
 });

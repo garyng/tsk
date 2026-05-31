@@ -33,14 +33,17 @@ suite('untitled buffers — local-only features', () => {
     }
 
     test('decoration snapshot is non-empty for an untitled `.tsk` buffer', async () => {
-        const doc = await openUntitled('- [ ] decorate me <!-- @id:u1 -->');
+        // @priority gives the buffer a decoration to assert on: markers + metadata
+        // are now semantic tokens (M41), leaving the priority line background as
+        // the only `.tsk` decoration. (Untitled marker/metadata tokens are covered
+        // in semantic-tokens.test.ts.)
+        const doc = await openUntitled('- [ ] decorate me <!-- @id:u1 @priority:1 -->');
         // Decorations fire on `onDidChangeActiveTextEditor`. Give them a
         // moment to land before reading the snapshot.
         await new Promise((resolve) => setTimeout(resolve, 50));
         const snap = api.getDecorations(doc.uri.toString());
         assert.ok(snap, 'expected a decoration snapshot for the untitled buffer');
-        // At least the marker range should be present.
-        assert.ok((snap.markers.todo ?? []).length > 0, 'expected at least one todo marker range');
+        assert.ok(snap.priorities[1].length > 0, 'expected the @priority:1 decoration range');
     });
 
     test('Alt+A on an untitled blank line wraps it into a fresh task', async () => {

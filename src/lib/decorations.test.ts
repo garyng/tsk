@@ -37,12 +37,15 @@ describe('MARKER_THEME_COLOR_IDS', () => {
         expect(Object.keys(MARKER_THEME_COLOR_IDS).sort()).toEqual([...ALL_MARKERS].sort());
     });
 
-    it('leaves todo undefined so the editor default foreground wins', () => {
-        expect(MARKER_THEME_COLOR_IDS.todo).toBeUndefined();
-    });
-
-    it('uses the tsk.marker.* namespace for the five overrides', () => {
-        for (const marker of ['inprogress', 'completed', 'moved', 'cancelled', 'notes'] as const) {
+    it('uses the tsk.marker.* namespace for every marker', () => {
+        for (const marker of [
+            'todo',
+            'inprogress',
+            'completed',
+            'moved',
+            'cancelled',
+            'notes',
+        ] as const) {
             expect(MARKER_THEME_COLOR_IDS[marker]).toBe(`tsk.marker.${marker}`);
         }
     });

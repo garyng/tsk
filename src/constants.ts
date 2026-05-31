@@ -181,6 +181,7 @@ export const INTERNAL_COMMANDS = {
     goToParent: 'tsk.goToParent',
     goToDependsOn: 'tsk.goToDependsOn',
     goToRelated: 'tsk.goToRelated',
+    goToMovedTo: 'tsk.goToMovedTo',
     findAllChildren: 'tsk.findAllChildren',
     findAllDependents: 'tsk.findAllDependents',
     findAllRelated: 'tsk.findAllRelated',

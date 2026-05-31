@@ -32,6 +32,7 @@ import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerPasteImageProvider } from './paste-image';
 import { ScanController } from './scan-controller';
+import { registerSemanticTokens } from './semantic-tokens';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
 import {
@@ -150,6 +151,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     registerClipboardBridge(context, logger);
     registerInstallClipboardBridgeSkillCommand(context, logger);
     registerPasteImageProvider(context, logger);
+    registerSemanticTokens(context);
 
     logger.info('tsk extension activated.');
 

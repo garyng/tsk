@@ -86,7 +86,34 @@ function makeStateToggle(targetMarker: Marker, timestampKey: string) {
 }
 
 export const toggleTodoMutator = makeCreationToggle('todo');
-export const toggleNoteMutator = makeCreationToggle('notes');
+
+/**
+ * `toggleNote` is a hybrid — it keeps the creation pattern (so Alt+N still turns
+ * a plain line into a note) *and* swaps the marker on an existing task (so Alt+N
+ * flips any task to/from a note, the way Alt+S/C/X flip their own markers):
+ *
+ *   - Non-task line → wrap into a `[n]` note (`@id` + `@created`).
+ *   - Task with a non-note marker → swap the marker to `[n]`.
+ *   - `[n]` task, empty → unwrap back to a blank line.
+ *   - `[n]` task, id-less → promote (fill `@id` + `@created`).
+ *   - `[n]` task, proper → swap back to `[ ]` todo (so Alt+N is reversible).
+ */
+export const toggleNoteMutator = (line: string, deps: ToggleDeps): string => {
+    const parsed = parseLine(line);
+    if (!parsed) {
+        return wrapAsTask(line, 'notes', { id: deps.generateId(), timestamp: deps.now() });
+    }
+    if (parsed.marker !== 'notes') {
+        return swapMarker(line, 'notes');
+    }
+    if (parsed.content === '') return unwrapTask(line);
+    if (!parsed.metadata.has('id')) {
+        const promoted = promoteMissingMetadata(line, deps);
+        if (promoted !== null) return promoted;
+    }
+    return swapMarker(line, 'todo');
+};
+
 export const toggleInprogressMutator = makeStateToggle('inprogress', 'started');
 export const toggleCompletedMutator = makeStateToggle('completed', 'completed');
 export const toggleCancelledMutator = makeStateToggle('cancelled', 'cancelled');

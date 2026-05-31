@@ -117,6 +117,73 @@ describe('computeLensesForTask — forward edges', () => {
     });
 });
 
+describe('computeLensesForTask — movedTo (lifecycle pointer)', () => {
+    it('renders a movedTo lens from metadata, routed to goToMovedTo', () => {
+        const lookup = lookupFrom([node('gone', 'a.tsk', 0), node('dest', 'a.tsk', 5)]);
+        const lenses = computeLensesForTask(task('gone', 0, { movedTo: 'dest' }), 'a.tsk', lookup);
+        expect(lenses).toEqual([
+            {
+                line: 0,
+                title: `$(${CODICONS.movedTo}) movedTo: dest`,
+                command: INTERNAL_COMMANDS.goToMovedTo,
+                args: ['dest'],
+            },
+        ]);
+    });
+
+    it('uses the `forward` codicon for movedTo', () => {
+        expect(CODICONS.movedTo).toBe('forward');
+    });
+
+    it('marks a dangling movedTo target with `(missing)`', () => {
+        const lookup = lookupFrom([node('gone', 'a.tsk', 0)]);
+        const lenses = computeLensesForTask(
+            task('gone', 0, { movedTo: 'nowhere' }),
+            'a.tsk',
+            lookup,
+        );
+        expect(lenses).toEqual([
+            {
+                line: 0,
+                title: `$(${CODICONS.missing}) movedTo: nowhere (missing)`,
+                command: INTERNAL_COMMANDS.codelensMissing,
+                args: ['nowhere', 'movedTo'],
+            },
+        ]);
+    });
+
+    it('renders movedTo last in the forward group, before inverse edges', () => {
+        const lookup = lookupFrom([
+            node('source', 'a.tsk', 0, {
+                forward: { parent: 'p', dependsOn: 'd', relatedTo: 'r' },
+                inverse: { children: ['c'] },
+            }),
+            node('p', 'a.tsk', 1),
+            node('d', 'a.tsk', 2),
+            node('r', 'a.tsk', 3),
+            node('c', 'a.tsk', 4),
+            node('dest', 'a.tsk', 5),
+        ]);
+        const lenses = computeLensesForTask(
+            task('source', 0, { movedTo: 'dest' }),
+            'a.tsk',
+            lookup,
+        );
+        expect(lenses.map((l) => l.title)).toEqual([
+            `$(${CODICONS.parent}) parent: p`,
+            `$(${CODICONS.dependsOn}) dependsOn: d`,
+            `$(${CODICONS.relatedTo}) relatedTo: r`,
+            `$(${CODICONS.movedTo}) movedTo: dest`,
+            `$(${CODICONS.children}) children: 1`,
+        ]);
+    });
+
+    it('omits the movedTo lens when the metadata value is empty', () => {
+        const lookup = lookupFrom([node('gone', 'a.tsk', 0)]);
+        expect(computeLensesForTask(task('gone', 0, { movedTo: '' }), 'a.tsk', lookup)).toEqual([]);
+    });
+});
+
 describe('computeLensesForTask — inverse edges', () => {
     it('renders a `children: N` lens with the source uri and child ids', () => {
         const lookup = lookupFrom([

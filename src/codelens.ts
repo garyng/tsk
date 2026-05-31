@@ -61,7 +61,7 @@ export interface CodelensHandle {
 }
 
 /**
- * Register the `.tsk` CodeLensProvider plus the six navigation /
+ * Register the `.tsk` CodeLensProvider plus the seven navigation /
  * peek commands it dispatches to, plus the dangling-edge "(missing)"
  * handler that pops an info toast.
  *
@@ -143,6 +143,9 @@ export function registerCodelens(
             navigate(id),
         ),
         vscode.commands.registerCommand(INTERNAL_COMMANDS.goToRelated, (id: string) =>
+            navigate(id),
+        ),
+        vscode.commands.registerCommand(INTERNAL_COMMANDS.goToMovedTo, (id: string) =>
             navigate(id),
         ),
         vscode.commands.registerCommand(
