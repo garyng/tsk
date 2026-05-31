@@ -48,6 +48,8 @@ Three visual layers on `.tsk` documents. Two run through VS Code's **semantic to
 - **Inline metadata dim (semantic token).** Every `<!-- @key:value -->` block is dimmed (token type `taskMetadata`) so the comments recede; the hover popup surfaces the parsed values when you need them. Recolor via `"taskMetadata"` in the same setting.
 - **Priority line background (decoration).** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); applies live. This stays a decoration — nothing else paints a whole-line background — so it refreshes on editor focus, after save, and on a short post-change debounce rather than instantly.
 
+On top of these, a task's *text* is ordinary Markdown: `.tsk` extends the Markdown grammar, so inline `code`, **bold**, *italic*, and `[links](…)` render inside task lines exactly as they do elsewhere in the document — while the marker triplet and `<!-- … -->` metadata keep their own coloring. (The grammar wraps each task line so the embedded Markdown engages mid-line, which a flat checkbox match wouldn't.)
+
 The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via `workbench.colorCustomizations`) still drive the **Search Editor result rows** from `Alt+T`, which can't carry semantic tokens and are painted as decorations instead.
 
 ## List editing

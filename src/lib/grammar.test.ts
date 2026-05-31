@@ -177,3 +177,104 @@ describe('tsk grammar — tags', () => {
         expect(scopesAt(line, 16)).toContain('entity.name.tag.tsk');
     });
 });
+
+describe('tsk grammar — markdown inline in task content (M43)', () => {
+    // The grammar embeds text.html.markdown so a task's *content* gets Markdown
+    // inline styling (code, bold, italic, links). The #task-line wrapper is what
+    // makes this work — without it the content falls through to Markdown mid-line,
+    // where the block rules (^|\G-anchored) never engage and inline styling is lost.
+    //
+    // VS Code ships the real text.html.markdown grammar; here it's stubbed with a
+    // minimal #inline repository so the test stays hermetic and asserts only the
+    // tsk-side wiring (content reaches text.html.markdown#inline while the marker,
+    // metadata and tag scopes still win). The real grammar's behaviour is verified
+    // out-of-band by a vscode-textmate probe against the bundled markdown grammar on
+    // both the stable and 1.112 floor engines (see plan M43).
+    let inlineGrammar: IGrammar;
+
+    beforeAll(async () => {
+        // WASM is already loaded by the suite-level beforeAll above (loadWASM is
+        // once-only); we just build a second registry with a markdown stub that
+        // exposes #inline.
+        const grammarContent = await fs.readFile(grammarPath, 'utf-8');
+        const markdownStub = JSON.stringify({
+            name: 'Markdown',
+            scopeName: 'text.html.markdown',
+            patterns: [{ include: '#inline' }],
+            repository: {
+                inline: {
+                    patterns: [{ include: '#raw' }, { include: '#bold' }, { include: '#italic' }],
+                },
+                raw: { name: 'markup.inline.raw.string.markdown', match: '`[^`]+`' },
+                bold: { name: 'markup.bold.markdown', match: '\\*\\*[^*]+\\*\\*' },
+                italic: { name: 'markup.italic.markdown', match: '\\*[^*]+\\*' },
+            },
+        });
+
+        const registry = new Registry({
+            onigLib: Promise.resolve({
+                createOnigScanner: (sources) => new oniguruma.OnigScanner(sources),
+                createOnigString: (s) => new oniguruma.OnigString(s),
+            }),
+            loadGrammar: async (scopeName) => {
+                if (scopeName === 'text.html.markdown.tsk') {
+                    return parseRawGrammar(grammarContent, grammarPath);
+                }
+                if (scopeName === 'text.html.markdown') {
+                    return parseRawGrammar(markdownStub, 'markdown-inline-stub.json');
+                }
+                return null;
+            },
+        });
+
+        const loaded = await registry.loadGrammar('text.html.markdown.tsk');
+        if (!loaded) {
+            throw new Error('failed to load tsk grammar (inline harness)');
+        }
+        inlineGrammar = loaded;
+    });
+
+    function scopes(line: string, col: number): string[] {
+        const tokens = inlineGrammar.tokenizeLine(line, INITIAL).tokens;
+        return tokens.find((t) => t.startIndex <= col && col < t.endIndex)?.scopes ?? [];
+    }
+
+    it('highlights an inline code span inside task content', () => {
+        const line = '- [ ] ship `v1` today';
+        expect(scopes(line, 11)).toContain('markup.inline.raw.string.markdown'); // opening `
+        expect(scopes(line, 12)).toContain('markup.inline.raw.string.markdown'); // v1
+    });
+
+    it('highlights bold inside task content', () => {
+        const line = '- [ ] ship **docs** today';
+        expect(scopes(line, 13)).toContain('markup.bold.markdown'); // inside **docs**
+    });
+
+    it('highlights italic inside task content', () => {
+        const line = '- [/] read *spec* now';
+        expect(scopes(line, 12)).toContain('markup.italic.markdown'); // inside *spec*
+    });
+
+    it('still scopes the marker triplet on a content-rich task', () => {
+        // The #task-marker match rules run first inside the wrapper, so the marker
+        // keeps its own scope even though the rest of the line is now Markdown inline.
+        const line = '- [x] ship `v1` and **docs**';
+        expect(scopes(line, 2)).toContain('punctuation.definition.task-marker.begin.tsk');
+        expect(scopes(line, 3)).toContain('markup.task-marker.completed.tsk');
+        expect(scopes(line, 4)).toContain('punctuation.definition.task-marker.end.tsk');
+    });
+
+    it('keeps metadata winning over markdown inline', () => {
+        const line = '- [ ] ship `v1` <!-- @id:abc -->';
+        expect(scopes(line, line.indexOf('<!--') + 1)).toContain('comment.block.metadata.tsk');
+        // the code span before the comment is still raw, not swallowed
+        expect(scopes(line, line.indexOf('`') + 1)).toContain('markup.inline.raw.string.markdown');
+    });
+
+    it('keeps #tag winning over markdown inline', () => {
+        const line = '- [ ] ship **docs** #project/tsk';
+        const hash = line.indexOf('#');
+        expect(scopes(line, hash)).toContain('punctuation.definition.tag.tsk');
+        expect(scopes(line, hash + 1)).toContain('entity.name.tag.tsk');
+    });
+});
