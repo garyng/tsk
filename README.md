@@ -91,7 +91,7 @@ Empty / missing / malformed `tags.yml` is tolerated — the loader returns an em
 
 ## Relationships, code lenses & navigation
 
-Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N`). Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
+Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N`). A moved task (`[>]`) carrying an `@movedTo` target also shows a `movedTo: <id>` lens pointing at where the work went. Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
 
 | Lens                       | Command                  | Behavior |
 |----------------------------|--------------------------|----------|
@@ -101,13 +101,14 @@ Every task with relationship metadata grows code lenses showing forward edges (`
 | `dependents: N`            | `tsk.findAllDependents`  | Peek view of every task `@dependsOn`-pointing here. |
 | `relatedTo: <id>`          | `tsk.goToRelated`        | Open the related task's location. |
 | `related: N`               | `tsk.findAllRelated`     | Peek view of every task `@relatedTo`-pointing here. |
+| `movedTo: <id>`            | `tsk.goToMovedTo`        | Open the move target's location (a `[>]` task's `@movedTo`). |
 | `<key>: <id> (missing)`    | `tsk.codelens.missing`   | Info toast — the referenced `@id` isn't in the workspace. |
 
 These commands are invoked exclusively by lens clicks — no palette entries, no keybindings; the lens *is* the invocation.
 
 **Canonical-occurrence gating.** Lenses render only on the canonical occurrence of an `@id` (the lex-lowest `(file, line)` in the workspace). Duplicate-`@id` losers get a diagnostic squiggle pointing at the canonical winner instead of a potentially misleading lens.
 
-**Navigation highlight.** Clicking a forward-edge lens (parent / dependsOn / relatedTo) lands on the target line and leaves a soft whole-line tint there until your next interaction. It's persistent, not a flash — it clears on the next navigate, a user-initiated cursor move in that editor, or the active editor moving off it. Theme it via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id (default: soft yellow with alpha, readable on light and dark themes).
+**Navigation highlight.** Clicking a forward-edge lens (parent / dependsOn / relatedTo / movedTo) lands on the target line and leaves a soft whole-line tint there until your next interaction. It's persistent, not a flash — it clears on the next navigate, a user-initiated cursor move in that editor, or the active editor moving off it. Theme it via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id (default: soft yellow with alpha, readable on light and dark themes).
 
 ## Hover
 

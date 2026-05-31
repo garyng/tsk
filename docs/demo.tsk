@@ -103,7 +103,7 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 
 ## 8. Move
 
-`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`.
+`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`. Pick a target and the task gains an `@movedTo` plus a `movedTo: <id>` lens (the `forward` codicon) — click it to jump to where the work went.
 
 - [ ] belongs in another project <!-- @id:move-demo -->
 
@@ -121,7 +121,7 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 
 ## 11. Putting it together
 
-A real slice of a plan — every status, priority, tag, and link at once. The priorities tint their rows, the cancelled line is struck through, the metadata stays dimmed. Hover any task, click a `children:` / `parent:` / `dependsOn:` lens to jump, or `Alt+T` a tag to find more like it.
+A real slice of a plan — every status, priority, tag, and link at once. The priorities tint their rows, the cancelled line is struck through, the metadata stays dimmed. Hover any task, click a `children:` / `parent:` / `dependsOn:` / `movedTo:` lens to jump, or `Alt+T` a tag to find more like it.
 
 - [/] Ship v1.0 #project/tsk <!-- @id:show-root @created:2026-05-20T09:00:00+08:00 @started:2026-05-22T10:00:00+08:00 @priority:1 -->
     - [x] cut the release branch #release <!-- @id:show-branch @parent:show-root @created:2026-05-20T09:05:00+08:00 @completed:2026-05-23T16:00:00+08:00 -->
