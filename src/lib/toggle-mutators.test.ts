@@ -79,9 +79,19 @@ describe('toggleNoteMutator', () => {
         );
     });
 
-    it('no-ops on a different marker (so toggleNote stays creation-scoped)', () => {
-        const line = '- [ ] not a note';
-        expect(toggleNoteMutator(line, FIXED_DEPS)).toBe(line);
+    it('flips a non-note task to a note — Alt+N works on tasks (M42)', () => {
+        expect(toggleNoteMutator('- [ ] not a note <!-- @id:x -->', FIXED_DEPS)).toBe(
+            '- [n] not a note <!-- @id:x -->',
+        );
+        expect(toggleNoteMutator('- [x] done <!-- @id:y -->', FIXED_DEPS)).toBe(
+            '- [n] done <!-- @id:y -->',
+        );
+    });
+
+    it('flips a proper note back to a todo — reversible (M42)', () => {
+        expect(toggleNoteMutator('- [n] an aside <!-- @id:z -->', FIXED_DEPS)).toBe(
+            '- [ ] an aside <!-- @id:z -->',
+        );
     });
 });
 

@@ -73,6 +73,28 @@ suite('toggle marker commands', () => {
         assert.match(first ?? '', /^- \[n\] aside <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/);
     });
 
+    test('toggleNote flips an existing task to/from a note (M42)', async () => {
+        // Any non-note task → note (the metadata is preserved, no re-stamp).
+        const [toNote] = await runToggle(
+            '- [ ] reconsider <!-- @id:n42 -->',
+            'tsk.toggleNote',
+            [0],
+        );
+        assert.strictEqual(toNote, '- [n] reconsider <!-- @id:n42 -->');
+
+        // A done task flips too — Alt+N is marker-agnostic on tasks now.
+        const [doneToNote] = await runToggle(
+            '- [x] shipped <!-- @id:d42 -->',
+            'tsk.toggleNote',
+            [0],
+        );
+        assert.strictEqual(doneToNote, '- [n] shipped <!-- @id:d42 -->');
+
+        // And a proper note flips back to a todo (reversible).
+        const [back] = await runToggle('- [n] reconsider <!-- @id:n42 -->', 'tsk.toggleNote', [0]);
+        assert.strictEqual(back, '- [ ] reconsider <!-- @id:n42 -->');
+    });
+
     test('toggleTodo on a blank line lands the cursor between the two spacer columns', async () => {
         // Alt+A on a blank line emits `- [ ]  <!-- @id:… -->` with two
         // spaces between marker and metadata. The cursor should sit between
