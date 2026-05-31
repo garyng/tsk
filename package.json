@@ -371,7 +371,7 @@
     "scripts": {
         "build:host": "vite build -c vite.config.host.ts",
         "build": "npm run build:host",
-        "dev:host": "vite build -c vite.config.host.ts --watch",
+        "dev:host": "vite build -c vite.config.host.ts --watch --mode development",
         "typecheck": "tsc",
         "compile:tests": "tsc -p tests/tsconfig.json",
         "test": "vitest run",
