@@ -1,8 +1,12 @@
 import { INTERNAL_COMMANDS } from '../constants';
 import type { GraphNode } from './graph';
 
-/** Union of the three navigate command ids (single-arg, target id). */
-type NavigateCommand = (typeof INTERNAL_COMMANDS)['goToParent' | 'goToDependsOn' | 'goToRelated'];
+/** Union of the navigate command ids (single-arg, target id). */
+type NavigateCommand = (typeof INTERNAL_COMMANDS)[
+    | 'goToParent'
+    | 'goToDependsOn'
+    | 'goToRelated'
+    | 'goToMovedTo'];
 
 /** Union of the three peek command ids (source uri + line + target ids). */
 type PeekCommand = (typeof INTERNAL_COMMANDS)[
@@ -20,17 +24,17 @@ type PeekCommand = (typeof INTERNAL_COMMANDS)[
  * argument shapes, and the union here lets TypeScript narrow `args` at
  * each call site once the command is known.
  *
- *   - **Navigate** (`tsk.goToParent` / `goToDependsOn` / `goToRelated`):
- *     args = `[targetId]`. The handler resolves the target via the graph
- *     at invocation time (the graph may have shifted between lens render
- *     and click; deferring the lookup is the only correct option).
+ *   - **Navigate** (`tsk.goToParent` / `goToDependsOn` / `goToRelated` /
+ *     `goToMovedTo`): args = `[targetId]`. The handler resolves the target
+ *     via the graph at invocation time (the graph may have shifted between
+ *     lens render and click; deferring the lookup is the only correct option).
  *   - **Peek** (`tsk.findAllChildren` / `findAllDependents` /
  *     `findAllRelated`): args = `[sourceUri, sourceLine, targetIds]`.
  *     The handler resolves each `targetId` to a Location at invocation
  *     time, then anchors the peek view at `(sourceUri, sourceLine)`.
  *   - **Missing** (`tsk.codelens.missing`): args = `[targetId, label]`
  *     where `label` is the relationship name ("parent" / "dependsOn" /
- *     "relatedTo") so the toast can name the relationship for context.
+ *     "relatedTo" / "movedTo") so the toast can name the relationship.
  */
 export type LensDescriptor = {
     line: number;
@@ -65,6 +69,9 @@ export type GraphLookup = (id: string) => GraphNode | undefined;
  *     flow). They read as "follow the slot in the structure."
  *   - **Thinner arrows** mark the *lateral* relatedTo/related link —
  *     a free-form pointer, not a hierarchy slot.
+ *   - **`forward`** marks the `movedTo` lifecycle pointer — this task was
+ *     relocated to another. Neither a hierarchy slot nor a lateral link,
+ *     so it gets its own glyph.
  *   - **`warning`** marks dangling forward edges, since the click opens
  *     an info toast rather than navigating.
  */
@@ -75,10 +82,11 @@ export const CODICONS = {
     dependents: 'triangle-right',
     relatedTo: 'arrow-right',
     related: 'arrow-left',
+    movedTo: 'forward',
     missing: 'warning',
 } as const;
 
-type ForwardLabel = 'parent' | 'dependsOn' | 'relatedTo';
+type ForwardLabel = 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo';
 type InverseLabel = 'children' | 'dependents' | 'related';
 
 /** The minimum projection of a parsed task the lens computer needs. */
@@ -149,6 +157,17 @@ export function computeLensesForTask(
                 lookup,
             ),
         );
+    }
+
+    // `movedTo` is read from this task's metadata, not `node.forward` — it's
+    // a lifecycle pointer, deliberately not a relationship-graph edge (so it
+    // gets no inverse "moved here from" tracking). Past the canonical gate
+    // above, `task.metadata` IS the canonical node's metadata, so this matches
+    // what a forward graph edge would hold. A null/empty value (a `@movedTo`
+    // with no id) renders nothing.
+    const movedTo = task.metadata.get('movedTo');
+    if (movedTo) {
+        out.push(forwardLens(task.line, 'movedTo', movedTo, INTERNAL_COMMANDS.goToMovedTo, lookup));
     }
 
     if (node.inverse.children.length > 0) {
