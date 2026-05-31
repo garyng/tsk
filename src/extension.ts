@@ -9,11 +9,11 @@ import {
     EDITOR_CHANGE_DEBOUNCE_KEY,
     LOG_LEVEL_KEY,
     LOG_LEVEL_SETTING,
-    METADATA_FOREGROUND_COLOR_ID,
     OUTPUT_CHANNEL_NAME,
     PRIORITY_OPACITY_KEY,
     PRIORITY_OPACITY_SETTING,
 } from './constants';
+import { type DecorationSnapshot, DecorationsController } from './decorations-controller';
 import { DiagnosticsManager } from './diagnostics-manager';
 import { registerDuplicateCommands } from './duplicate-commands';
 import { isPersistableDocument, isTskDocument } from './editor-guards';
@@ -24,20 +24,9 @@ import { CacheService, type CacheWarning } from './lib/cache';
 import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
 import { scheduleDebounced } from './lib/debounce';
-import {
-    computeMarkerRanges,
-    computeMetadataRanges,
-    computePriorityRanges,
-    priorityBackgroundColor,
-    type RangeLike,
-} from './lib/decorations';
 import type { GraphNode } from './lib/graph';
 import { GraphService } from './lib/graph-service';
 import { Logger, type LogLevel } from './lib/logger';
-import { MARKERS, type Marker } from './lib/markers';
-import { parseDocument } from './lib/parser';
-import { PRIORITIES, type PriorityLevel } from './lib/priorities';
-import { computeSearchResultRanges } from './lib/search-result-decorations';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
@@ -95,13 +84,6 @@ export interface TskExtensionApi {
     getNavigationHighlight(): { uri: string; line: number } | undefined;
 }
 
-export interface DecorationSnapshot {
-    markers: Record<Marker, RangeLike[]>;
-    priorities: Record<PriorityLevel, RangeLike[]>;
-    /** Flat list of `<!-- ... -->` ranges across all tasks on this URI. */
-    metadata: RangeLike[];
-}
-
 /**
  * Per the **Warnings convention**: every `CacheWarning` surfaces both as a
  * log line in the `tsk` Output channel AND as a `vscode.Diagnostic` squiggle
@@ -125,23 +107,8 @@ interface ActivationState {
     diagnosticsManager: DiagnosticsManager;
     /** Per-URI debounce timers for cache rescan on doc change. */
     changeTimers: Map<string, NodeJS.Timeout>;
-    /**
-     * Per-URI debounce timers for decoration refresh on doc change. Kept
-     * separate from `changeTimers` so decoration latency stays decoupled
-     * from cache rescan latency.
-     */
-    decorationTimers: Map<string, NodeJS.Timeout>;
-    /** Per-marker decoration types — built once, live for the activation. */
-    markerDecorationTypes: Record<Marker, vscode.TextEditorDecorationType>;
-    /** Per-priority decoration types — rebuilt when opacity setting changes. */
-    priorityDecorationTypes: Record<PriorityLevel, vscode.TextEditorDecorationType>;
-    /**
-     * Single dimmed decoration type for inline metadata comments. Color is
-     * `tsk.metadata.foreground` (themable), built once.
-     */
-    metadataDecorationType: vscode.TextEditorDecorationType;
-    /** Per-URI snapshot of last-applied decoration ranges (for the e2e API). */
-    decorationSnapshots: Map<string, DecorationSnapshot>;
+    /** Decoration engine — owns the decoration types, debounce timers, snapshots. */
+    decorations: DecorationsController;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<TskExtensionApi> {
@@ -152,7 +119,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     logger.info('tsk extension activating.');
 
     const { db, cache } = openCache(context, logger);
-    const decorationTypes = buildAllDecorationTypes(context);
+    const decorations = new DecorationsController(context, readPriorityOpacity());
 
     const diagnostics = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
     context.subscriptions.push(diagnostics);
@@ -172,9 +139,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         diagnostics,
         diagnosticsManager,
         changeTimers: new Map(),
-        decorationTimers: new Map(),
-        ...decorationTypes,
-        decorationSnapshots: new Map(),
+        decorations,
     };
 
     attachConfigListener(context, logger);
@@ -184,7 +149,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     // (e.g. when restoring a previous session). Decorate them right after the
     // initial scan finishes.
     for (const editor of vscode.window.visibleTextEditors) {
-        applyDecorationsToEditor(editor);
+        decorations.applyToEditor(editor);
     }
 
     attachFileSystemWatcher(context);
@@ -203,7 +168,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         counts: () => cache.counts(),
         findTaskById: (id) => cache.lookupById(id),
         listAllTags: () => cache.listAllTags(),
-        getDecorations: (uri) => state?.decorationSnapshots.get(uri),
+        getDecorations: (uri) => state?.decorations.getSnapshot(uri),
         getTags: () => tagsLoader.getTags(),
         reloadTags: () => tagsLoader.reload(),
         lookupGraph: (id) => graph.getNode(id),
@@ -216,8 +181,7 @@ export function deactivate(): void {
     if (state) {
         for (const timer of state.changeTimers.values()) clearTimeout(timer);
         state.changeTimers.clear();
-        for (const timer of state.decorationTimers.values()) clearTimeout(timer);
-        state.decorationTimers.clear();
+        state.decorations.clearTimers();
     }
     state = undefined;
 }
@@ -252,36 +216,6 @@ function openCache(
 }
 
 /**
- * Build the three decoration-type collections (markers, priorities,
- * metadata) and register their disposers. Priority decorations are
- * rebuilt on opacity changes — the disposer walks the *current* set
- * held in state, so the post-activation replacement still cleans up.
- */
-function buildAllDecorationTypes(context: vscode.ExtensionContext): {
-    markerDecorationTypes: Record<Marker, vscode.TextEditorDecorationType>;
-    priorityDecorationTypes: Record<PriorityLevel, vscode.TextEditorDecorationType>;
-    metadataDecorationType: vscode.TextEditorDecorationType;
-} {
-    const markerDecorationTypes = buildMarkerDecorationTypes();
-    for (const type of Object.values(markerDecorationTypes)) context.subscriptions.push(type);
-
-    const priorityDecorationTypes = buildPriorityDecorationTypes(readPriorityOpacity());
-    context.subscriptions.push({
-        dispose: () => {
-            if (!state) return;
-            for (const type of Object.values(state.priorityDecorationTypes)) type.dispose();
-        },
-    });
-
-    const metadataDecorationType = vscode.window.createTextEditorDecorationType({
-        color: new vscode.ThemeColor(METADATA_FOREGROUND_COLOR_ID),
-    });
-    context.subscriptions.push(metadataDecorationType);
-
-    return { markerDecorationTypes, priorityDecorationTypes, metadataDecorationType };
-}
-
-/**
  * Wire the `onDidChangeConfiguration` listener. Reacts to two settings:
  * the log level (re-reads the level + announces the change) and the
  * priority opacity (rebuilds the decoration types + announces).
@@ -294,7 +228,7 @@ function attachConfigListener(context: vscode.ExtensionContext, logger: Logger):
                 logger.info(`log level changed to ${readLogLevel()}.`);
             }
             if (event.affectsConfiguration(PRIORITY_OPACITY_SETTING)) {
-                rebuildPriorityDecorationTypes();
+                state?.decorations.rebuildPriority(readPriorityOpacity());
                 logger.info(`priority opacity changed to ${readPriorityOpacity()}.`);
             }
         }),
@@ -321,7 +255,7 @@ function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
             state.diagnosticsManager.setGraphDuplicates(state.graph.getDuplicates());
             state.diagnosticsManager.setBrokenReferences(state.graph.getBrokenForwardEdges());
             state.codelens.refresh();
-            state.decorationSnapshots.delete(key);
+            state.decorations.evict(key);
         }),
     );
 }
@@ -343,38 +277,31 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
         vscode.workspace.onDidSaveTextDocument((doc) => {
             if (!isTskDocument(doc)) return;
             if (isPersistableDocument(doc)) rescanFromDoc(doc);
-            applyDecorationsForDoc(doc);
+            state?.decorations.applyForDoc(doc);
         }),
         vscode.workspace.onDidChangeTextDocument((event) => {
             const doc = event.document;
             if (isTskDocument(doc)) {
                 if (isPersistableDocument(doc)) scheduleDebouncedRescan(doc);
-                scheduleDebouncedDecorate(doc);
+                state?.decorations.scheduleDecorate(doc, readChangeDebounceMs());
             } else if (doc.languageId === 'search-result') {
                 // Search Editor results populate (and re-populate on re-search)
                 // via document edits — re-decorate the match rows when they do.
-                scheduleDebouncedDecorate(doc);
+                state?.decorations.scheduleDecorate(doc, readChangeDebounceMs());
             }
         }),
         vscode.window.onDidChangeActiveTextEditor((editor) => {
-            if (editor) applyDecorationsToEditor(editor);
+            if (editor) state?.decorations.applyToEditor(editor);
         }),
         vscode.window.onDidChangeVisibleTextEditors((editors) => {
-            for (const editor of editors) applyDecorationsToEditor(editor);
+            for (const editor of editors) state?.decorations.applyToEditor(editor);
         }),
         vscode.workspace.onDidCloseTextDocument((doc) => {
             // Evict the decoration snapshot for a closed buffer so the Map
             // doesn't grow unbounded across untitled docs (Untitled-1, …),
             // which never reach the on-disk delete watcher. (M31/A — the leak
             // flagged in M18.) Also clear any pending decorate timer for it.
-            if (!state) return;
-            const key = doc.uri.toString();
-            state.decorationSnapshots.delete(key);
-            const timer = state.decorationTimers.get(key);
-            if (timer) {
-                clearTimeout(timer);
-                state.decorationTimers.delete(key);
-            }
+            state?.decorations.evict(doc.uri.toString());
         }),
     );
 }
@@ -543,130 +470,4 @@ function readPriorityOpacity(): number {
     // [0, 1] (the schema enforces it in the UI but settings.json can smuggle).
     const value = vscode.workspace.getConfiguration('tsk').get<number>(PRIORITY_OPACITY_KEY, 0);
     return clampPriorityOpacity(value);
-}
-
-function buildMarkerDecorationTypes(): Record<Marker, vscode.TextEditorDecorationType> {
-    const out = {} as Record<Marker, vscode.TextEditorDecorationType>;
-    for (const def of MARKERS) {
-        const options: vscode.DecorationRenderOptions = {};
-        if (def.color) options.color = new vscode.ThemeColor(def.color.id);
-        if (def.strikethrough) options.textDecoration = 'line-through';
-        out[def.name] = vscode.window.createTextEditorDecorationType(options);
-    }
-    return out;
-}
-
-function buildPriorityDecorationTypes(
-    opacity: number,
-): Record<PriorityLevel, vscode.TextEditorDecorationType> {
-    const out = {} as Record<PriorityLevel, vscode.TextEditorDecorationType>;
-    for (const def of PRIORITIES) {
-        out[def.level] = vscode.window.createTextEditorDecorationType({
-            backgroundColor: priorityBackgroundColor(def.level, opacity),
-            isWholeLine: true,
-        });
-    }
-    return out;
-}
-
-function rebuildPriorityDecorationTypes(): void {
-    if (!state) return;
-    for (const type of Object.values(state.priorityDecorationTypes)) type.dispose();
-    state.priorityDecorationTypes = buildPriorityDecorationTypes(readPriorityOpacity());
-    for (const editor of vscode.window.visibleTextEditors) {
-        applyDecorationsToEditor(editor);
-    }
-}
-
-function applyDecorationsToEditor(editor: vscode.TextEditor): void {
-    if (!state) return;
-    // The find-by-tag Search Editor renders results in a `search-result`
-    // document — decorate its tsk match rows too (M30/B), offset by the gutter.
-    if (editor.document.languageId === 'search-result') {
-        applySearchResultDecorations(editor);
-        return;
-    }
-    if (!isTskDocument(editor.document)) return;
-    const {
-        markerDecorationTypes,
-        priorityDecorationTypes,
-        metadataDecorationType,
-        decorationSnapshots,
-    } = state;
-
-    const tasks = parseDocument(editor.document.getText());
-    const markerRanges = computeMarkerRanges(tasks);
-    const priorityRanges = computePriorityRanges(tasks);
-    const metadataRanges = computeMetadataRanges(tasks);
-
-    // Apply *every* marker type — including with empty arrays — so a marker
-    // that just lost its last instance gets its old decorations cleared.
-    const markerSnapshot = {} as Record<Marker, RangeLike[]>;
-    for (const def of MARKERS) {
-        const ranges = markerRanges.get(def.name) ?? [];
-        markerSnapshot[def.name] = ranges;
-        editor.setDecorations(markerDecorationTypes[def.name], ranges.map(toVscodeRange));
-    }
-
-    const prioritySnapshot = {} as Record<PriorityLevel, RangeLike[]>;
-    for (const def of PRIORITIES) {
-        const ranges = priorityRanges.get(def.level) ?? [];
-        prioritySnapshot[def.level] = ranges;
-        editor.setDecorations(priorityDecorationTypes[def.level], ranges.map(toVscodeRange));
-    }
-
-    editor.setDecorations(metadataDecorationType, metadataRanges.map(toVscodeRange));
-
-    decorationSnapshots.set(editor.document.uri.toString(), {
-        markers: markerSnapshot,
-        priorities: prioritySnapshot,
-        metadata: metadataRanges,
-    });
-}
-
-/**
- * Apply tsk decorations to a Search Editor (`search-result`) document — the
- * find-by-tag result view. Reuses the same decoration types as `.tsk` editors,
- * but the ranges come from {@link computeSearchResultRanges}, which strips each
- * result row's `␣␣<lineNo>:␣` gutter and shifts the columns onto the row. No
- * snapshot is stored: `search-result` URIs are ephemeral, and the snapshot map
- * is the tsk-editor restore/GC concern.
- */
-function applySearchResultDecorations(editor: vscode.TextEditor): void {
-    if (!state) return;
-    const { markerDecorationTypes, priorityDecorationTypes, metadataDecorationType } = state;
-    const { markers, priorities, metadata } = computeSearchResultRanges(editor.document.getText());
-
-    for (const def of MARKERS) {
-        editor.setDecorations(
-            markerDecorationTypes[def.name],
-            (markers.get(def.name) ?? []).map(toVscodeRange),
-        );
-    }
-    for (const def of PRIORITIES) {
-        editor.setDecorations(
-            priorityDecorationTypes[def.level],
-            (priorities.get(def.level) ?? []).map(toVscodeRange),
-        );
-    }
-    editor.setDecorations(metadataDecorationType, metadata.map(toVscodeRange));
-}
-
-function applyDecorationsForDoc(doc: vscode.TextDocument): void {
-    // A single doc can back multiple editors (split panes / multiple groups);
-    // each one needs its own setDecorations call.
-    for (const editor of vscode.window.visibleTextEditors) {
-        if (editor.document === doc) applyDecorationsToEditor(editor);
-    }
-}
-
-function scheduleDebouncedDecorate(doc: vscode.TextDocument): void {
-    if (!state) return;
-    scheduleDebounced(state.decorationTimers, doc.uri.toString(), readChangeDebounceMs(), () =>
-        applyDecorationsForDoc(doc),
-    );
-}
-
-function toVscodeRange(r: RangeLike): vscode.Range {
-    return new vscode.Range(r.startLine, r.startCol, r.endLine, r.endCol);
 }
