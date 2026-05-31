@@ -1,0 +1,19 @@
+# Sibling of ../docs/demo.tsk — gives the Extension Development Host a
+# real tags.yml to drive autocompletion + find-by-tag against the demo.
+# Mirror the demo's tag vocabulary here when you add new ones.
+
+project/tsk:
+    description: The tsk extension itself
+    parent: project
+project/test:
+    description: Test cases (used by M8 demo to illustrate sibling tags under `project`)
+    parent: project
+
+milestone/M2: Parser milestone
+milestone/M3: Cache layer milestone
+
+inventory/homelab/nas1: NAS device in the homelab inventory
+
+JIRAID-123: Reference to JIRA ticket 123 (placeholder for external-tracker links)
+
+declared-only-example: An example tag declared only in tags.yml — open demo.tsk, type `#decl`, and watch it surface even though nothing in the demo uses it

@@ -1,0 +1,9 @@
+# e2e fixture — assertions in tests/e2e/tags-completion.test.ts depend on
+# this exact set. Add new tags here when the fixture grows.
+
+project/tsk:
+    description: The tsk extension itself
+    parent: project
+milestone/M3: Cache layer milestone (string-form description)
+only-here: Orphan tag exerciser
+yaml-only-not-in-tsk: A tag that exists only in tags.yml, not in any .tsk file

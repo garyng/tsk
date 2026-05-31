@@ -1,0 +1,179 @@
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
+import * as oniguruma from 'vscode-oniguruma';
+import { type IGrammar, INITIAL, parseRawGrammar, Registry } from 'vscode-textmate';
+
+const grammarPath = path.resolve(__dirname, '../../syntaxes/tsk.tmLanguage.json');
+
+let grammar: IGrammar;
+
+beforeAll(async () => {
+    const wasmPath = require.resolve('vscode-oniguruma/release/onig.wasm');
+    const wasmBin = await fs.readFile(wasmPath);
+    await oniguruma.loadWASM(wasmBin);
+
+    const grammarContent = await fs.readFile(grammarPath, 'utf-8');
+
+    const registry = new Registry({
+        onigLib: Promise.resolve({
+            createOnigScanner: (sources) => new oniguruma.OnigScanner(sources),
+            createOnigString: (s) => new oniguruma.OnigString(s),
+        }),
+        loadGrammar: async (scopeName) => {
+            if (scopeName === 'text.html.markdown.tsk') {
+                return parseRawGrammar(grammarContent, grammarPath);
+            }
+            if (scopeName === 'text.html.markdown') {
+                return parseRawGrammar(
+                    JSON.stringify({
+                        name: 'Markdown',
+                        scopeName: 'text.html.markdown',
+                        patterns: [],
+                    }),
+                    'markdown-stub.json',
+                );
+            }
+            return null;
+        },
+    });
+
+    const loaded = await registry.loadGrammar('text.html.markdown.tsk');
+    if (!loaded) {
+        throw new Error('failed to load tsk grammar');
+    }
+    grammar = loaded;
+});
+
+function scopesAt(line: string, col: number): string[] {
+    const tokens = grammar.tokenizeLine(line, INITIAL).tokens;
+    const token = tokens.find((t) => t.startIndex <= col && col < t.endIndex);
+    return token?.scopes ?? [];
+}
+
+function scopesContaining(line: string, scope: string): string[][] {
+    const tokens = grammar.tokenizeLine(line, INITIAL).tokens;
+    return tokens.filter((t) => t.scopes.includes(scope)).map((t) => t.scopes);
+}
+
+describe('tsk grammar — task markers', () => {
+    const cases: Array<[string, string, number]> = [
+        ['todo', '- [ ] do thing', 3],
+        ['in-progress', '- [/] do thing', 3],
+        ['completed (lower)', '- [x] do thing', 3],
+        ['completed (upper)', '- [X] do thing', 3],
+        ['moved', '- [>] do thing', 3],
+        ['cancelled', '- [!] do thing', 3],
+        ['notes (lower)', '- [n] note', 3],
+        ['notes (upper)', '- [N] note', 3],
+    ];
+
+    const markerToScope: Record<string, string> = {
+        todo: 'markup.task-marker.todo.tsk',
+        'in-progress': 'markup.task-marker.inprogress.tsk',
+        'completed (lower)': 'markup.task-marker.completed.tsk',
+        'completed (upper)': 'markup.task-marker.completed.tsk',
+        moved: 'markup.task-marker.moved.tsk',
+        cancelled: 'markup.task-marker.cancelled.tsk',
+        'notes (lower)': 'markup.task-marker.notes.tsk',
+        'notes (upper)': 'markup.task-marker.notes.tsk',
+    };
+
+    for (const [name, line, col] of cases) {
+        it(`scopes the marker char for ${name}`, () => {
+            const scopes = scopesAt(line, col);
+            expect(scopes).toContain(markerToScope[name]);
+        });
+    }
+
+    it('scopes the brackets around the marker', () => {
+        const line = '- [x] done';
+        expect(scopesAt(line, 2)).toContain('punctuation.definition.task-marker.begin.tsk');
+        expect(scopesAt(line, 4)).toContain('punctuation.definition.task-marker.end.tsk');
+    });
+
+    it('scopes the bullet dash', () => {
+        expect(scopesAt('- [x] done', 0)).toContain('punctuation.definition.list.begin.tsk');
+    });
+
+    it('matches indented task markers', () => {
+        expect(scopesAt('    - [x] done', 7)).toContain('markup.task-marker.completed.tsk');
+    });
+
+    it('matches alternative bullet chars (* and +)', () => {
+        expect(scopesAt('* [x] done', 3)).toContain('markup.task-marker.completed.tsk');
+        expect(scopesAt('+ [x] done', 3)).toContain('markup.task-marker.completed.tsk');
+    });
+
+    it('does not match malformed markers', () => {
+        expect(scopesAt('- [xx] not a task', 3)).not.toContain('markup.task-marker.completed.tsk');
+        expect(scopesAt('-[x] missing space', 2)).not.toContain('markup.task-marker.completed.tsk');
+    });
+});
+
+describe('tsk grammar — inline metadata', () => {
+    it('wraps the whole comment as a metadata block', () => {
+        const line = 'before <!-- @id:abc12345 --> after';
+        const open = scopesAt(line, 7);
+        const close = scopesAt(line, 25);
+        expect(open).toContain('comment.block.metadata.tsk');
+        expect(close).toContain('comment.block.metadata.tsk');
+    });
+
+    it('scopes @ + key + : + value separately', () => {
+        const line = '<!-- @id:abc12345 -->';
+        expect(scopesAt(line, 5)).toContain('punctuation.definition.metadata.tsk');
+        expect(scopesAt(line, 6)).toContain('entity.name.tag.metadata.tsk');
+        expect(scopesAt(line, 8)).toContain('punctuation.separator.key-value.metadata.tsk');
+        expect(scopesAt(line, 9)).toContain('string.unquoted.metadata.tsk');
+    });
+
+    it('handles multiple metadata entries in one comment', () => {
+        const line = '<!-- @id:abc12345 @created:2026-01-02T12:45 -->';
+        const keyScopes = scopesContaining(line, 'entity.name.tag.metadata.tsk');
+        expect(keyScopes.length).toBe(2);
+        const valueScopes = scopesContaining(line, 'string.unquoted.metadata.tsk');
+        expect(valueScopes.length).toBe(2);
+    });
+
+    it('handles a value-less metadata entry', () => {
+        const line = '<!-- @completed -->';
+        expect(scopesAt(line, 6)).toContain('entity.name.tag.metadata.tsk');
+    });
+
+    it('does not let the value swallow the closing -->', () => {
+        // No space before the closing tag — value must stop at `-->`, else
+        // the comment block never closes and bleeds into following text.
+        const line = '<!-- @id:abc12345--> trailing';
+        // The value scope must apply to `abc12345` (positions 9..16).
+        expect(scopesAt(line, 9)).toContain('string.unquoted.metadata.tsk');
+        expect(scopesAt(line, 16)).toContain('string.unquoted.metadata.tsk');
+        // The text after `-->` must be outside the comment.
+        expect(scopesAt(line, 21)).not.toContain('comment.block.metadata.tsk');
+    });
+});
+
+describe('tsk grammar — tags', () => {
+    it('scopes a simple tag at line start', () => {
+        const line = '#JIRAID-123 some content';
+        expect(scopesAt(line, 0)).toContain('punctuation.definition.tag.tsk');
+        expect(scopesAt(line, 1)).toContain('entity.name.tag.tsk');
+    });
+
+    it('scopes a hierarchical tag with slashes', () => {
+        const line = 'see #inventory/homelab/nas1 for details';
+        expect(scopesAt(line, 4)).toContain('punctuation.definition.tag.tsk');
+        expect(scopesAt(line, 5)).toContain('entity.name.tag.tsk');
+    });
+
+    it('does not scope `# heading` (markdown heading) as a tag', () => {
+        const line = '# heading';
+        expect(scopesAt(line, 0)).not.toContain('punctuation.definition.tag.tsk');
+    });
+
+    it('scopes a tag inside a task line', () => {
+        const line = '- [ ] do thing #project/test';
+        expect(scopesAt(line, 15)).toContain('punctuation.definition.tag.tsk');
+        expect(scopesAt(line, 16)).toContain('entity.name.tag.tsk');
+    });
+});

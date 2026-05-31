@@ -1,0 +1,106 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Tsk",
+    "scopeName": "text.html.markdown.tsk",
+    "fileTypes": ["tsk"],
+    "patterns": [
+        { "include": "#task-marker" },
+        { "include": "#tsk-metadata" },
+        { "include": "#tsk-tag" },
+        { "include": "text.html.markdown" }
+    ],
+    "repository": {
+        "task-marker": {
+            "patterns": [
+                { "include": "#task-marker-todo" },
+                { "include": "#task-marker-inprogress" },
+                { "include": "#task-marker-completed" },
+                { "include": "#task-marker-moved" },
+                { "include": "#task-marker-cancelled" },
+                { "include": "#task-marker-notes" }
+            ]
+        },
+        "task-marker-todo": {
+            "match": "^(\\s*)([-*+])(\\s+)(\\[)( )(\\])",
+            "captures": {
+                "2": { "name": "punctuation.definition.list.begin.tsk" },
+                "4": { "name": "punctuation.definition.task-marker.begin.tsk" },
+                "5": { "name": "markup.task-marker.todo.tsk" },
+                "6": { "name": "punctuation.definition.task-marker.end.tsk" }
+            }
+        },
+        "task-marker-inprogress": {
+            "match": "^(\\s*)([-*+])(\\s+)(\\[)(/)(\\])",
+            "captures": {
+                "2": { "name": "punctuation.definition.list.begin.tsk" },
+                "4": { "name": "punctuation.definition.task-marker.begin.tsk" },
+                "5": { "name": "markup.task-marker.inprogress.tsk" },
+                "6": { "name": "punctuation.definition.task-marker.end.tsk" }
+            }
+        },
+        "task-marker-completed": {
+            "match": "^(\\s*)([-*+])(\\s+)(\\[)([xX])(\\])",
+            "captures": {
+                "2": { "name": "punctuation.definition.list.begin.tsk" },
+                "4": { "name": "punctuation.definition.task-marker.begin.tsk" },
+                "5": { "name": "markup.task-marker.completed.tsk" },
+                "6": { "name": "punctuation.definition.task-marker.end.tsk" }
+            }
+        },
+        "task-marker-moved": {
+            "match": "^(\\s*)([-*+])(\\s+)(\\[)(>)(\\])",
+            "captures": {
+                "2": { "name": "punctuation.definition.list.begin.tsk" },
+                "4": { "name": "punctuation.definition.task-marker.begin.tsk" },
+                "5": { "name": "markup.task-marker.moved.tsk" },
+                "6": { "name": "punctuation.definition.task-marker.end.tsk" }
+            }
+        },
+        "task-marker-cancelled": {
+            "match": "^(\\s*)([-*+])(\\s+)(\\[)(!)(\\])",
+            "captures": {
+                "2": { "name": "punctuation.definition.list.begin.tsk" },
+                "4": { "name": "punctuation.definition.task-marker.begin.tsk" },
+                "5": { "name": "markup.task-marker.cancelled.tsk" },
+                "6": { "name": "punctuation.definition.task-marker.end.tsk" }
+            }
+        },
+        "task-marker-notes": {
+            "match": "^(\\s*)([-*+])(\\s+)(\\[)([nN])(\\])",
+            "captures": {
+                "2": { "name": "punctuation.definition.list.begin.tsk" },
+                "4": { "name": "punctuation.definition.task-marker.begin.tsk" },
+                "5": { "name": "markup.task-marker.notes.tsk" },
+                "6": { "name": "punctuation.definition.task-marker.end.tsk" }
+            }
+        },
+        "tsk-metadata": {
+            "name": "comment.block.metadata.tsk",
+            "begin": "<!--",
+            "end": "-->",
+            "beginCaptures": {
+                "0": { "name": "punctuation.definition.comment.begin.tsk" }
+            },
+            "endCaptures": {
+                "0": { "name": "punctuation.definition.comment.end.tsk" }
+            },
+            "patterns": [{ "include": "#tsk-metadata-entry" }]
+        },
+        "tsk-metadata-entry": {
+            "match": "(@)([A-Za-z][A-Za-z0-9_]*)(?:(:)((?:(?!-->)\\S)*))?",
+            "captures": {
+                "1": { "name": "punctuation.definition.metadata.tsk" },
+                "2": { "name": "entity.name.tag.metadata.tsk" },
+                "3": { "name": "punctuation.separator.key-value.metadata.tsk" },
+                "4": { "name": "string.unquoted.metadata.tsk" }
+            }
+        },
+        "tsk-tag": {
+            "match": "(?<=^|\\s)(#)([A-Za-z][A-Za-z0-9_/-]*)",
+            "captures": {
+                "1": { "name": "punctuation.definition.tag.tsk" },
+                "2": { "name": "entity.name.tag.tsk" }
+            }
+        }
+    }
+}

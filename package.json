@@ -1,0 +1,407 @@
+{
+    "name": "tsk",
+    "displayName": "tsk",
+    "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
+    "version": "0.1.1",
+    "publisher": "garyng",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/garyng/tsk.git"
+    },
+    "categories": [
+        "Other"
+    ],
+    "engines": {
+        "vscode": "^1.112.0"
+    },
+    "main": "./dist/extension.cjs",
+    "activationEvents": [
+        "onLanguage:tsk",
+        "workspaceContains:**/*.tsk"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "tsk",
+                "extensions": [
+                    ".tsk"
+                ],
+                "aliases": [
+                    "Tsk"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "tsk",
+                "scopeName": "text.html.markdown.tsk",
+                "path": "./syntaxes/tsk.tmLanguage.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "tsk.rebuildCache",
+                "title": "Rebuild Cache",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.findAllTasksByTag",
+                "title": "Find All Tasks by Tag",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleTodo",
+                "title": "Toggle Todo",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleInprogress",
+                "title": "Toggle In Progress",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleCompleted",
+                "title": "Toggle Completed",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleCancelled",
+                "title": "Toggle Cancelled",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleNote",
+                "title": "Toggle Note",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleP1",
+                "title": "Toggle Priority 1 (High)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleP2",
+                "title": "Toggle Priority 2 (Medium)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleP3",
+                "title": "Toggle Priority 3 (Low)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.copyTaskId",
+                "title": "Copy Task Id",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleMoved",
+                "title": "Toggle Moved",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleRelatedTo",
+                "title": "Toggle Related To",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleDependsOn",
+                "title": "Toggle Depends On",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.toggleParent",
+                "title": "Toggle Parent",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.handleEnter",
+                "title": "Handle Enter (list continuation / outdent / remove)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.handleTab",
+                "title": "Handle Tab (indent empty task)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.handleShiftTab",
+                "title": "Handle Shift+Tab (outdent task)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.handleBackspace",
+                "title": "Handle Backspace (degrade empty task to bullet)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.duplicateLineDown",
+                "title": "Duplicate Line Down (fresh @id for task copies)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.duplicateLineUp",
+                "title": "Duplicate Line Up (fresh @id for task copies)",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.installClipboardBridgeSkill",
+                "title": "Install Clipboard Bridge Skill",
+                "category": "Tsk"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "tsk.findAllTasksByTag",
+                "key": "alt+t",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
+            {
+                "command": "tsk.toggleTodo",
+                "key": "alt+a",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleInprogress",
+                "key": "alt+s",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleCompleted",
+                "key": "alt+c",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleCancelled",
+                "key": "alt+x",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleNote",
+                "key": "alt+n",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleP1",
+                "key": "alt+1",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleP2",
+                "key": "alt+2",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleP3",
+                "key": "alt+3",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.copyTaskId",
+                "key": "alt+`",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleMoved",
+                "key": "alt+m",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleRelatedTo",
+                "key": "alt+r",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleDependsOn",
+                "key": "alt+d",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.toggleParent",
+                "key": "alt+p",
+                "when": "editorLangId == 'tsk'"
+            },
+            {
+                "command": "tsk.handleEnter",
+                "key": "enter",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.handleTab",
+                "key": "tab",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.handleShiftTab",
+                "key": "shift+tab",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.handleBackspace",
+                "key": "backspace",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode"
+            },
+            {
+                "command": "tsk.duplicateLineDown",
+                "key": "shift+alt+down",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
+            {
+                "command": "tsk.duplicateLineUp",
+                "key": "shift+alt+up",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
+            }
+        ],
+        "colors": [
+            {
+                "id": "tsk.marker.inprogress",
+                "description": "Foreground color of the [/] in-progress task marker triplet.",
+                "defaults": {
+                    "light": "#1976d2",
+                    "dark": "#3794ff"
+                }
+            },
+            {
+                "id": "tsk.marker.completed",
+                "description": "Foreground color of the [x] completed task marker triplet.",
+                "defaults": {
+                    "light": "#388e3c",
+                    "dark": "#67c23a"
+                }
+            },
+            {
+                "id": "tsk.marker.moved",
+                "description": "Foreground color of the [>] moved task marker triplet.",
+                "defaults": {
+                    "light": "#f57c00",
+                    "dark": "#ff9d00"
+                }
+            },
+            {
+                "id": "tsk.marker.cancelled",
+                "description": "Foreground color of the [!] cancelled task marker triplet.",
+                "defaults": {
+                    "light": "#757575",
+                    "dark": "#9e9e9e"
+                }
+            },
+            {
+                "id": "tsk.marker.notes",
+                "description": "Foreground color of the [n] notes task marker triplet.",
+                "defaults": {
+                    "light": "#7e57c2",
+                    "dark": "#bb6dd9"
+                }
+            },
+            {
+                "id": "tsk.metadata.foreground",
+                "description": "Foreground color of inline metadata comments (<!-- @key:value -->), dimmed so they recede into the editor background. Hover-on-task surfaces the parsed values.",
+                "defaults": {
+                    "light": "#5c5c5cb0",
+                    "dark": "#969696b0"
+                }
+            },
+            {
+                "id": "tsk.navigation.highlight",
+                "description": "Background tint applied to the target line after a tsk.goTo* navigate. Persists until the next navigate, a user-initiated cursor move, or the editor moves off the highlighted target.",
+                "defaults": {
+                    "light": "#fff59d50",
+                    "dark": "#ffe57f30"
+                }
+            }
+        ],
+        "configuration": {
+            "title": "Tsk",
+            "properties": {
+                "tsk.cache.path": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk/cache.db",
+                    "description": "Path to the on-disk SQLite cache. Supports ${workspaceFolder} substitution. When no workspace folder is open, falls back to in-memory."
+                },
+                "tsk.tags.path": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk/tags.yml",
+                    "description": "Path to the workspace tags.yml. Supports ${workspaceFolder} substitution. When blank or no workspace folder is open, no tags.yml is loaded (completion still surfaces tags discovered in .tsk files)."
+                },
+                "tsk.log.level": {
+                    "type": "string",
+                    "enum": [
+                        "debug",
+                        "info",
+                        "warn",
+                        "error"
+                    ],
+                    "default": "info",
+                    "description": "Verbosity of the tsk Output channel."
+                },
+                "tsk.editor.changeDebounceMs": {
+                    "type": "number",
+                    "default": 300,
+                    "minimum": 0,
+                    "maximum": 5000,
+                    "description": "Debounce (ms) before re-decorating and rescanning a .tsk document after a text change. Lower feels snappier; higher coalesces typing bursts on large files."
+                },
+                "tsk.decorations.priority.opacity": {
+                    "type": "number",
+                    "default": 0.15,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Background opacity of priority line decorations (0 = invisible, 1 = full)."
+                },
+                "tsk.clipboard.bridgeEnabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Watch the clipboard-bridge file and copy its contents to the host clipboard on change. Off by default. Useful inside devcontainers where no host clipboard tool (xclip / wl-copy / clip.exe / pbcopy) is reachable — any process that can write the file can push text to the host clipboard."
+                },
+                "tsk.clipboard.bridgePath": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt",
+                    "description": "Path to the clipboard-bridge watch file. Supports ${workspaceFolder} substitution. Only used when tsk.clipboard.bridgeEnabled is true. When blank or no workspace folder is open, the bridge stays inactive."
+                },
+                "tsk.pasteImage.baseDirectory": {
+                    "type": "string",
+                    "default": "./images",
+                    "description": "Base directory for images saved when pasting an image into a .tsk, Markdown, or Jupyter markdown-cell document. The saved path is <document directory>/<base directory>/<selection>.<ext>; a selection may itself contain path separators (subdirectories), and any intermediate directories are created. Relative base directories resolve against the document's parent directory (for notebook cells, the notebook's directory); an absolute base directory is used as-is. Leave blank to save directly beside the document."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "build:host": "vite build -c vite.config.host.ts",
+        "build": "npm run build:host",
+        "dev:host": "vite build -c vite.config.host.ts --watch --mode development",
+        "typecheck": "tsc",
+        "compile:tests": "tsc -p tests/tsconfig.json",
+        "test": "vitest run",
+        "prepare:e2e": "npm run compile:tests && npm run build:host",
+        "test:e2e": "npm run prepare:e2e && bash scripts/run-e2e.sh --label stable",
+        "test:e2e:floor": "npm run prepare:e2e && bash scripts/run-e2e.sh --label floor",
+        "test:e2e:all": "npm run prepare:e2e && bash scripts/run-e2e.sh",
+        "lint": "biome check .",
+        "format": "biome format --write .",
+        "package": "vsce package --out artifacts/"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.15",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "^22.19.19",
+        "@types/vscode": "~1.110.0",
+        "@vitest/coverage-v8": "^4.1.7",
+        "@vscode/test-cli": "^0.0.12",
+        "@vscode/test-electron": "^2.5.2",
+        "@vscode/vsce": "^3.9.1",
+        "typescript": "^6.0.3",
+        "vite": "^8.0.14",
+        "vitest": "^4.1.7",
+        "vscode-oniguruma": "^2.0.1",
+        "vscode-textmate": "^9.3.2"
+    },
+    "dependencies": {
+        "date-fns": "^4.3.0",
+        "nanoid": "^5.1.11",
+        "pathe": "^2.0.3",
+        "yaml": "^2.9.0"
+    }
+}

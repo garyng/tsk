@@ -1,0 +1,11 @@
+# e2e fixture — broken forward references (M20/B)
+
+Drives `tests/e2e/missing-ref-diagnostic.test.ts`. Each task below
+has at least one `@parent` / `@dependsOn` / `@relatedTo` pointing at
+an id that doesn't exist anywhere in the workspace. Don't add a
+declaration for any of these ghost ids — the test asserts the
+broken-ref squiggle stays on.
+
+- [ ] orphan-parent <!-- @id:m20-orphan-parent @parent:m20-ghost-parent -->
+- [ ] orphan-depends <!-- @id:m20-orphan-depends @dependsOn:m20-ghost-depends -->
+- [ ] triple-broken <!-- @id:m20-triple-broken @parent:m20-ghost-p @dependsOn:m20-ghost-d @relatedTo:m20-ghost-r -->

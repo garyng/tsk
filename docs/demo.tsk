@@ -1,0 +1,138 @@
+<!-- A hands-on tour. Put your cursor on a task and press the key. Ctrl+Z undoes anything. -->
+
+# tsk — interactive tour
+
+Every `- [ ]` line is a task; `Alt`+a key changes it and tsk fills in the id and timestamps. Press `F5` to open this in the dev host, then work down the page. One `Ctrl+Z` undoes any change.
+
+## 1. Status
+
+| Key | Status |
+|-----|--------|
+| `Alt+A` | todo `[ ]` |
+| `Alt+S` | in progress `[/]` |
+| `Alt+C` | done `[x]` |
+| `Alt+X` | cancelled `[!]` |
+| `Alt+N` | note `[n]` |
+
+Same key toggles back. `Alt+A` turns a bare line — or a checkbox-less `- bullet` — into a task; on an empty `- [ ]` it removes it.
+
+Try `Alt+A` on the bare line and the bare bullet (it becomes `- [ ] …`, the marker is never doubled), then `Alt+S` / `Alt+C` on the tasks:
+
+buy milk
+
+- water the plants
+
+- [ ] flip me with Alt+S <!-- @id:first-flip -->
+- [x] un-complete me with Alt+C <!-- @id:first-done @completed:2026-05-27T09:00:00+08:00 -->
+
+## 2. Priority
+
+| Key | Priority |
+|-----|----------|
+| `Alt+1` | high |
+| `Alt+2` | medium |
+| `Alt+3` | low |
+
+Colors the whole line; the same number clears it.
+
+- [ ] ship the release <!-- @id:pri-a -->
+- [ ] water the plants <!-- @id:pri-b -->
+
+## 3. Tags
+
+`#tag`, nest with `/`. Type `#` to autocomplete (from your tasks + this folder's `tags.yml`); try `proj`, `inv`, `decl`:
+
+- [ ] sketch the architecture #
+- [ ] order the parts #
+
+`Alt+T` → searchable tag list with counts → opens a search of matching tasks.
+
+- [ ] chase the ticket #JIRAID-123 <!-- @id:tag-a -->
+- [ ] mount the NAS #inventory/homelab/nas1 <!-- @id:tag-b -->
+
+## 4. Links
+
+| Key | Link |
+|-----|------|
+| `Alt+P` | `@parent` |
+| `Alt+D` | `@dependsOn` |
+| `Alt+R` | `@relatedTo` |
+
+Each opens a picker; the same key removes. Linked tasks grow code lenses (`parent: …`, `children: 2`) — click to jump or peek.
+
+Parent + two children — look at the lenses:
+
+- [ ] plan the launch <!-- @id:link-parent -->
+- [ ] book the venue <!-- @id:link-child-1 @parent:link-parent -->
+- [ ] send the invites <!-- @id:link-child-2 @parent:link-parent -->
+
+Try `Alt+D` here, pick "plan the launch":
+
+- [ ] arrange the catering <!-- @id:link-dep -->
+
+## 5. Structure
+
+| Key | Effect |
+|-----|--------|
+| `Enter` (end of line) | new sibling task below |
+| `Enter` (empty task) | outdent, or remove at the margin |
+| `Tab` (empty task) | indent one level |
+| `Shift+Tab` | outdent |
+| `Backspace` (empty task) | degrade to a bare `- ` bullet |
+| `Backspace` (empty `- `) | strip the bullet, leaving the indent |
+| `Shift+Alt+↓` / `Shift+Alt+↑` | duplicate the line; the copy gets a fresh `@id`, content selected to retype |
+
+Bare bullets (a `- ` item with no `[ ]`) get the same `Enter` / `Tab` / `Shift+Tab` treatment minus the checkbox — handy for notes nested under a task. Duplicate any task above with `Shift+Alt+↓`: the copy is stamped with a new `@id` (so it doesn't shadow the original) and its content lands selected — just type to rename it.
+
+- [ ] first step <!-- @id:indent-a -->
+- [ ] Enter here for a fresh task, then Tab to indent it <!-- @id:indent-b -->
+    - [ ] Shift+Tab walks me back out <!-- @id:indent-c -->
+    - a bare bullet (no checkbox) — try Enter / Backspace here
+
+## 6. Hover
+
+Hover a task to read its id, timestamps ("3 hours ago"), tags, and links.
+
+- [/] migrate the database #project/tsk <!-- @id:hover-demo @created:2026-05-24T09:00:00+08:00 @started:2026-05-25T11:00:00+08:00 -->
+
+## 7. Broken links
+
+A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or replace it.
+
+- [ ] dangling parent <!-- @id:broken-demo @parent:this-id-does-not-exist -->
+
+## 8. Move
+
+`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`.
+
+- [ ] belongs in another project <!-- @id:move-demo -->
+
+## 9. Copy id
+
+`` Alt+` `` copies the task's `@id`.
+
+- [ ] copy my id <!-- @id:copy-demo -->
+
+## 10. Paste image
+
+`Ctrl+V` an image → saved to disk + a Markdown link inserted (alt text selected). Select text first to name it (subfolders allowed). `Ctrl+Z` removes the link and the file together.
+
+<!-- paste an image on the line below -->
+
+## 11. Putting it together
+
+A real slice of a plan — every status, priority, tag, and link at once. The priorities tint their rows, the cancelled line is struck through, the metadata stays dimmed. Hover any task, click a `children:` / `parent:` / `dependsOn:` lens to jump, or `Alt+T` a tag to find more like it.
+
+- [/] Ship v1.0 #project/tsk <!-- @id:show-root @created:2026-05-20T09:00:00+08:00 @started:2026-05-22T10:00:00+08:00 @priority:1 -->
+    - [x] cut the release branch #release <!-- @id:show-branch @parent:show-root @created:2026-05-20T09:05:00+08:00 @completed:2026-05-23T16:00:00+08:00 -->
+    - [/] write the changelog <!-- @id:show-log @parent:show-root @dependsOn:show-branch @created:2026-05-20T09:06:00+08:00 @started:2026-05-24T11:00:00+08:00 @priority:2 -->
+    - [ ] tag and publish the build <!-- @id:show-pub @parent:show-root @dependsOn:show-log @created:2026-05-20T09:07:00+08:00 @priority:1 -->
+    - [n] keep the engine floor at 1.112 <!-- @id:show-note @parent:show-root @created:2026-05-20T09:08:00+08:00 -->
+    - [!] backport to v0.x #release <!-- @id:show-drop @parent:show-root @created:2026-05-20T09:09:00+08:00 @cancelled:2026-05-21T14:00:00+08:00 -->
+    - [>] write the migration guide <!-- @id:show-move @parent:show-root @created:2026-05-20T09:10:00+08:00 @moved:2026-05-25T08:00:00+08:00 @movedTo:show-pub -->
+    - a loose note (bare bullet — no checkbox, no metadata)
+- [ ] gather launch feedback #project/tsk <!-- @id:show-feedback @relatedTo:show-root @created:2026-05-20T09:11:00+08:00 @priority:3 -->
+
+## More
+
+The cache powers tag search and the lenses — run **Tsk: Rebuild Cache** if anything looks stale. Every `tsk.*` setting is documented in the README. It's all plain text you own.
