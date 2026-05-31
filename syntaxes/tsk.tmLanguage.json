@@ -4,12 +4,23 @@
     "scopeName": "text.html.markdown.tsk",
     "fileTypes": ["tsk"],
     "patterns": [
-        { "include": "#task-marker" },
+        { "include": "#task-line" },
         { "include": "#tsk-metadata" },
         { "include": "#tsk-tag" },
         { "include": "text.html.markdown" }
     ],
     "repository": {
+        "task-line": {
+            "comment": "Scopes a whole task line. The begin is a zero-width lookahead so the existing #task-marker match rules still consume + scope the `- [ ]` prefix; the rest of the line then gets tsk metadata/tags and Markdown inline styling (code, bold, italic, links). Without this wrapper the content falls through to text.html.markdown mid-line, where Markdown's block rules (^|\\G-anchored) never engage, so inline styling is lost.",
+            "begin": "(?=^\\s*[-*+]\\s+\\[[ /xX>!nN]\\])",
+            "end": "$",
+            "patterns": [
+                { "include": "#task-marker" },
+                { "include": "#tsk-metadata" },
+                { "include": "#tsk-tag" },
+                { "include": "text.html.markdown#inline" }
+            ]
+        },
         "task-marker": {
             "patterns": [
                 { "include": "#task-marker-todo" },
