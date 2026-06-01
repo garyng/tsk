@@ -1,0 +1,19 @@
+version: "3"
+
+tasks:
+  watch:
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm run dev:host
+
+  build:
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm run build
+
+  package:
+    dir: "{{ .TASKFILE_DIR }}"
+    deps:
+      - build
+    cmds:
+      - npm run package
