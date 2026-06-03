@@ -12,6 +12,7 @@ import {
     OUTPUT_CHANNEL_NAME,
     PRIORITY_OPACITY_KEY,
     PRIORITY_OPACITY_SETTING,
+    STATE_PATH_KEY,
 } from './constants';
 import { type DecorationSnapshot, DecorationsController } from './decorations-controller';
 import { DiagnosticsManager } from './diagnostics-manager';
@@ -26,10 +27,13 @@ import { type CacheCounts, Db, type TaskRecord } from './lib/db';
 import type { GraphNode } from './lib/graph';
 import { GraphService } from './lib/graph-service';
 import { Logger, type LogLevel } from './lib/logger';
+import { NowStore } from './lib/now-store';
+import type { NowTreeState } from './lib/now-tree';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
+import { registerNowCommands } from './now-commands';
 import { registerPasteImageProvider } from './paste-image';
 import { ScanController } from './scan-controller';
 import { registerSemanticTokens } from './semantic-tokens';
@@ -83,6 +87,12 @@ export interface TskExtensionApi {
      * since VSCode doesn't expose decoration state directly.
      */
     getNavigationHighlight(): { uri: string; line: number } | undefined;
+    /**
+     * The current now-tree snapshot, and the current "now" task `@id` (M44/M45).
+     * Exposed for e2e introspection of the undo-tree without driving the panel.
+     */
+    getNowTree(): NowTreeState;
+    getNowTaskId(): string | undefined;
 }
 
 /**
@@ -114,6 +124,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     logger.info('tsk extension activating.');
 
     const { cache } = openCache(context, logger);
+    const nowStore = openNowStore(context, logger);
     const decorations = new DecorationsController(context, readPriorityOpacity());
 
     const diagnostics = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
@@ -146,7 +157,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     attachDocumentListeners(context);
 
     const tagsLoader = await createTagsLoader(context, logger);
-    registerAllCommands(context, cache, graph, tagsLoader, logger);
+    registerAllCommands(context, cache, graph, tagsLoader, logger, nowStore);
 
     registerClipboardBridge(context, logger);
     registerInstallClipboardBridgeSkillCommand(context, logger);
@@ -164,6 +175,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         reloadTags: () => tagsLoader.reload(),
         lookupGraph: (id) => graph.getNode(id),
         getNavigationHighlight: () => navigationHighlight.getCurrent(),
+        getNowTree: () => nowStore.getState(),
+        getNowTaskId: () => nowStore.getCurrentNowId() ?? undefined,
     };
 }
 
@@ -203,6 +216,30 @@ function openCache(
     }
 
     return { db, cache };
+}
+
+/**
+ * Resolve `tsk.state.path`, open the now-tree's `state.db`, and register its
+ * close hook on `context.subscriptions`. Mirrors {@link openCache} — a separate
+ * file + connection, so `Tsk: Rebuild Cache` (which only touches the cache DB)
+ * structurally can't reach it.
+ */
+function openNowStore(context: vscode.ExtensionContext, logger: Logger): NowStore {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const rawSetting = vscode.workspace.getConfiguration('tsk').get<string>(STATE_PATH_KEY, '');
+    const statePath = resolveCachePath(rawSetting, workspaceFolder);
+    ensureCacheParentDir(statePath);
+
+    const store = new NowStore(statePath, { warn: (message) => logger.warn(message) });
+    context.subscriptions.push(store);
+
+    if (statePath === IN_MEMORY) {
+        logger.info('now-tree state opened in-memory (no workspace folder).');
+    } else {
+        logger.info(`now-tree state opened at ${statePath}.`);
+    }
+
+    return store;
 }
 
 /**
@@ -306,6 +343,7 @@ function registerAllCommands(
     graph: GraphService,
     tagsLoader: TagsLoader,
     logger: Logger,
+    nowStore: NowStore,
 ): void {
     registerToggleCommands(context, logger);
     registerCopyTaskIdCommand(context, logger);
@@ -316,6 +354,7 @@ function registerAllCommands(
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
+    registerNowCommands(context, nowStore, cache, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {

@@ -203,6 +203,11 @@
                 "command": "tsk.installClipboardBridgeSkill",
                 "title": "Install Clipboard Bridge Skill",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.markNow",
+                "title": "Mark Now",
+                "category": "Tsk"
             }
         ],
         "keybindings": [
@@ -304,6 +309,11 @@
             {
                 "command": "tsk.duplicateLineUp",
                 "key": "shift+alt+up",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
+            {
+                "command": "tsk.markNow",
+                "key": "alt+w",
                 "when": "editorLangId == 'tsk' && editorTextFocus"
             }
         ],
@@ -425,6 +435,16 @@
                     "type": "string",
                     "default": "./images",
                     "description": "Base directory for images saved when pasting an image into a .tsk, Markdown, or Jupyter markdown-cell document. The saved path is <document directory>/<base directory>/<selection>.<ext>; a selection may itself contain path separators (subdirectories), and any intermediate directories are created. Relative base directories resolve against the document's parent directory (for notebook cells, the notebook's directory); an absolute base directory is used as-is. Leave blank to save directly beside the document."
+                },
+                "tsk.state.path": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk/state.db",
+                    "description": "Path to the on-disk SQLite state database holding the \"now\" undo-tree. Kept separate from the rebuildable cache, so Tsk: Rebuild Cache never touches it. Supports ${workspaceFolder} substitution. When no workspace folder is open, the now-tree is in-memory and lost when the window closes."
+                },
+                "tsk.now.autoInProgress": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When marking a task as \"now\" (Alt+W), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
                 }
             }
         }

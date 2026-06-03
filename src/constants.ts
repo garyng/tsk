@@ -99,6 +99,12 @@ export const PASTE_IMAGE_BASE_DIRECTORY_KEY = 'pasteImage.baseDirectory';
 export const EDITOR_CHANGE_DEBOUNCE_SETTING = 'tsk.editor.changeDebounceMs';
 export const EDITOR_CHANGE_DEBOUNCE_KEY = 'editor.changeDebounceMs';
 
+export const STATE_PATH_SETTING = 'tsk.state.path';
+export const STATE_PATH_KEY = 'state.path';
+
+export const NOW_AUTO_IN_PROGRESS_SETTING = 'tsk.now.autoInProgress';
+export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every
@@ -164,6 +170,7 @@ export const COMMANDS = {
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
+    markNow: 'tsk.markNow',
 } as const satisfies Record<string, `tsk.${string}`>;
 
 /**
