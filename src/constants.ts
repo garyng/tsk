@@ -120,6 +120,7 @@ export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
 
 export const METADATA_FOREGROUND_COLOR_ID = 'tsk.metadata.foreground';
 export const NAVIGATION_HIGHLIGHT_COLOR_ID = 'tsk.navigation.highlight';
+export const NOW_HIGHLIGHT_COLOR_ID = 'tsk.now.highlight';
 
 // ── Timing ──────────────────────────────────────────────────────────────────
 

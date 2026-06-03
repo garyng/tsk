@@ -27,6 +27,12 @@ export class ScanController {
         private readonly diagnosticsManager: DiagnosticsManager,
         private readonly codelens: CodelensHandle,
         private readonly logger: Logger,
+        /**
+         * Fired at the end of the shared rescan tail (every cache mutation +
+         * rebuild). The now-decoration re-resolves here so an external / line-
+         * shifting edit or a `Tsk: Rebuild Cache` re-paints the current-now line.
+         */
+        private readonly onRescanComplete?: () => void,
     ) {}
 
     /**
@@ -151,5 +157,6 @@ export class ScanController {
         this.diagnosticsManager.setGraphDuplicates(this.graph.getDuplicates());
         this.diagnosticsManager.setBrokenReferences(this.graph.getBrokenForwardEdges());
         this.codelens.refresh();
+        this.onRescanComplete?.();
     }
 }

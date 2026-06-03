@@ -34,6 +34,7 @@ import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerNowCommands } from './now-commands';
+import { NowDecoration } from './now-decoration';
 import { registerPasteImageProvider } from './paste-image';
 import { ScanController } from './scan-controller';
 import { registerSemanticTokens } from './semantic-tokens';
@@ -93,6 +94,8 @@ export interface TskExtensionApi {
      */
     getNowTree(): NowTreeState;
     getNowTaskId(): string | undefined;
+    /** The currently-painted now-decoration location, or `undefined` when nothing is highlighted (M45). */
+    getNowDecoration(): { uri: string; line: number } | undefined;
 }
 
 /**
@@ -134,8 +137,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     const diagnosticsManager = new DiagnosticsManager(diagnostics);
     const navigationHighlight = new NavigationHighlight();
     context.subscriptions.push(navigationHighlight);
+    const nowDecoration = new NowDecoration(cache, nowStore);
+    context.subscriptions.push(nowDecoration);
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
-    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger);
+    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger, () =>
+        nowDecoration.reapply(),
+    );
 
     state = {
         logger,
@@ -152,6 +159,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     for (const editor of vscode.window.visibleTextEditors) {
         decorations.applyToEditor(editor);
     }
+    nowDecoration.reapply();
 
     attachFileSystemWatcher(context);
     attachDocumentListeners(context);
@@ -177,6 +185,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         getNavigationHighlight: () => navigationHighlight.getCurrent(),
         getNowTree: () => nowStore.getState(),
         getNowTaskId: () => nowStore.getCurrentNowId() ?? undefined,
+        getNowDecoration: () => nowDecoration.getCurrent(),
     };
 }
 
