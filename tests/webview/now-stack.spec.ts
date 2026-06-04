@@ -160,6 +160,8 @@ test('collapsing a fork hides its offshoot', async ({ page }) => {
     await page.locator('[data-tree-row-id="B"] .now-row__twistie').click();
     await expect(page.locator('.now-row')).toHaveCount(4);
     await expect(page.locator('[data-tree-row-id="D"]')).toHaveCount(0);
+    // The twistie flips to chevron-right; D is gone.
+    await expect(page).toHaveScreenshot('now-stack-tree-collapsed.png');
 });
 
 test('keeps a fork collapsed across a re-render', async ({ page }) => {
