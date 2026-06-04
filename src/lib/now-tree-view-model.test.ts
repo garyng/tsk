@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { emptyNowTree, markNow, type NowTreeState, removeEntry, switchTo } from './now-tree';
-import { layoutNowTree, type NowRow } from './now-tree-view-model';
+import {
+    buildNowTreeView,
+    layoutNowTree,
+    MISSING_NOW_LABEL,
+    type NowRow,
+    type NowRowView,
+    type ResolveContent,
+} from './now-tree-view-model';
 
 /** Mark `entryId` as the current now (id = `t-<entryId>`, fixed timestamp). */
 function mk(state: NowTreeState, entryId: string): NowTreeState {
@@ -125,5 +132,90 @@ describe('layoutNowTree — linear-compaction', () => {
             layoutNowTree(s).map((r) => [r.entryId, r.onCurrentPath]),
         );
         expect(onPath).toEqual({ A: true, B: true, C: true, D: false, E: false });
+    });
+});
+
+describe('buildNowTreeView — label + relative time', () => {
+    const FIXED_NOW = new Date('2026-06-04T12:00:00.000Z');
+    const noResolve: ResolveContent = () => undefined;
+
+    /** Assert exactly one row and return it (narrows `T | undefined` for strict indexing). */
+    function only(rows: NowRowView[]): NowRowView {
+        expect(rows).toHaveLength(1);
+        const [row] = rows;
+        if (!row) throw new Error('expected exactly one row');
+        return row;
+    }
+
+    it('prefers live workspace content over the mark-time snapshot', () => {
+        const s = markNow(emptyNowTree(), {
+            entryId: 'A',
+            id: 't-A',
+            markedAt: 'm',
+            content: 'snapshot A',
+        });
+        const resolve: ResolveContent = (id) => (id === 't-A' ? { content: 'live A' } : undefined);
+        const row = only(buildNowTreeView(s, resolve, FIXED_NOW));
+        expect(row.label).toBe('live A');
+        expect(row.resolved).toBe(true);
+        expect(row.id).toBe('t-A');
+    });
+
+    it('falls back to the snapshot when the id is not live', () => {
+        const s = markNow(emptyNowTree(), {
+            entryId: 'A',
+            id: 't-A',
+            markedAt: 'm',
+            content: 'snapshot A',
+        });
+        const row = only(buildNowTreeView(s, noResolve, FIXED_NOW));
+        expect(row.label).toBe('snapshot A');
+        expect(row.resolved).toBe(false);
+    });
+
+    it('shows the missing marker when neither live nor snapshot exists', () => {
+        const s = mk(emptyNowTree(), 'A'); // mk records no content snapshot
+        const row = only(buildNowTreeView(s, noResolve, FIXED_NOW));
+        expect(row.label).toBe(MISSING_NOW_LABEL);
+        expect(row.resolved).toBe(false);
+    });
+
+    it('formats `when` as relative time', () => {
+        const s = markNow(emptyNowTree(), {
+            entryId: 'A',
+            id: 't-A',
+            markedAt: '2026-06-04T11:55:00.000Z',
+        });
+        const row = only(buildNowTreeView(s, noResolve, FIXED_NOW));
+        expect(row.when).toBe('5 minutes ago');
+    });
+
+    it('passes an unparseable markedAt through as `when`', () => {
+        const s = mk(emptyNowTree(), 'A'); // markedAt: 'm'
+        const row = only(buildNowTreeView(s, noResolve, FIXED_NOW));
+        expect(row.when).toBe('m');
+    });
+
+    it('renders a recurring @id as distinct rows that both resolve', () => {
+        // Two nodes mark the SAME @id (recurrence) → two rows, same id, both live.
+        let s = markNow(emptyNowTree(), { entryId: 'A', id: 'dup', markedAt: 'm' });
+        s = markNow(s, { entryId: 'B', id: 'dup', markedAt: 'm' }); // child, same @id
+        const resolve: ResolveContent = (id) =>
+            id === 'dup' ? { content: 'the task' } : undefined;
+        const rows = buildNowTreeView(s, resolve, FIXED_NOW);
+        expect(rows.map((r) => r.entryId)).toEqual(['B', 'A']); // current-first trunk
+        expect(rows.every((r) => r.id === 'dup' && r.label === 'the task' && r.resolved)).toBe(
+            true,
+        );
+    });
+
+    it('preserves the layout topology (depth/kind/current) from layoutNowTree', () => {
+        let s = mk(emptyNowTree(), 'A');
+        s = mk(s, 'B');
+        s = switchTo(s, 'A'); // current A, B an offshoot
+        const rows = buildNowTreeView(s, noResolve, FIXED_NOW);
+        expect(
+            rows.map((r) => `${r.entryId}:${r.depth}:${r.kind}${r.current ? ':cur' : ''}`),
+        ).toEqual(['A:0:trunk:cur', 'B:1:branch']);
     });
 });

@@ -1,3 +1,4 @@
+import { formatRelativeTime } from './hover-logic';
 import type { NowEntry, NowTreeState } from './now-tree';
 
 /** One rendered row of the now-stack, after linear-compaction layout. */
@@ -69,6 +70,50 @@ export function layoutNowTree(state: NowTreeState): NowRow[] {
         for (const child of offTrunk) emitOffshoot(child, 1);
     }
     return rows;
+}
+
+/** Resolve a task `@id` to its live workspace record (the `cache.lookupById` shape). */
+export type ResolveContent = (id: string) => { content: string } | undefined;
+
+/** A `NowRow` decorated for rendering: resolved label, relative time, the task `@id`. */
+export interface NowRowView extends NowRow {
+    /** The task `@id` this node marks (may recur across nodes). */
+    id: string;
+    /** Live workspace content if resolvable, else the mark-time snapshot, else a missing marker. */
+    label: string;
+    /** Relative time of the mark, e.g. "3 minutes ago". */
+    when: string;
+    /** Whether the `@id` currently resolves in the workspace cache. */
+    resolved: boolean;
+}
+
+/** Label shown when an `@id` resolves to neither a live task nor a snapshot. */
+export const MISSING_NOW_LABEL = '(missing in workspace)';
+
+/**
+ * Decorate the linear-compaction rows for rendering. For each node resolves
+ * the display `label` (live workspace content ?? the mark-time snapshot ?? a
+ * missing marker), its relative `when`, and whether the `@id` is still live.
+ * Pure — the host injects `resolve` (`cache.lookupById`) and `now`, so the
+ * webview receives a ready-to-render viewmodel over `postMessage`.
+ */
+export function buildNowTreeView(
+    state: NowTreeState,
+    resolve: ResolveContent,
+    now: Date,
+): NowRowView[] {
+    const byId = new Map(state.entries.map((e) => [e.entryId, e]));
+    return layoutNowTree(state).map((row) => {
+        const entry = byId.get(row.entryId) as NowEntry;
+        const live = resolve(entry.id);
+        return {
+            ...row,
+            id: entry.id,
+            label: live?.content ?? entry.content ?? MISSING_NOW_LABEL,
+            when: formatRelativeTime(entry.markedAt, now),
+            resolved: live !== undefined,
+        };
+    });
 }
 
 function makeRow(

@@ -182,10 +182,21 @@ function commandLink(command: string, args: unknown[], label: string): string {
  * `date-fns/formatDistance(d, now, { addSuffix: true })` does all the
  * pluralisation + "X ago" / "in X" logic; we don't reimplement.
  */
+/**
+ * Relative-time phrase like "3 minutes ago" (date-fns `formatDistance`, with
+ * suffix). Returns the raw value unchanged if it isn't a parseable date —
+ * shared by the hover timestamp and the now-stack `when` column.
+ */
+export function formatRelativeTime(value: string, now: Date): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return formatDistance(date, now, { addSuffix: true });
+}
+
 function formatTimestamp(value: string, now: Date): string {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return `${value} (${formatDistance(date, now, { addSuffix: true })})`;
+    return `${value} (${formatRelativeTime(value, now)})`;
 }
 
 /**
