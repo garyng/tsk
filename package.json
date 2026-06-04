@@ -213,7 +213,8 @@
             {
                 "command": "tsk.now.openStack",
                 "title": "Open Now Stack",
-                "category": "Tsk"
+                "category": "Tsk",
+                "icon": "$(target)"
             },
             {
                 "command": "tsk.now.clear",
@@ -221,6 +222,15 @@
                 "category": "Tsk"
             }
         ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "tsk.now.openStack",
+                    "when": "editorLangId == tsk",
+                    "group": "navigation"
+                }
+            ]
+        },
         "keybindings": [
             {
                 "command": "tsk.findAllTasksByTag",
