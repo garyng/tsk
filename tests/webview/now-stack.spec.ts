@@ -114,6 +114,17 @@ async function mount(page: Page): Promise<string[]> {
     return errors;
 }
 
+/** Messages the bundle has posted back to the (mocked) host. */
+const posted = (page: Page): Promise<unknown[]> =>
+    page.evaluate(() => (window as unknown as { __posted: unknown[] }).__posted);
+
+/** Mount + push the sample tree, returning once the rows are on screen. */
+async function render(page: Page): Promise<void> {
+    await mount(page);
+    await page.evaluate((rows) => window.postMessage({ type: 'render', rows }, '*'), SAMPLE_ROWS);
+    await expect(page.locator('.now-row')).toHaveCount(5);
+}
+
 test('mounts with no runtime errors and shows the empty state', async ({ page }) => {
     const errors = await mount(page);
     await expect(page.locator('.now-stack__empty')).toBeVisible();
@@ -143,19 +154,44 @@ test('a populated render builds the compacted grida tree', async ({ page }) => {
 });
 
 test('collapsing a fork hides its offshoot', async ({ page }) => {
-    await mount(page);
-    await page.evaluate((rows) => window.postMessage({ type: 'render', rows }, '*'), SAMPLE_ROWS);
-    await expect(page.locator('.now-row')).toHaveCount(5);
+    await render(page);
     // Click fork B's twistie → its child D disappears (5 → 4 rows).
     await page.locator('[data-tree-row-id="B"] .now-row__twistie').click();
     await expect(page.locator('.now-row')).toHaveCount(4);
     await expect(page.locator('[data-tree-row-id="D"]')).toHaveCount(0);
 });
 
+test('reveals the codicon row actions on hover', async ({ page }) => {
+    await render(page);
+    await page.locator('[data-tree-row-id="B"]').hover();
+    await expect(page.locator('[data-tree-row-id="B"] .now-row__actions')).toBeVisible();
+    await expect(page).toHaveScreenshot('now-stack-tree-hover.png');
+});
+
+test('clicking a row posts a jump carrying the task @id', async ({ page }) => {
+    await render(page);
+    await page.locator('[data-tree-row-id="C"]').click();
+    expect(await posted(page)).toContainEqual({ type: 'jump', id: 't-C' });
+});
+
+test('a row action button posts its action with the entryId', async ({ page }) => {
+    await render(page);
+    const rowB = page.locator('[data-tree-row-id="B"]');
+    await rowB.hover(); // actions are hover-revealed
+    await rowB.getByRole('button', { name: 'Set as current now' }).click();
+    expect(await posted(page)).toContainEqual({ type: 'switchTo', entryId: 'B' });
+});
+
+test('toolbar buttons post the tree-level actions', async ({ page }) => {
+    await render(page);
+    await page.getByRole('button', { name: 'Back (switch to parent)' }).click();
+    await page.getByRole('button', { name: 'Clear now history' }).click();
+    const messages = await posted(page);
+    expect(messages).toContainEqual({ type: 'back' });
+    expect(messages).toContainEqual({ type: 'clear' });
+});
+
 test('posts {type:"ready"} to the host on mount', async ({ page }) => {
     await mount(page);
-    const posted = await page.evaluate(
-        () => (window as unknown as { __posted: unknown[] }).__posted,
-    );
-    expect(posted).toContainEqual({ type: 'ready' });
+    expect(await posted(page)).toContainEqual({ type: 'ready' });
 });

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
-import { COMMANDS } from './constants';
+import { COMMANDS, INTERNAL_COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import type { HostToWebview, WebviewToHost } from './lib/now-protocol';
@@ -77,9 +77,43 @@ export class NowPanel implements vscode.Disposable {
     }
 
     private onMessage(message: WebviewToHost): void {
-        if (message?.type === 'ready') {
-            // The client has mounted and is listening — safe to paint now.
-            this.postRender();
+        // Thin router: the C3a now-tree commands do the work, the store's
+        // `onDidChange` then drives the re-render. `ready` is the first-paint
+        // handshake. Unknown / malformed messages are ignored.
+        switch (message?.type) {
+            case 'ready':
+                this.postRender();
+                return;
+            case 'jump':
+                void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowJump, message.id);
+                return;
+            case 'switchTo':
+                void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowSwitchTo, message.entryId);
+                return;
+            case 'remove':
+                void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowRemove, message.entryId);
+                return;
+            case 'pruneSubtree':
+                void vscode.commands.executeCommand(
+                    INTERNAL_COMMANDS.nowPruneSubtree,
+                    message.entryId,
+                );
+                return;
+            case 'pruneChildren':
+                void vscode.commands.executeCommand(
+                    INTERNAL_COMMANDS.nowPruneChildren,
+                    message.entryId,
+                );
+                return;
+            case 'back':
+                void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowBack);
+                return;
+            case 'pruneOffPath':
+                void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowPruneOffPath);
+                return;
+            case 'clear':
+                void vscode.commands.executeCommand(COMMANDS.nowClear);
+                return;
         }
     }
 
@@ -112,7 +146,7 @@ export class NowPanel implements vscode.Disposable {
             `img-src ${webview.cspSource} https: data:`,
             `style-src ${webview.cspSource} 'unsafe-inline'`,
             `script-src 'nonce-${nonce}'`,
-            `font-src ${webview.cspSource}`,
+            `font-src ${webview.cspSource} data:`,
         ].join('; ');
         return `<!DOCTYPE html>
 <html lang="en">

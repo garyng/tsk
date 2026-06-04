@@ -17,5 +17,20 @@ import type { NowRowView } from './now-row';
  */
 export type HostToWebview = { type: 'render'; rows: NowRowView[] };
 
-/** Messages the webview posts back to the extension. */
-export type WebviewToHost = { type: 'ready' };
+/**
+ * Messages the webview posts back to the extension. `ready` triggers the first
+ * render; the rest are user actions the panel routes to the now-tree commands
+ * (`jump` carries a task `@id`; the node mutators a tree `entryId`;
+ * `back`/`pruneOffPath`/`clear` act on the current / whole tree). `revealCurrent`
+ * is handled entirely webview-side (grida `reveal()`), so it isn't here.
+ */
+export type WebviewToHost =
+    | { type: 'ready' }
+    | { type: 'jump'; id: string }
+    | { type: 'switchTo'; entryId: string }
+    | { type: 'remove'; entryId: string }
+    | { type: 'pruneSubtree'; entryId: string }
+    | { type: 'pruneChildren'; entryId: string }
+    | { type: 'back' }
+    | { type: 'pruneOffPath' }
+    | { type: 'clear' };
