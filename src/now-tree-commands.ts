@@ -26,8 +26,14 @@ export function registerNowTreeCommands(
     navigationHighlight: NavigationHighlight,
     logger: Logger,
 ): void {
-    /** Reveal + highlight the task `@id`'s line (read-only peek — never edits). */
-    async function jump(id: string): Promise<void> {
+    /**
+     * Reveal + highlight the task `@id`'s line in the SOURCE-side editor group —
+     * the one the panel sits beside (the `sourceColumn` it passes) — reusing the
+     * tab that's already showing the file, like markdown preview drives its
+     * source. Never opens over the panel's own column (which is "active" right
+     * after a webview click, and would spawn a stray new tab). Never edits.
+     */
+    async function jump(id: string, sourceColumn?: vscode.ViewColumn): Promise<void> {
         if (!id) return;
         const located = locate(cache, id);
         if (!located) {
@@ -38,9 +44,19 @@ export function registerNowTreeCommands(
             return;
         }
         const doc = await vscode.workspace.openTextDocument(located.uri);
-        const editor = await vscode.window.showTextDocument(doc);
         const range = pointRange(located.line);
-        editor.selection = new vscode.Selection(range.start, range.end);
+        // Prefer the column already showing this doc (reuse that exact tab);
+        // else the panel's source column; else the first group.
+        const visible = vscode.window.visibleTextEditors.find(
+            (e) => e.document.uri.toString() === doc.uri.toString(),
+        );
+        const viewColumn = visible?.viewColumn ?? sourceColumn ?? vscode.ViewColumn.One;
+        const editor = await vscode.window.showTextDocument(doc, {
+            viewColumn,
+            preserveFocus: false,
+            preview: false,
+            selection: range,
+        });
         editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
         navigationHighlight.set(editor, located.line);
     }
@@ -66,7 +82,10 @@ export function registerNowTreeCommands(
     }
 
     context.subscriptions.push(
-        vscode.commands.registerCommand(INTERNAL_COMMANDS.nowJump, (id: string) => jump(id)),
+        vscode.commands.registerCommand(
+            INTERNAL_COMMANDS.nowJump,
+            (id: string, column?: vscode.ViewColumn) => jump(id, column),
+        ),
         vscode.commands.registerCommand(INTERNAL_COMMANDS.nowSwitchTo, (entryId: string) => {
             if (entryId) nowStore.switchTo(entryId);
         }),

@@ -24,6 +24,8 @@ const VIEW_TYPE = 'tsk.nowStack';
 export class NowPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
     private readonly storeSub: { dispose(): void };
+    /** The editor group the panel opened beside — jumps navigate THERE, not the panel's own column. */
+    private sourceColumn: vscode.ViewColumn = vscode.ViewColumn.One;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -42,6 +44,9 @@ export class NowPanel implements vscode.Disposable {
             this.panel.reveal(vscode.ViewColumn.Beside);
             return;
         }
+        // Capture the active editor's column BEFORE opening beside it — that's
+        // the group jumps will navigate (the markdown-preview / source model).
+        this.sourceColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
         this.adopt(
             vscode.window.createWebviewPanel(
                 VIEW_TYPE,
@@ -95,7 +100,11 @@ export class NowPanel implements vscode.Disposable {
                 this.postRender();
                 return;
             case 'jump':
-                void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowJump, message.id);
+                void vscode.commands.executeCommand(
+                    INTERNAL_COMMANDS.nowJump,
+                    message.id,
+                    this.sourceColumn,
+                );
                 return;
             case 'switchTo':
                 void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowSwitchTo, message.entryId);
