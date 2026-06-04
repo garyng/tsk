@@ -214,6 +214,11 @@
                 "command": "tsk.now.openStack",
                 "title": "Open Now Stack",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.now.clear",
+                "title": "Clear Now History",
+                "category": "Tsk"
             }
         ],
         "keybindings": [

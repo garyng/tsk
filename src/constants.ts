@@ -173,14 +173,16 @@ export const COMMANDS = {
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
     markNow: 'tsk.markNow',
     openNowStack: 'tsk.now.openStack',
+    nowClear: 'tsk.now.clear',
 } as const satisfies Record<string, `tsk.${string}`>;
 
 /**
  * Commands registered programmatically and invoked only via CodeLens
- * descriptors (see `lib/codelens-logic.ts`). Deliberately NOT in
- * `package.json#contributes.commands` — they require arguments only the
- * lens layer can supply, so surfacing them in the Command Palette would
- * just produce broken invocations.
+ * descriptors (see `lib/codelens-logic.ts`) or the now-stack webview bridge
+ * (see `now-tree-commands.ts`). Deliberately NOT in
+ * `package.json#contributes.commands` — they require arguments (a task `@id`,
+ * a tree `entryId`) only those layers can supply, so surfacing them in the
+ * Command Palette would just produce broken invocations.
  *
  * Kept separate from `COMMANDS` so the package.json cross-check stays
  * sharp ("every contributed command is in `COMMANDS`" — without false
@@ -195,6 +197,16 @@ export const INTERNAL_COMMANDS = {
     findAllDependents: 'tsk.findAllDependents',
     findAllRelated: 'tsk.findAllRelated',
     codelensMissing: 'tsk.codelens.missing',
+    // Now-stack actions — the webview posts an action message, the panel routes
+    // it to one of these (jump takes a task `@id`; the rest a tree `entryId`,
+    // except back/pruneOffPath which act on the current).
+    nowJump: 'tsk.now.jump',
+    nowSwitchTo: 'tsk.now.switchTo',
+    nowBack: 'tsk.now.back',
+    nowRemove: 'tsk.now.remove',
+    nowPruneSubtree: 'tsk.now.pruneSubtree',
+    nowPruneChildren: 'tsk.now.pruneChildren',
+    nowPruneOffPath: 'tsk.now.pruneOffPath',
     /**
      * Quick-fix backing for broken-ref diagnostics (M20/C). Takes
      * `(uri: vscode.Uri, line: number, key: 'parent' | 'dependsOn' | 'relatedTo')`,

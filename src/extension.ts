@@ -36,6 +36,7 @@ import { NavigationHighlight } from './navigation-highlight';
 import { registerNowCommands } from './now-commands';
 import { NowDecoration } from './now-decoration';
 import { registerNowPanel } from './now-panel';
+import { registerNowTreeCommands } from './now-tree-commands';
 import { registerPasteImageProvider } from './paste-image';
 import { ScanController } from './scan-controller';
 import { registerSemanticTokens } from './semantic-tokens';
@@ -166,7 +167,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     attachDocumentListeners(context);
 
     const tagsLoader = await createTagsLoader(context, logger);
-    registerAllCommands(context, cache, graph, tagsLoader, logger, nowStore);
+    registerAllCommands(context, cache, graph, tagsLoader, logger, nowStore, navigationHighlight);
 
     registerClipboardBridge(context, logger);
     registerInstallClipboardBridgeSkillCommand(context, logger);
@@ -354,6 +355,7 @@ function registerAllCommands(
     tagsLoader: TagsLoader,
     logger: Logger,
     nowStore: NowStore,
+    navigationHighlight: NavigationHighlight,
 ): void {
     registerToggleCommands(context, logger);
     registerCopyTaskIdCommand(context, logger);
@@ -365,6 +367,7 @@ function registerAllCommands(
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
     registerNowCommands(context, nowStore, cache, logger);
+    registerNowTreeCommands(context, nowStore, cache, navigationHighlight, logger);
     registerNowPanel(context, nowStore, cache, logger);
 
     context.subscriptions.push(
