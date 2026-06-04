@@ -200,8 +200,9 @@ Requires **VS Code 1.112+** (the extension declares `engines.vscode = "^1.112.0"
 
 ```sh
 npm install            # one-time
-npm run build:host     # produces dist/extension.cjs via Vite (library mode, CJS)
-npm run dev:host       # same, in watch mode
+npm run build          # host (dist/host/extension.cjs) + webview (dist/webview/now-stack.js)
+npm run build:host     # just the extension host bundle (Vite library mode, CJS)
+npm run dev:host       # host bundle, watch mode (dev:webview watches the webview)
 ```
 
 Open the repo in VS Code and pick **Run and Debug → Run Extension** to launch a development host with the extension loaded. After a fresh `npm run build:host`, the running dev host still has the *previous* bundle — run **Developer: Restart Extension Host** in the dev host window to pick up the new build.

@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
             fileName: (format) => (format === 'cjs' ? 'extension.cjs' : `extension.${format}.js`),
         },
         target: 'node22',
-        outDir: 'dist',
+        outDir: 'dist/host',
         sourcemap: true,
         emptyOutDir: true,
         minify: mode !== 'development',

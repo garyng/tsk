@@ -15,7 +15,7 @@
     "engines": {
         "vscode": "^1.112.0"
     },
-    "main": "./dist/extension.cjs",
+    "main": "./dist/host/extension.cjs",
     "activationEvents": [
         "onLanguage:tsk",
         "workspaceContains:**/*.tsk"
@@ -459,12 +459,14 @@
     },
     "scripts": {
         "build:host": "vite build -c vite.config.host.ts",
-        "build": "npm run build:host",
+        "build:webview": "vite build -c vite.config.webview.ts",
+        "build": "npm run build:host && npm run build:webview",
         "dev:host": "vite build -c vite.config.host.ts --watch --mode development",
-        "typecheck": "tsc",
+        "dev:webview": "vite build -c vite.config.webview.ts --watch --mode development",
+        "typecheck": "tsc && tsc -p tsconfig.webview.json",
         "compile:tests": "tsc -p tests/tsconfig.json",
         "test": "vitest run",
-        "prepare:e2e": "npm run compile:tests && npm run build:host",
+        "prepare:e2e": "npm run compile:tests && npm run build",
         "test:e2e": "npm run prepare:e2e && bash scripts/run-e2e.sh --label stable",
         "test:e2e:floor": "npm run prepare:e2e && bash scripts/run-e2e.sh --label floor",
         "test:e2e:all": "npm run prepare:e2e && bash scripts/run-e2e.sh",
@@ -476,11 +478,15 @@
         "@biomejs/biome": "^2.4.15",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.19.19",
+        "@types/react": "^18.3.30",
+        "@types/react-dom": "^18.3.7",
         "@types/vscode": "~1.110.0",
         "@vitest/coverage-v8": "^4.1.7",
         "@vscode/test-cli": "^0.0.12",
         "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.9.1",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
         "typescript": "^6.0.3",
         "vite": "^8.0.14",
         "vitest": "^4.1.7",
