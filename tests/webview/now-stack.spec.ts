@@ -3,9 +3,11 @@ import { expect, type Page, test } from '@playwright/test';
 
 /**
  * The built webview bundle, loaded as text and injected as a module script. It's
- * self-contained (React is bundled in, no imports), so it runs standalone in a
- * blank page once `acquireVsCodeApi` is mocked. `npm run test:webview` builds it
- * first; reading it here keeps the test exercising the real shipped artifact.
+ * self-contained (React + grida are bundled in, no imports), so it runs
+ * standalone in a blank page once `acquireVsCodeApi` is mocked. `npm run
+ * test:webview` builds it first; reading it here keeps the test exercising the
+ * real shipped artifact. The bundle injects its own `<style>` on load, so the
+ * harness only supplies the editor-like backdrop.
  */
 const bundle = readFileSync('dist/webview/now-stack.js', 'utf8');
 
@@ -17,7 +19,6 @@ const HARNESS = `<!DOCTYPE html>
     :root { color-scheme: dark; }
     body { margin: 0; background: #1e1e1e; color: #cccccc;
            font: 13px/1.5 system-ui, "Segoe UI", sans-serif; }
-    .now-stack { padding: 12px; }
 </style>
 </head>
 <body>
@@ -32,6 +33,68 @@ const HARNESS = `<!DOCTYPE html>
     </script>
 </body>
 </html>`;
+
+/**
+ * A resolved, linear-compaction viewmodel (the §step-8 shape): trunk C◉/B/A with
+ * D under B and a missing E under A. Exercises the current highlight, two
+ * twisties (B, A are forks), a missing-task label, and the relative-time column.
+ */
+const SAMPLE_ROWS = [
+    row('C', 'B', 0, 'trunk', false, true, true, 'Write the parser', '2 minutes ago', true),
+    row(
+        'B',
+        'A',
+        0,
+        'trunk',
+        true,
+        true,
+        false,
+        'Refactor the cache layer',
+        '10 minutes ago',
+        true,
+    ),
+    row('D', 'B', 1, 'branch', false, false, false, 'Add unit tests', '8 minutes ago', true),
+    row('A', null, 0, 'trunk', true, true, false, 'Ship phase 7', 'about 1 hour ago', true),
+    row(
+        'E',
+        'A',
+        1,
+        'branch',
+        false,
+        false,
+        false,
+        '(missing in workspace)',
+        'about 1 hour ago',
+        false,
+    ),
+];
+
+function row(
+    entryId: string,
+    parentId: string | null,
+    depth: number,
+    kind: 'trunk' | 'branch',
+    isFork: boolean,
+    onCurrentPath: boolean,
+    current: boolean,
+    label: string,
+    when: string,
+    resolved: boolean,
+) {
+    return {
+        entryId,
+        parentId,
+        depth,
+        kind,
+        isFork,
+        onCurrentPath,
+        current,
+        id: `t-${entryId}`,
+        label,
+        when,
+        resolved,
+    };
+}
 
 /**
  * Mount the built bundle into a blank page with a mocked vscode API, returning
@@ -60,12 +123,33 @@ test('mounts with no runtime errors and shows the empty state', async ({ page })
     await expect(page).toHaveScreenshot('now-stack-empty.png');
 });
 
-test('a render message switches to the rendered state', async ({ page }) => {
+test('an empty render keeps the empty state', async ({ page }) => {
     const errors = await mount(page);
-    await page.evaluate(() => window.postMessage({ type: 'render' }, '*'));
-    await expect(page.locator('.now-stack__placeholder')).toBeVisible();
+    await page.evaluate(() => window.postMessage({ type: 'render', rows: [] }, '*'));
+    await expect(page.locator('.now-stack__empty')).toBeVisible();
     expect(errors).toEqual([]);
-    await expect(page).toHaveScreenshot('now-stack-rendered.png');
+});
+
+test('a populated render builds the compacted grida tree', async ({ page }) => {
+    const errors = await mount(page);
+    await page.evaluate((rows) => window.postMessage({ type: 'render', rows }, '*'), SAMPLE_ROWS);
+    await expect(page.locator('.now-tree')).toBeVisible();
+    // grida flattens the synthetic tree back to our five compacted rows.
+    await expect(page.locator('.now-row')).toHaveCount(5);
+    // exactly the current row is highlighted; B and A render a twistie.
+    await expect(page.locator('.now-row[data-state="current"]')).toHaveCount(1);
+    expect(errors).toEqual([]);
+    await expect(page).toHaveScreenshot('now-stack-tree.png');
+});
+
+test('collapsing a fork hides its offshoot', async ({ page }) => {
+    await mount(page);
+    await page.evaluate((rows) => window.postMessage({ type: 'render', rows }, '*'), SAMPLE_ROWS);
+    await expect(page.locator('.now-row')).toHaveCount(5);
+    // Click fork B's twistie → its child D disappears (5 → 4 rows).
+    await page.locator('[data-tree-row-id="B"] .now-row__twistie').click();
+    await expect(page.locator('.now-row')).toHaveCount(4);
+    await expect(page.locator('[data-tree-row-id="D"]')).toHaveCount(0);
 });
 
 test('posts {type:"ready"} to the host on mount', async ({ page }) => {

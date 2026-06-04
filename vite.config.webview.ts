@@ -16,7 +16,9 @@ export default defineConfig(({ mode }) => ({
     // throws `process is not defined` in the webview (no Node `process` in the
     // browser), and React never mounts — a blank panel. Replace it at build time.
     define: {
-        'process.env.NODE_ENV': JSON.stringify(mode === 'development' ? 'development' : 'production'),
+        'process.env.NODE_ENV': JSON.stringify(
+            mode === 'development' ? 'development' : 'production',
+        ),
     },
     build: {
         outDir: 'dist/webview',

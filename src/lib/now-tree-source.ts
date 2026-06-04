@@ -1,5 +1,5 @@
 import type { NodeId, TreeNode } from '@grida/tree-view';
-import type { NowRowView } from './now-tree-view-model';
+import type { NowRowView } from './now-row';
 
 /**
  * Synthetic root id for the grida tree. Rendered hidden (`showRoot:false`);

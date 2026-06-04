@@ -1,9 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
+import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import type { HostToWebview, WebviewToHost } from './lib/now-protocol';
 import type { NowStore } from './lib/now-store';
+import { buildNowTreeView } from './lib/now-tree-view-model';
 
 const VIEW_TYPE = 'tsk.nowStack';
 
@@ -13,11 +15,11 @@ const VIEW_TYPE = 'tsk.nowStack';
  * built React bundle (`dist/webview/now-stack.js`) under a nonce + strict CSP,
  * bridges messages, and re-renders whenever the now-tree changes.
  *
- * M46 is the SHELL: `render` carries no rows yet (the webview shows a
- * placeholder); the `@grida/tree-view` UI + the resolved row viewmodel land in
- * M47. The store subscription, the `ready` handshake, and the
- * `registerWebviewPanelSerializer` revive (so a popped-out panel survives a
- * reload) are all wired now.
+ * Each render builds the resolved, linear-compaction viewmodel host-side
+ * (`buildNowTreeView` over the store state + the cache as the label resolver)
+ * and posts it; the webview reconstructs the grida tree and renders. The `ready`
+ * handshake guards the first paint, the store subscription drives re-renders,
+ * and `registerWebviewPanelSerializer` revives a popped-out panel after reload.
  */
 export class NowPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
@@ -26,6 +28,7 @@ export class NowPanel implements vscode.Disposable {
     constructor(
         private readonly extensionUri: vscode.Uri,
         private readonly nowStore: NowStore,
+        private readonly cache: CacheService,
         private readonly logger: Logger,
     ) {
         // Re-render on every tree change (mark / switch / prune / clear). The
@@ -81,8 +84,14 @@ export class NowPanel implements vscode.Disposable {
     }
 
     private postRender(): void {
-        const message: HostToWebview = { type: 'render' };
-        void this.panel?.webview.postMessage(message);
+        if (!this.panel) return;
+        const rows = buildNowTreeView(
+            this.nowStore.getState(),
+            (id) => this.cache.lookupById(id),
+            new Date(),
+        );
+        const message: HostToWebview = { type: 'render', rows };
+        void this.panel.webview.postMessage(message);
     }
 
     private webviewOptions(): vscode.WebviewPanelOptions & vscode.WebviewOptions {
@@ -129,9 +138,10 @@ export class NowPanel implements vscode.Disposable {
 export function registerNowPanel(
     context: vscode.ExtensionContext,
     nowStore: NowStore,
+    cache: CacheService,
     logger: Logger,
 ): NowPanel {
-    const panel = new NowPanel(context.extensionUri, nowStore, logger);
+    const panel = new NowPanel(context.extensionUri, nowStore, cache, logger);
     context.subscriptions.push(
         panel,
         vscode.commands.registerCommand(COMMANDS.openNowStack, () => panel.open()),

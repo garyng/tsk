@@ -365,7 +365,7 @@ function registerAllCommands(
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
     registerNowCommands(context, nowStore, cache, logger);
-    registerNowPanel(context, nowStore, logger);
+    registerNowPanel(context, nowStore, cache, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {
