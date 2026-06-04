@@ -10,6 +10,14 @@ import { defineConfig } from 'vite';
 // each with its own `emptyOutDir`, so they never clobber each other — build
 // order is irrelevant and `dev:host` / `dev:webview` can watch concurrently.
 export default defineConfig(({ mode }) => ({
+    // React + ReactDOM read `process.env.NODE_ENV` to choose dev vs prod code
+    // paths. Vite does NOT inject this replacement in LIBRARY mode (only in app
+    // builds), so without it the bundle ships a bare `process.env.NODE_ENV`,
+    // throws `process is not defined` in the webview (no Node `process` in the
+    // browser), and React never mounts — a blank panel. Replace it at build time.
+    define: {
+        'process.env.NODE_ENV': JSON.stringify(mode === 'development' ? 'development' : 'production'),
+    },
     build: {
         outDir: 'dist/webview',
         emptyOutDir: true,

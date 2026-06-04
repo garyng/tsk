@@ -18,7 +18,8 @@
     "main": "./dist/host/extension.cjs",
     "activationEvents": [
         "onLanguage:tsk",
-        "workspaceContains:**/*.tsk"
+        "workspaceContains:**/*.tsk",
+        "onWebviewPanel:tsk.nowStack"
     ],
     "contributes": {
         "languages": [
@@ -207,6 +208,11 @@
             {
                 "command": "tsk.markNow",
                 "title": "Mark Now",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.now.openStack",
+                "title": "Open Now Stack",
                 "category": "Tsk"
             }
         ],
@@ -470,12 +476,15 @@
         "test:e2e": "npm run prepare:e2e && bash scripts/run-e2e.sh --label stable",
         "test:e2e:floor": "npm run prepare:e2e && bash scripts/run-e2e.sh --label floor",
         "test:e2e:all": "npm run prepare:e2e && bash scripts/run-e2e.sh",
+        "test:webview": "npm run build:webview && playwright test",
+        "test:webview:update": "npm run build:webview && playwright test --update-snapshots",
         "lint": "biome check .",
         "format": "biome format --write .",
         "package": "vsce package --out artifacts/"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.15",
+        "@playwright/test": "^1.60.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.19.19",
         "@types/react": "^18.3.30",

@@ -35,6 +35,7 @@ import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerNowCommands } from './now-commands';
 import { NowDecoration } from './now-decoration';
+import { registerNowPanel } from './now-panel';
 import { registerPasteImageProvider } from './paste-image';
 import { ScanController } from './scan-controller';
 import { registerSemanticTokens } from './semantic-tokens';
@@ -364,6 +365,7 @@ function registerAllCommands(
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
     registerNowCommands(context, nowStore, cache, logger);
+    registerNowPanel(context, nowStore, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {

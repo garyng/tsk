@@ -1,5 +1,6 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { HostToWebview, WebviewToHost } from '../../lib/now-protocol';
 
 /**
  * The "now stack" webview client (M46 shell). For now it just mounts, signals
@@ -14,32 +15,20 @@ import { createRoot } from 'react-dom/client';
  * across reloads via get/setState.
  */
 declare function acquireVsCodeApi(): {
-    postMessage(message: unknown): void;
+    postMessage(message: WebviewToHost): void;
     getState(): unknown;
     setState(state: unknown): void;
 };
 
 const vscode = acquireVsCodeApi();
 
-/** Messages the extension posts INTO the webview. (Rows arrive in M47.) */
-interface RenderMessage {
-    type: 'render';
-}
-
-function isRenderMessage(value: unknown): value is RenderMessage {
-    return (
-        typeof value === 'object' &&
-        value !== null &&
-        (value as { type?: unknown }).type === 'render'
-    );
-}
-
 function NowStack() {
     const [rendered, setRendered] = useState(false);
 
     useEffect(() => {
         const onMessage = (event: MessageEvent): void => {
-            if (isRenderMessage(event.data)) setRendered(true);
+            const data = event.data as Partial<HostToWebview> | undefined;
+            if (data?.type === 'render') setRendered(true);
         };
         window.addEventListener('message', onMessage);
         // Tell the extension we're mounted so it posts the initial render.

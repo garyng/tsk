@@ -172,6 +172,7 @@ export const COMMANDS = {
     duplicateLineUp: 'tsk.duplicateLineUp',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
     markNow: 'tsk.markNow',
+    openNowStack: 'tsk.now.openStack',
 } as const satisfies Record<string, `tsk.${string}`>;
 
 /**
