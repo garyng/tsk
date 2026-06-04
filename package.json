@@ -484,6 +484,7 @@
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.15",
+        "@grida/tree-view": "0.1.0",
         "@playwright/test": "^1.60.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.19.19",
