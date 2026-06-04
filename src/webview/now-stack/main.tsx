@@ -1,4 +1,10 @@
-import { defaultKeymap, InMemoryTreeSource, type Row, TreeController } from '@grida/tree-view';
+import {
+    defaultKeymap,
+    InMemoryTreeSource,
+    type Keymap,
+    type Row,
+    TreeController,
+} from '@grida/tree-view';
 import { TreeProvider, useTree, useTreeSnapshot } from '@grida/tree-view/react';
 import codiconCss from '@vscode/codicons/dist/codicon.css?raw';
 import codiconFont from '@vscode/codicons/dist/codicon.ttf?inline';
@@ -47,6 +53,11 @@ const saveCollapsed = (collapsed: Set<string>): void =>
 /** px of indent per compacted depth level. */
 const INDENT_STEP = 16;
 const rowDomId = (id: string): string => `now-row-${id}`;
+
+// `defaultKeymap` binds Enter/F2 to `rename` — but the now-tree has no inline
+// rename. Remap them to `activate` so Enter jumps the focused row (↑/↓ move,
+// →/← expand/collapse stay as grida's defaults).
+const NOW_KEYMAP: Keymap = { ...defaultKeymap, Enter: 'activate', F2: 'activate' };
 
 function NowStack() {
     const [rows, setRows] = useState<NowRowView[] | null>(null);
@@ -155,7 +166,7 @@ function NowRows() {
     const rows = useTreeSnapshot((c) => c.getRows());
     const focused = useTreeSnapshot((c) => c.getFocused());
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-        const { handled } = ctrl.keyDown(event, defaultKeymap);
+        const { handled } = ctrl.keyDown(event, NOW_KEYMAP);
         if (handled) event.preventDefault();
     };
     return (
