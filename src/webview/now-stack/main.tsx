@@ -8,6 +8,7 @@ import {
     StrictMode,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -33,6 +34,15 @@ declare function acquireVsCodeApi(): {
 
 const vscode = acquireVsCodeApi();
 const post = (message: WebviewToHost): void => vscode.postMessage(message);
+
+/** Persisted webview state (survives a reload / pop-out). */
+interface PersistedState {
+    collapsed?: string[];
+}
+const loadCollapsed = (): Set<string> =>
+    new Set((vscode.getState() as PersistedState | undefined)?.collapsed ?? []);
+const saveCollapsed = (collapsed: Set<string>): void =>
+    vscode.setState({ collapsed: [...collapsed] } satisfies PersistedState);
 
 /** px of indent per compacted depth level. */
 const INDENT_STEP = 16;
@@ -66,14 +76,29 @@ function NowStack() {
 }
 
 function NowTree({ rows }: { rows: NowRowView[] }) {
-    // Rebuild the grida tree whenever the rows change. All forks start expanded
-    // (the fully-compacted view); cross-render collapse persistence is M47/C3c.
+    // The forks the user has collapsed — survives a re-render (every store change
+    // rebuilds the controller) and, via setState, a panel reload / pop-out.
+    const collapsedRef = useRef<Set<string>>(loadCollapsed());
+
     const controller = useMemo(() => {
         const { root, nodes } = buildNowTreeSource(rows);
         const source = new InMemoryTreeSource<NowRowView>({ root, nodes, showRoot: false });
-        return new TreeController<NowRowView>({ source, expanded: expandedNowIds(rows) });
+        // Start every fork expanded EXCEPT the ones the user collapsed.
+        const expanded = expandedNowIds(rows).filter((id) => !collapsedRef.current.has(id));
+        return new TreeController<NowRowView>({ source, expanded });
     }, [rows]);
     useEffect(() => () => controller.dispose(), [controller]);
+
+    // Remember collapses as the user toggles (only current forks, so the set
+    // can't accumulate stale ids).
+    useEffect(() => {
+        return controller.subscribe('expanded', () => {
+            const expanded = controller.getExpanded();
+            const collapsed = new Set(expandedNowIds(rows).filter((id) => !expanded.has(id)));
+            collapsedRef.current = collapsed;
+            saveCollapsed(collapsed);
+        });
+    }, [controller, rows]);
 
     // Keyboard `Enter` → grida emits an `activate` intent → jump that row.
     useEffect(() => {

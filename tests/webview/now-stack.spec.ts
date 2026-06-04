@@ -25,10 +25,11 @@ const HARNESS = `<!DOCTYPE html>
     <div id="root"></div>
     <script>
         window.__posted = [];
+        let __state;
         window.acquireVsCodeApi = () => ({
             postMessage: (m) => window.__posted.push(m),
-            getState: () => undefined,
-            setState: () => {},
+            getState: () => __state,
+            setState: (s) => { __state = s; },
         });
     </script>
 </body>
@@ -159,6 +160,16 @@ test('collapsing a fork hides its offshoot', async ({ page }) => {
     await page.locator('[data-tree-row-id="B"] .now-row__twistie').click();
     await expect(page.locator('.now-row')).toHaveCount(4);
     await expect(page.locator('[data-tree-row-id="D"]')).toHaveCount(0);
+});
+
+test('keeps a fork collapsed across a re-render', async ({ page }) => {
+    await render(page);
+    await page.locator('[data-tree-row-id="B"] .now-row__twistie').click();
+    await expect(page.locator('.now-row')).toHaveCount(4); // D hidden under collapsed B
+    // Re-send the SAME rows (as a store onDidChange would) → B stays collapsed.
+    await page.evaluate((rows) => window.postMessage({ type: 'render', rows }, '*'), SAMPLE_ROWS);
+    await expect(page.locator('[data-tree-row-id="D"]')).toHaveCount(0);
+    await expect(page.locator('.now-row')).toHaveCount(4);
 });
 
 test('reveals the codicon row actions on hover', async ({ page }) => {

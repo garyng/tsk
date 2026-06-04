@@ -141,10 +141,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     context.subscriptions.push(navigationHighlight);
     const nowDecoration = new NowDecoration(cache, nowStore);
     context.subscriptions.push(nowDecoration);
+    // Created before the scan controller so its `refresh()` can ride the
+    // rescan-tail (a cache rebuild changes labels without touching the tree).
+    const nowPanel = registerNowPanel(context, nowStore, cache, logger);
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
-    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger, () =>
-        nowDecoration.reapply(),
-    );
+    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger, () => {
+        nowDecoration.reapply();
+        nowPanel.refresh();
+    });
 
     state = {
         logger,
@@ -368,7 +372,6 @@ function registerAllCommands(
     registerHoverProvider(context, cache, graph, tagsLoader);
     registerNowCommands(context, nowStore, cache, logger);
     registerNowTreeCommands(context, nowStore, cache, navigationHighlight, logger);
-    registerNowPanel(context, nowStore, cache, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {

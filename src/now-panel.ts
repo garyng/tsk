@@ -57,6 +57,16 @@ export class NowPanel implements vscode.Disposable {
         this.adopt(panel);
     }
 
+    /**
+     * Re-render from the current store + cache state. The store's `onDidChange`
+     * already covers tree mutations; this is the hook for a CACHE rescan (e.g.
+     * after `tsk.rebuildCache`), where labels can change but the tree doesn't.
+     * A no-op when the panel is closed.
+     */
+    refresh(): void {
+        this.postRender();
+    }
+
     dispose(): void {
         this.storeSub.dispose();
         this.panel?.dispose();
