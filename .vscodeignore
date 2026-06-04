@@ -13,6 +13,7 @@ artifacts/**
 .vscode-test.mjs
 vite.config.host.ts
 vite.config.webview.ts
+playwright.config.ts
 vitest.config.ts
 tsconfig.json
 tsconfig.webview.json

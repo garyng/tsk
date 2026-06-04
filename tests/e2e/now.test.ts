@@ -109,4 +109,20 @@ suite('mark-now (M45)', () => {
         assert.strictEqual(kb.key, 'alt+w');
         assert.strictEqual(kb.when, "editorLangId == 'tsk' && editorTextFocus");
     });
+
+    test('tsk.now.openStack opens the Now Stack panel without throwing', async () => {
+        // Smoke: createWebviewPanel + the nonce/CSP HTML build cleanly. The React
+        // mount, the message bridge, and "Move into a New Window" are dev-host
+        // (manual) checks — the webview DOM isn't reachable from the e2e API.
+        await vscode.commands.executeCommand('tsk.now.openStack');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        const ext = vscode.extensions.getExtension(EXTENSION_ID);
+        assert.ok(ext);
+        const commands = ext.packageJSON.contributes.commands as ReadonlyArray<{ command: string }>;
+        assert.ok(
+            commands.some((c) => c.command === 'tsk.now.openStack'),
+            'tsk.now.openStack should be contributed',
+        );
+    });
 });
