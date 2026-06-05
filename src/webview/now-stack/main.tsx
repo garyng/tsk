@@ -180,12 +180,16 @@ function NowRows() {
         const { handled } = ctrl.keyDown(event, NOW_KEYMAP);
         if (handled) event.preventDefault();
     };
+    // Only reference a focused row that's actually rendered: grida can retain a
+    // focus id whose row is now collapsed/pruned away, which would make
+    // aria-activedescendant point at a non-existent element (B3).
+    const activeId = focused && rows.some((r) => r.id === focused) ? focused : undefined;
     return (
         <div
             className="now-tree"
             role="tree"
             tabIndex={0}
-            aria-activedescendant={focused ? rowDomId(focused) : undefined}
+            aria-activedescendant={activeId ? rowDomId(activeId) : undefined}
             onKeyDown={onKeyDown}
         >
             {rows.map((row) => (
