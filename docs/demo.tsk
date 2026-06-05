@@ -119,7 +119,21 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 
 <!-- paste an image on the line below -->
 
-## 11. Putting it together
+## 11. Now
+
+| Key | Effect |
+|-----|--------|
+| `Alt+W` | mark the task as your current "now" |
+
+`Alt+W` stamps a missing `@id`, flips the task to `[/]`, and pushes it onto a persistent undo-**tree** of "what am I working on now" — the marked line gets a left-edge highlight. Open the tree from the `target` button in this editor's title bar (or **Tsk: Open Now Stack**); it docks beside the file like a Markdown preview — click a node to jump straight back to it.
+
+Mark the first line, then the second (it becomes a *child*). Open the stack, click the first to switch back, then mark the third — the tree keeps **both** branches, so your history is never lost:
+
+- [ ] draft the launch plan <!-- @id:now-draft -->
+- [ ] handle the review notes <!-- @id:now-review -->
+- [ ] cut the release <!-- @id:now-release -->
+
+## 12. Putting it together
 
 A real slice of a plan — every status, priority, tag, and link at once. The priorities tint their rows, the cancelled line is struck through, the metadata stays dimmed. Hover any task, click a `children:` / `parent:` / `dependsOn:` / `movedTo:` lens to jump, or `Alt+T` a tag to find more like it. The task text itself is plain Markdown — inline `code`, **bold**, and *italic* all render in place.
 

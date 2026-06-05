@@ -112,6 +112,31 @@ These commands are invoked exclusively by lens clicks — no palette entries, no
 
 **Navigation highlight.** Clicking a forward-edge lens (parent / dependsOn / relatedTo / movedTo) lands on the target line and leaves a soft whole-line tint there until your next interaction. It's persistent, not a flash — it clears on the next navigate, a user-initiated cursor move in that editor, or the active editor moving off it. Theme it via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id (default: soft yellow with alpha, readable on light and dark themes).
 
+## Now task & tree
+
+`Alt+W` (**Tsk: Mark Now**) marks the task under the cursor as your current "now". In a single undo step it stamps a missing `@id` (+ `@created`) and — unless you turn off `tsk.now.autoInProgress` — flips the marker to `[/]`. The current now-task carries a persistent left-edge highlight (the `tsk.now.highlight` color, a soft blue readable on light and dark).
+
+Marks accumulate into an **undo-tree**, not a stack: each new mark becomes a child of the current one, and switching to an earlier node and marking again *branches* rather than overwriting — history is never pruned implicitly. Open the tree from the `target` button in a `.tsk` editor's title bar, or **Tsk: Open Now Stack**. It's a React webview that docks **beside** the file like a Markdown preview (and pops out via *Move / Copy into a New Window*), rendered with [`@grida/tree-view`](https://grida.co/packages/@grida/tree-view) for a native tree feel — keyboard nav (`↑`/`↓` move, `←`/`→` collapse/expand, `Enter` jumps), twisties, collapse-state that persists.
+
+The tree uses **linear-compaction**: the path from root to the current now renders as a flat trunk (current at the top), and only real branches indent — so a mostly-linear history stays flat instead of deeply nested.
+
+| Action | What it does |
+|--------|--------------|
+| **Click a node** | Jump to that task. Reuses the editor beside the panel (a task in another file opens in that group — never a stray tab over the panel). Read-only; never edits. |
+| **Set as current** | Switch the now-pointer to that node. Undo / redo is a pointer move — nothing is deleted. |
+| **Back** (toolbar) | Switch to the current node's parent (undo one step). |
+| **Remove** | Drop one node, re-parenting its children onto its parent. |
+| **Delete branch** | Drop a node and its whole subtree. |
+| **Remove children** | Drop a node's descendants, keeping the node itself. |
+| **Prune off-path** (toolbar) | Drop every branch not on the path to the current now (linearize). |
+| **Clear** (toolbar, or **Tsk: Clear Now History**) | Wipe the whole tree — modal-confirmed; your tasks are untouched. |
+
+**Persistence.** The now-tree lives in its own SQLite `state.db` (default `${workspaceFolder}/.vscode/tsk/state.db`, set via `tsk.state.path`) — **separate from `cache.db`**, so **Tsk: Rebuild Cache** leaves it intact. With no workspace folder it's session-only (in-memory). Like the cache, it's single-root today.
+
+**Recurrence.** The same task can appear at several nodes (mark it, move on, come back later) — a node's identity is its position in the tree, not the `@id`, so one task can sit at multiple points in your history.
+
+**Limits (v1).** No in-panel search/filter; a now-task in a *closed* file shows no in-editor highlight (only the tree label); `@movedTo` isn't followed; multi-root workspaces aren't supported yet (same as the cache).
+
 ## Hover
 
 Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't decode the dimmed `<!-- … -->` comment by eye. It lists the `@id`, each timestamp rendered both absolutely and as friendly relative time (`… (3 days ago)`), the tags, and any relationship links — each link a clickable command URI that jumps to the referenced task. The task content itself is deliberately *not* repeated (it's already under your cursor). Document-local, so it works on untitled buffers too.
@@ -170,8 +195,10 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.clipboard.bridgeEnabled` | `false` | Master switch for the clipboard bridge (watch a file → host clipboard). |
 | `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched bridge file; only used when the bridge is enabled. |
 | `tsk.pasteImage.baseDirectory` | `./images` | Base directory (under the document) for pasted images. Blank ⇒ beside the document. |
+| `tsk.state.path` | `${workspaceFolder}/.vscode/tsk/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
+| `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]`. Turn off to leave the marker unchanged. |
 
-Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`. These drive the Search Editor result rows; in `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
+Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. These drive the Search Editor result rows; in `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 
 ## Limitations
 
