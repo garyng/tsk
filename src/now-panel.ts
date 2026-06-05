@@ -23,8 +23,16 @@ const VIEW_TYPE = 'tsk.nowStack';
  */
 export class NowPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
+    /** The last viewmodel posted (serialized) — to skip re-posting an identical one. */
+    private lastPosted: string | undefined;
     private readonly storeSub: { dispose(): void };
-    /** The editor group the panel opened beside — jumps navigate THERE, not the panel's own column. */
+    private readonly editorSub: { dispose(): void };
+    /**
+     * The editor group jumps navigate to — the markdown-preview "source" model.
+     * Tracks the last ACTIVE non-panel text editor (below), so it stays correct
+     * across the panel being revived by the serializer or popped into a new
+     * window — neither of which runs `open()`.
+     */
     private sourceColumn: vscode.ViewColumn = vscode.ViewColumn.One;
 
     constructor(
@@ -36,6 +44,13 @@ export class NowPanel implements vscode.Disposable {
         // Re-render on every tree change (mark / switch / prune / clear). The
         // `ready` handshake guards the first paint; later changes post directly.
         this.storeSub = this.nowStore.onDidChange(() => this.postRender());
+        this.sourceColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
+        this.editorSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
+            // Keep the source group fresh — but never the panel's own column
+            // (a jump there would open over the panel / spawn a stray tab).
+            const col = editor?.viewColumn;
+            if (col !== undefined && col !== this.panel?.viewColumn) this.sourceColumn = col;
+        });
     }
 
     /** Open the panel (or reveal it if already open) beside the active editor. */
@@ -44,9 +59,6 @@ export class NowPanel implements vscode.Disposable {
             this.panel.reveal(vscode.ViewColumn.Beside);
             return;
         }
-        // Capture the active editor's column BEFORE opening beside it — that's
-        // the group jumps will navigate (the markdown-preview / source model).
-        this.sourceColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
         this.adopt(
             vscode.window.createWebviewPanel(
                 VIEW_TYPE,
@@ -74,6 +86,7 @@ export class NowPanel implements vscode.Disposable {
 
     dispose(): void {
         this.storeSub.dispose();
+        this.editorSub.dispose();
         this.panel?.dispose();
         this.panel = undefined;
     }
@@ -83,6 +96,7 @@ export class NowPanel implements vscode.Disposable {
     private adopt(panel: vscode.WebviewPanel): void {
         this.logger.debug(`${COMMANDS.openNowStack}: now-stack webview panel attached`);
         this.panel = panel;
+        this.lastPosted = undefined; // a fresh webview needs the next render unconditionally
         panel.webview.options = this.webviewOptions();
         panel.webview.html = this.html(panel.webview);
         panel.webview.onDidReceiveMessage((message: WebviewToHost) => this.onMessage(message));
@@ -143,6 +157,14 @@ export class NowPanel implements vscode.Disposable {
             (id) => this.cache.lookupById(id),
             new Date(),
         );
+        // Skip the cross-process post + webview re-render when nothing visible
+        // changed since the last post. The rescan-tail fires `refresh()` on every
+        // edit/save/watcher event (most unrelated to any now-task), so re-posting
+        // an identical viewmodel is pure churn + flicker. Relative `when` drifts
+        // at minute granularity, so a genuine time change still posts.
+        const serialized = JSON.stringify(rows);
+        if (serialized === this.lastPosted) return;
+        this.lastPosted = serialized;
         const message: HostToWebview = { type: 'render', rows };
         void this.panel.webview.postMessage(message);
     }
