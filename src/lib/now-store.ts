@@ -1,4 +1,5 @@
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
+import { IN_MEMORY } from './cache-path';
 import { generateId } from './ids';
 import {
     clear as clearTree,
@@ -83,7 +84,7 @@ export class NowStore {
         this.warn = options.warn;
         this.db = new DatabaseSync(path);
         // WAL is meaningless for `:memory:` (sqlite reports "memory" anyway).
-        if (path !== ':memory:') this.db.exec('PRAGMA journal_mode = WAL');
+        if (path !== IN_MEMORY) this.db.exec('PRAGMA journal_mode = WAL');
         this.db.exec('PRAGMA synchronous = NORMAL');
         // Read the on-disk schema version BEFORE stamping ours. A fresh DB
         // reports 0; a DB written by a DIFFERENT NOW_TREE_VERSION holds rows we
