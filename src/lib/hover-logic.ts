@@ -174,15 +174,6 @@ function commandLink(command: string, args: unknown[], label: string): string {
 }
 
 /**
- * Render an ISO-8601 timestamp with a parenthesised human-friendly
- * relative distance, e.g. `2026-05-27T10:00:00+08:00 (2 hours ago)`.
- * Falls back to the raw value when the string doesn't parse as a date —
- * we never want a broken timestamp to crash the hover.
- *
- * `date-fns/formatDistance(d, now, { addSuffix: true })` does all the
- * pluralisation + "X ago" / "in X" logic; we don't reimplement.
- */
-/**
  * Relative-time phrase like "3 minutes ago" (date-fns `formatDistance`, with
  * suffix). Returns the raw value unchanged if it isn't a parseable date —
  * shared by the hover timestamp and the now-stack `when` column.
@@ -193,6 +184,12 @@ export function formatRelativeTime(value: string, now: Date): string {
     return formatDistance(date, now, { addSuffix: true });
 }
 
+/**
+ * Render an ISO-8601 timestamp with a parenthesised human-friendly relative
+ * distance, e.g. `2026-05-27T10:00:00+08:00 (2 hours ago)`. Falls back to the
+ * raw value when the string doesn't parse — we never want a broken timestamp to
+ * crash the hover.
+ */
 function formatTimestamp(value: string, now: Date): string {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
