@@ -85,8 +85,25 @@ export class NowStore {
         // WAL is meaningless for `:memory:` (sqlite reports "memory" anyway).
         if (path !== ':memory:') this.db.exec('PRAGMA journal_mode = WAL');
         this.db.exec('PRAGMA synchronous = NORMAL');
-        this.db.exec(`PRAGMA user_version = ${NOW_TREE_VERSION}`);
+        // Read the on-disk schema version BEFORE stamping ours. A fresh DB
+        // reports 0; a DB written by a DIFFERENT NOW_TREE_VERSION holds rows we
+        // can't read through the current column mapping, so discard them (start
+        // empty + warn) rather than misreading. (Previously user_version was
+        // written unconditionally and never read back, so the load-time
+        // `version !== NOW_TREE_VERSION` guard was a tautology.)
+        const versionRow = this.db.prepare('PRAGMA user_version').get() as
+            | { user_version: number }
+            | undefined;
+        const onDiskVersion = versionRow?.user_version ?? 0;
         this.db.exec(SCHEMA);
+        if (onDiskVersion !== 0 && onDiskVersion !== NOW_TREE_VERSION) {
+            this.warn?.(
+                `now state.db is schema v${onDiskVersion}, expected v${NOW_TREE_VERSION}; discarding it.`,
+            );
+            this.db.exec('DELETE FROM now_entry');
+            this.db.exec('DELETE FROM now_meta');
+        }
+        this.db.exec(`PRAGMA user_version = ${NOW_TREE_VERSION}`);
         this.stmts = {
             listEntries: this.db.prepare(
                 `SELECT entry_id, task_id, marked_at, parent_id, created_seq, content

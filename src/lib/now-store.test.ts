@@ -160,4 +160,30 @@ describe('NowStore (persistence)', () => {
         expect(warn).toHaveBeenCalledOnce();
         store.dispose();
     });
+
+    it('discards a state.db written by a different schema version (A5) and warns', () => {
+        const file = join(tmp, 'versioned.db');
+        const first = new NowStore(file, { deps: deterministicDeps() });
+        first.markNow('task-a');
+        first.dispose();
+
+        // Simulate a future / foreign schema: bump user_version on disk.
+        const raw = new DatabaseSync(file);
+        raw.exec('PRAGMA user_version = 999');
+        raw.close();
+
+        const warn = vi.fn();
+        const reopened = new NowStore(file, { warn });
+        expect(reopened.getState().entries).toHaveLength(0); // discarded, not misread
+        expect(warn).toHaveBeenCalledOnce();
+        reopened.dispose();
+
+        // The discard cleared the rows AND restamped user_version, so a fresh
+        // reopen is cleanly empty with no re-warn (version now matches).
+        const warn2 = vi.fn();
+        const again = new NowStore(file, { warn: warn2 });
+        expect(again.getState().entries).toHaveLength(0);
+        expect(warn2).not.toHaveBeenCalled();
+        again.dispose();
+    });
 });
