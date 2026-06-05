@@ -101,4 +101,25 @@ describe('buildNowTreeSource — grida round-trip', () => {
         const rows = view(s);
         expect(expandedNowIds(rows).sort()).toEqual(['A', 'B']);
     });
+
+    it('attaches a malformed depth (gap / first depth>0) to root instead of throwing', () => {
+        // A payload that violates layoutNowTree's invariant — the webview runs
+        // buildNowTreeSource directly on render-message rows, so it must degrade.
+        const badRow = (entryId: string, depth: number): NowRowView => ({
+            entryId,
+            parentId: null,
+            depth,
+            kind: 'branch',
+            isFork: false,
+            onCurrentPath: false,
+            current: false,
+            id: `t-${entryId}`,
+            label: entryId,
+            when: '',
+            resolved: true,
+        });
+        const bad = [badRow('X', 2), badRow('Y', 5)]; // first depth 2, then a gap
+        expect(() => flatten(bad)).not.toThrow();
+        expect(flatten(bad)).toEqual(['X:0', 'Y:0']); // both fall back to root → depth 0
+    });
 });

@@ -27,9 +27,12 @@ export function buildNowTreeSource(rows: NowRowView[]): {
     const lineage: NodeId[] = []; // lineage[d] = the current ancestor at depth d
 
     for (const row of rows) {
-        // The depth-(d−1) ancestor is always set: rows arrive parent-before-child
-        // with depth increasing by at most 1 (layoutNowTree's invariant).
-        const parent = row.depth === 0 ? NOW_TREE_ROOT : (lineage[row.depth - 1] as NodeId);
+        // Normal path: rows arrive parent-before-child with depth increasing by at
+        // most 1 (layoutNowTree's invariant). Defensive `?? NOW_TREE_ROOT`: the
+        // webview runs this directly on `render`-message rows, so a malformed
+        // payload (a depth gap, or a first row at depth > 0) attaches the row to
+        // root instead of dereferencing an absent ancestor and blanking the panel.
+        const parent = row.depth === 0 ? NOW_TREE_ROOT : (lineage[row.depth - 1] ?? NOW_TREE_ROOT);
         parentOf.set(row.entryId, parent);
         (children.get(parent) as NodeId[]).push(row.entryId);
         children.set(row.entryId, []);
