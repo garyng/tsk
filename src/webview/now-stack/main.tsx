@@ -90,6 +90,9 @@ function NowTree({ rows }: { rows: NowRowView[] }) {
     // The forks the user has collapsed — survives a re-render (every store change
     // rebuilds the controller) and, via setState, a panel reload / pop-out.
     const collapsedRef = useRef<Set<string>>(loadCollapsed());
+    // Set while a programmatic reveal() expands ancestors, so that expansion
+    // isn't persisted as the user un-collapsing those forks (A4).
+    const suppressPersist = useRef(false);
 
     const controller = useMemo(() => {
         const { root, nodes } = buildNowTreeSource(rows);
@@ -104,6 +107,7 @@ function NowTree({ rows }: { rows: NowRowView[] }) {
     // can't accumulate stale ids).
     useEffect(() => {
         return controller.subscribe('expanded', () => {
+            if (suppressPersist.current) return; // a reveal-driven expand, not a user toggle
             const expanded = controller.getExpanded();
             const collapsed = new Set(expandedNowIds(rows).filter((id) => !expanded.has(id)));
             collapsedRef.current = collapsed;
@@ -121,24 +125,31 @@ function NowTree({ rows }: { rows: NowRowView[] }) {
     }, [controller]);
 
     const currentEntryId = rows.find((r) => r.current)?.entryId;
+    const revealCurrent = (): void => {
+        if (!currentEntryId) return;
+        // Suppress the collapse-persist for the ancestor forks reveal() expands
+        // (A4); scroll only after React commits the now-shown row — double rAF,
+        // since grida's expand re-renders on the next frame (B2).
+        suppressPersist.current = true;
+        controller.reveal(currentEntryId);
+        suppressPersist.current = false;
+        requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+                document
+                    .getElementById(rowDomId(currentEntryId))
+                    ?.scrollIntoView({ block: 'center' });
+            }),
+        );
+    };
     return (
         <TreeProvider controller={controller}>
-            <Toolbar currentEntryId={currentEntryId} />
+            <Toolbar onRevealCurrent={revealCurrent} />
             <NowRows />
         </TreeProvider>
     );
 }
 
-function Toolbar({ currentEntryId }: { currentEntryId: string | undefined }) {
-    const ctrl = useTree<NowRowView>();
-    const revealCurrent = (): void => {
-        if (!currentEntryId) return;
-        ctrl.reveal(currentEntryId);
-        // grida expands + focuses; the DOM scroll is the consumer's job.
-        requestAnimationFrame(() => {
-            document.getElementById(rowDomId(currentEntryId))?.scrollIntoView({ block: 'center' });
-        });
-    };
+function Toolbar({ onRevealCurrent }: { onRevealCurrent: () => void }) {
     return (
         <div className="now-toolbar">
             <IconButton
@@ -151,7 +162,7 @@ function Toolbar({ currentEntryId }: { currentEntryId: string | undefined }) {
                 title="Prune off-path branches"
                 onClick={() => post({ type: 'pruneOffPath' })}
             />
-            <IconButton icon="location" title="Reveal current now" onClick={revealCurrent} />
+            <IconButton icon="location" title="Reveal current now" onClick={onRevealCurrent} />
             <IconButton
                 icon="clear-all"
                 title="Clear now history"
