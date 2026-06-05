@@ -3,10 +3,11 @@ import { NOW_HIGHLIGHT_COLOR_ID } from './constants';
 import { isTskDocument } from './editor-guards';
 import type { CacheService } from './lib/cache';
 import type { NowStore } from './lib/now-store';
-import { parseLine } from './lib/parser';
+import { resolveNowTarget } from './now-resolve';
 import { pointRange } from './range-helpers';
 
-interface NowTarget {
+/** What's actually painted: the now-task's editor uri (as a string) + line. */
+interface PaintedNow {
     uri: string;
     line: number;
 }
@@ -35,7 +36,7 @@ interface NowTarget {
 export class NowDecoration implements vscode.Disposable {
     private readonly decorationType: vscode.TextEditorDecorationType;
     private readonly subscriptions: vscode.Disposable[] = [];
-    private current: NowTarget | undefined;
+    private current: PaintedNow | undefined;
 
     constructor(
         private readonly cache: CacheService,
@@ -59,13 +60,14 @@ export class NowDecoration implements vscode.Disposable {
      */
     reapply(): void {
         const id = this.nowStore.getCurrentNowId();
-        const target = id ? this.resolveTarget(id) : undefined;
-        let painted: NowTarget | undefined;
+        const target = id ? resolveNowTarget(this.cache, id) : undefined;
+        const targetUri = target?.uri.toString();
+        let painted: PaintedNow | undefined;
         for (const editor of vscode.window.visibleTextEditors) {
             if (!isTskDocument(editor.document)) continue;
-            if (target && editor.document.uri.toString() === target.uri) {
+            if (target && editor.document.uri.toString() === targetUri) {
                 editor.setDecorations(this.decorationType, [pointRange(target.line)]);
-                painted = target;
+                painted = { uri: targetUri as string, line: target.line };
             } else {
                 editor.setDecorations(this.decorationType, []);
             }
@@ -78,37 +80,12 @@ export class NowDecoration implements vscode.Disposable {
      * or the now-task's file isn't visible. Exposed via `TskExtensionApi` for
      * e2e introspection (VSCode doesn't expose decoration state directly).
      */
-    getCurrent(): NowTarget | undefined {
+    getCurrent(): PaintedNow | undefined {
         return this.current;
     }
 
     dispose(): void {
         this.decorationType.dispose();
         for (const sub of this.subscriptions) sub.dispose();
-    }
-
-    /**
-     * Canonical `(uri, line)` for the now-`@id`: the cache's record when present
-     * (the canonical occurrence, matching the jump target); otherwise a live scan
-     * of visible editors for a task carrying that `@id` (covers a just-marked or
-     * untitled task the cache hasn't indexed yet).
-     */
-    private resolveTarget(id: string): NowTarget | undefined {
-        const record = this.cache.lookupById(id);
-        if (record) return { uri: record.fileUri, line: record.line };
-        return this.scanVisibleForId(id);
-    }
-
-    private scanVisibleForId(id: string): NowTarget | undefined {
-        for (const editor of vscode.window.visibleTextEditors) {
-            const doc = editor.document;
-            if (!isTskDocument(doc)) continue;
-            for (let line = 0; line < doc.lineCount; line++) {
-                if (parseLine(doc.lineAt(line).text)?.metadata.get('id') === id) {
-                    return { uri: doc.uri.toString(), line };
-                }
-            }
-        }
-        return undefined;
     }
 }

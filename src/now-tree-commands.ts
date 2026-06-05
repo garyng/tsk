@@ -3,8 +3,8 @@ import { COMMANDS, INTERNAL_COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import type { NowStore } from './lib/now-store';
-import { parseLine } from './lib/parser';
 import type { NavigationHighlight } from './navigation-highlight';
+import { resolveNowTarget } from './now-resolve';
 import { pointRange } from './range-helpers';
 
 /**
@@ -35,7 +35,7 @@ export function registerNowTreeCommands(
      */
     async function jump(id: string, sourceColumn?: vscode.ViewColumn): Promise<void> {
         if (!id) return;
-        const located = locate(cache, id);
+        const located = resolveNowTarget(cache, id);
         if (!located) {
             logger.warn(`${INTERNAL_COMMANDS.nowJump}: task @id "${id}" not found.`);
             void vscode.window.showInformationMessage(
@@ -104,25 +104,4 @@ export function registerNowTreeCommands(
         ),
         vscode.commands.registerCommand(COMMANDS.nowClear, () => clear()),
     );
-}
-
-/**
- * Resolve a task `@id` to a `(uri, line)`. The cache covers saved + scanned
- * docs; on a miss, scan visible UNTITLED buffers (a just-marked task in an
- * unsaved doc isn't cached yet) so jump still lands.
- */
-function locate(cache: CacheService, id: string): { uri: vscode.Uri; line: number } | undefined {
-    const record = cache.lookupById(id);
-    if (record) return { uri: vscode.Uri.parse(record.fileUri), line: record.line };
-
-    for (const editor of vscode.window.visibleTextEditors) {
-        const doc = editor.document;
-        if (!doc.isUntitled) continue;
-        for (let line = 0; line < doc.lineCount; line++) {
-            if (parseLine(doc.lineAt(line).text)?.metadata.get('id') === id) {
-                return { uri: doc.uri, line };
-            }
-        }
-    }
-    return undefined;
 }
