@@ -69,7 +69,9 @@ export function registerNowCommands(
 
             // Snapshot the content only when the cache can't resolve the id yet
             // (untitled, or not-yet-scanned) — otherwise the view reads it live.
-            const content = cache.lookupById(id) ? undefined : parsed?.content || undefined;
+            // `??` not `||`: an empty-content task (metadata only) has content === ''
+            // and must still snapshot '' rather than collapse to "(missing)".
+            const content = cache.lookupById(id) ? undefined : (parsed?.content ?? undefined);
             nowStore.markNow(id, content);
             logger.info(`${COMMANDS.markNow}: now = ${id}`);
         }),

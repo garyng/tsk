@@ -113,6 +113,15 @@ suite('now feature (M45 mark + M48 tree actions)', () => {
         assert.strictEqual(api.getNowTaskId(), 'm45-real', 'the current now must be unchanged');
     });
 
+    test('marking a metadata-only (empty-content) task snapshots "" not undefined (A1)', async () => {
+        // cache-miss (untitled) branch: the snapshot is the only label source, and
+        // an empty content string must survive (`??`, not `||`).
+        await markNow('- [ ] <!-- @id:m50-empty -->');
+        const entry = api.getNowTree().entries.find((e) => e.id === 'm50-empty');
+        assert.ok(entry, 'the empty-content task should be marked');
+        assert.strictEqual(entry.content, '', 'snapshot should be the empty string, not undefined');
+    });
+
     test('contributes Alt+W → tsk.markNow, gated to tsk editors', () => {
         const ext = vscode.extensions.getExtension(EXTENSION_ID);
         assert.ok(ext);
