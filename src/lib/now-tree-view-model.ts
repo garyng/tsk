@@ -99,7 +99,6 @@ function makeRow(
 ): NowRow {
     return {
         entryId: entry.entryId,
-        parentId: entry.parentId,
         depth,
         kind,
         isFork,

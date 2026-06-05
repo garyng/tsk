@@ -107,7 +107,6 @@ describe('buildNowTreeSource — grida round-trip', () => {
         // buildNowTreeSource directly on render-message rows, so it must degrade.
         const badRow = (entryId: string, depth: number): NowRowView => ({
             entryId,
-            parentId: null,
             depth,
             kind: 'branch',
             isFork: false,

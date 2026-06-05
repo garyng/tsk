@@ -9,7 +9,6 @@
 /** One rendered row of the now-stack, after linear-compaction layout. */
 export interface NowRow {
     entryId: string;
-    parentId: string | null;
     /** Indent level: 0 = the flat current-path trunk; offshoots / forks deepen by 1. */
     depth: number;
     kind: 'trunk' | 'branch';
