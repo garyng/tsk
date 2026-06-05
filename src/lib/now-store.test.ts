@@ -37,6 +37,15 @@ describe('NowStore (in-memory)', () => {
         expect(changed).toHaveBeenCalledTimes(1);
     });
 
+    it('leaves in-memory state unchanged when a persist fails (A7)', () => {
+        const s = new NowStore(':memory:', { deps: deterministicDeps() });
+        s.markNow('task-a'); // e1 — persisted fine
+        const before = s.getState();
+        s.dispose(); // closes the db → the next persist() will throw
+        expect(() => s.markNow('task-b')).toThrow();
+        expect(s.getState()).toEqual(before); // no advanced-but-unpersisted node
+    });
+
     it('delegates to the reducers (mark → branch → switch)', () => {
         store.markNow('task-a'); // e1 root
         store.markNow('task-b'); // e2 child of e1

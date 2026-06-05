@@ -190,8 +190,11 @@ export class NowStore {
 
     private apply(next: NowTreeState): void {
         if (next === this.state) return; // pure reducer returned the same state — nothing changed
-        this.state = next;
+        // Persist BEFORE advancing the in-memory state: if the write throws, the
+        // in-memory tree stays consistent with disk (no advanced-but-unpersisted
+        // state, and listeners aren't notified of a change that didn't land).
         this.persist(next);
+        this.state = next;
         for (const listener of [...this.listeners]) listener();
     }
 
