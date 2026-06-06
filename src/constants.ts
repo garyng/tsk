@@ -105,6 +105,9 @@ export const STATE_PATH_KEY = 'state.path';
 export const NOW_AUTO_IN_PROGRESS_SETTING = 'tsk.now.autoInProgress';
 export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
 
+export const AUTOLINKS_SETTING = 'tsk.autolinks';
+export const AUTOLINKS_KEY = 'autolinks';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every

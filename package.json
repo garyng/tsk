@@ -479,6 +479,34 @@
                     "type": "boolean",
                     "default": true,
                     "description": "When marking a task as \"now\" (via Tsk: Mark Now), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
+                },
+                "tsk.autolinks": {
+                    "type": "array",
+                    "default": [],
+                    "markdownDescription": "Turn text matching a regular expression into a clickable link in `.tsk` editors. Each rule's `pattern` is tested against every line (the `g` flag is always applied); each match becomes a link whose URL is `target` with capture groups substituted via JavaScript `String.replace` semantics — `$1`/`$2` (numbered), `$<name>` (named `(?<name>…)`), `$&` (whole match), `$$` (literal `$`). Example: `{ \"pattern\": \"([A-Z]+)-([0-9]+)\", \"target\": \"https://jira.example.com/$1-$2\" }` links `JIRAID-123`. Earlier rules win where matches overlap. A pattern using look-behind/look-ahead positions the link correctly but won't substitute (the URL falls back to the raw match).",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "pattern",
+                            "target"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "pattern": {
+                                "type": "string",
+                                "markdownDescription": "JavaScript regular-expression source, matched against every line. Use capture groups — including named `(?<name>…)` — to feed `target`."
+                            },
+                            "target": {
+                                "type": "string",
+                                "markdownDescription": "URL template. Substitutes `$1`/`$2` (numbered), `$<name>` (named), `$&` (whole match), `$$` (literal `$`)."
+                            },
+                            "flags": {
+                                "type": "string",
+                                "pattern": "^[imsu]*$",
+                                "markdownDescription": "Optional extra regex flags — any of `i` `m` `s` `u`. The `g` flag is always applied automatically."
+                            }
+                        }
+                    }
                 }
             }
         }

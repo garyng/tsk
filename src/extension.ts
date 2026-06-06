@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { registerAutoLinksProvider } from './autolinks-provider';
 import { registerClipboardBridge } from './clipboard-bridge';
 import { registerCodeActionsProvider } from './code-actions';
 import { registerCodelens } from './codelens';
@@ -99,6 +100,12 @@ export interface TskExtensionApi {
     getNowTaskId(): string | undefined;
     /** The currently-painted now-decoration location, or `undefined` when nothing is highlighted (M45). */
     getNowDecoration(): { uri: string; line: number } | undefined;
+    /**
+     * Force a re-read of `tsk.autolinks` + provider re-registration (Feature A).
+     * Exposed so e2e tests can deterministically refresh after a config update
+     * without waiting on the `onDidChangeConfiguration` round-trip.
+     */
+    refreshAutolinks(): void;
 }
 
 /**
@@ -178,6 +185,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     registerInstallClipboardBridgeSkillCommand(context, logger);
     registerPasteImageProvider(context, logger);
     registerSemanticTokens(context);
+    const autolinks = registerAutoLinksProvider(context, logger);
 
     logger.info('tsk extension activated.');
 
@@ -193,6 +201,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         getNowTree: () => nowStore.getState(),
         getNowTaskId: () => nowStore.getCurrentNowId() ?? undefined,
         getNowDecoration: () => nowDecoration.getCurrent(),
+        refreshAutolinks: () => autolinks.refresh(),
     };
 }
 
