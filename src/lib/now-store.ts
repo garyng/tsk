@@ -1,5 +1,4 @@
-import { DatabaseSync, type StatementSync } from 'node:sqlite';
-import { IN_MEMORY } from './cache-path';
+import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import { generateId } from './ids';
 import {
     clear as clearTree,
@@ -15,6 +14,7 @@ import {
     removeEntry as removeEntryTree,
     switchTo as switchToTree,
 } from './now-tree';
+import { openDatabase, transaction as runTransaction } from './sqlite';
 import { localTimestamp } from './time';
 
 /**
@@ -82,10 +82,9 @@ export class NowStore {
     constructor(path: string, options: NowStoreOptions = {}) {
         this.deps = options.deps ?? { generateId, now: localTimestamp };
         this.warn = options.warn;
-        this.db = new DatabaseSync(path);
-        // WAL is meaningless for `:memory:` (sqlite reports "memory" anyway).
-        if (path !== IN_MEMORY) this.db.exec('PRAGMA journal_mode = WAL');
-        this.db.exec('PRAGMA synchronous = NORMAL');
+        // No foreign_keys: the now-store has no FKs (the cache.db does). WAL +
+        // synchronous hardening is shared via `openDatabase`.
+        this.db = openDatabase(path);
         // Read the on-disk schema version BEFORE stamping ours. A fresh DB
         // reports 0; a DB written by a DIFFERENT NOW_TREE_VERSION holds rows we
         // can't read through the current column mapping, so discard them (start
@@ -210,7 +209,7 @@ export class NowStore {
     }
 
     private persist(state: NowTreeState): void {
-        this.transaction(() => {
+        runTransaction(this.db, () => {
             this.stmts.deleteEntries.run();
             this.stmts.deleteMeta.run();
             for (const e of state.entries) {
@@ -225,17 +224,6 @@ export class NowStore {
             }
             this.stmts.setMeta.run(META_CURRENT, state.currentEntryId);
         });
-    }
-
-    private transaction(fn: () => void): void {
-        this.db.exec('BEGIN');
-        try {
-            fn();
-            this.db.exec('COMMIT');
-        } catch (err) {
-            this.db.exec('ROLLBACK');
-            throw err;
-        }
     }
 }
 
