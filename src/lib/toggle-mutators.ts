@@ -63,6 +63,31 @@ function makeCreationToggle(targetMarker: Marker) {
     };
 }
 
+/** The lifecycle markers that carry a timestamp (a subset of {@link Marker}). */
+type StateMarker = 'inprogress' | 'completed' | 'cancelled';
+
+/**
+ * Lifecycle marker → its timestamp metadata key. The single source for the
+ * marker↔timestamp pairing — shared by the state toggles below AND by
+ * {@link enterInprogress} (which `tsk.markNow` reuses), so the two can't drift
+ * on what "moving a task into `[/]`" actually writes.
+ */
+const STATE_TIMESTAMP_KEY: Record<StateMarker, string> = {
+    inprogress: 'started',
+    completed: 'completed',
+    cancelled: 'cancelled',
+};
+
+/**
+ * Move a task INTO a lifecycle state: swap the marker and stamp its timestamp.
+ * The "set" half shared by every state toggle and by {@link enterInprogress};
+ * assumes the caller has already decided the task should transition (it
+ * overwrites the timestamp unconditionally).
+ */
+function applyState(line: string, marker: StateMarker, deps: ToggleDeps): string {
+    return setMetadataEntry(swapMarker(line, marker), STATE_TIMESTAMP_KEY[marker], deps.now());
+}
+
 /**
  * `toggleInprogress` / `toggleCompleted` / `toggleCancelled` share the
  * state-marker pattern: on first toggle, swap the marker and set the
@@ -74,14 +99,14 @@ function makeCreationToggle(targetMarker: Marker) {
  * timestamp without touching prior state markers' metadata — that's by
  * design, the user can use the dedicated toggle to clear those.
  */
-function makeStateToggle(targetMarker: Marker, timestampKey: string) {
+function makeStateToggle(targetMarker: StateMarker) {
     return (line: string, deps: ToggleDeps): string => {
         const parsed = parseLine(line);
         if (!parsed) return line;
         if (parsed.marker === targetMarker) {
-            return removeMetadataEntry(swapMarker(line, 'todo'), timestampKey);
+            return removeMetadataEntry(swapMarker(line, 'todo'), STATE_TIMESTAMP_KEY[targetMarker]);
         }
-        return setMetadataEntry(swapMarker(line, targetMarker), timestampKey, deps.now());
+        return applyState(line, targetMarker, deps);
     };
 }
 
@@ -114,9 +139,26 @@ export const toggleNoteMutator = (line: string, deps: ToggleDeps): string => {
     return swapMarker(line, 'todo');
 };
 
-export const toggleInprogressMutator = makeStateToggle('inprogress', 'started');
-export const toggleCompletedMutator = makeStateToggle('completed', 'completed');
-export const toggleCancelledMutator = makeStateToggle('cancelled', 'cancelled');
+export const toggleInprogressMutator = makeStateToggle('inprogress');
+export const toggleCompletedMutator = makeStateToggle('completed');
+export const toggleCancelledMutator = makeStateToggle('cancelled');
+
+/**
+ * Idempotently move a task INTO `[/] inprogress`, stamping `@started` exactly
+ * the way the Alt+S toggle ({@link toggleInprogressMutator}) does on entry —
+ * reused by `tsk.markNow`'s auto-in-progress so the two share one definition of
+ * "start a task" instead of re-implementing the marker swap.
+ *
+ * Idempotent: a non-task line or an already-`[/]` task is returned unchanged, so
+ * re-marking an in-progress task as "now" preserves its original `@started`.
+ * (The toggle never re-stamps an already-`[/]` task either — it toggles off —
+ * so there is no set-behaviour to mirror in that case.)
+ */
+export function enterInprogress(line: string, deps: ToggleDeps): string {
+    const parsed = parseLine(line);
+    if (!parsed || parsed.marker === 'inprogress') return line;
+    return applyState(line, 'inprogress', deps);
+}
 
 /**
  * `toggleP1` / `toggleP2` / `toggleP3` toggle the `@priority:N` metadata.

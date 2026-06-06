@@ -114,7 +114,7 @@ These commands are invoked exclusively by lens clicks — no palette entries, no
 
 ## Now task & tree
 
-`Alt+W` (**Tsk: Mark Now**) marks the task under the cursor as your current "now". In a single undo step it stamps a missing `@id` (+ `@created`) and — unless you turn off `tsk.now.autoInProgress` — flips the marker to `[/]`. The current now-task carries a persistent left-edge highlight (the `tsk.now.highlight` color, a soft blue readable on light and dark).
+`Alt+W` (**Tsk: Mark Now**) marks the task under the cursor as your current "now". In a single undo step it stamps a missing `@id` (+ `@created`) and — unless you turn off `tsk.now.autoInProgress` — flips the marker to `[/]` and stamps `@started`, the same transition the `Alt+S` in-progress toggle applies. The current now-task carries a persistent left-edge highlight (the `tsk.now.highlight` color, a soft blue readable on light and dark).
 
 Marks accumulate into an **undo-tree**, not a stack: each new mark becomes a child of the current one, and switching to an earlier node and marking again *branches* rather than overwriting — history is never pruned implicitly. Open the tree from the `target` button in a `.tsk` editor's title bar, or **Tsk: Open Now Stack**. It's a React webview that docks **beside** the file like a Markdown preview (and pops out via *Move / Copy into a New Window*), rendered with [`@grida/tree-view`](https://grida.co/packages/@grida/tree-view) for a native tree feel — keyboard nav (`↑`/`↓` move, `←`/`→` collapse/expand, `Enter` jumps), twisties, collapse-state that persists.
 
@@ -196,7 +196,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched bridge file; only used when the bridge is enabled. |
 | `tsk.pasteImage.baseDirectory` | `./images` | Base directory (under the document) for pasted images. Blank ⇒ beside the document. |
 | `tsk.state.path` | `${workspaceFolder}/.vscode/tsk/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
-| `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]`. Turn off to leave the marker unchanged. |
+| `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]` and stamp `@started` (like `Alt+S`). Turn off to leave the marker unchanged. |
 
 Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. These drive the Search Editor result rows; in `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 

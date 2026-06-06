@@ -5,8 +5,8 @@ import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import type { NowStore } from './lib/now-store';
 import { parseLine } from './lib/parser';
-import { promoteMissingMetadata, swapMarker } from './lib/toggle';
-import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
+import { promoteMissingMetadata } from './lib/toggle';
+import { defaultToggleDeps, enterInprogress, type ToggleDeps } from './lib/toggle-mutators';
 import { replaceLine } from './range-helpers';
 
 /**
@@ -14,13 +14,15 @@ import { replaceLine } from './range-helpers';
  * the current "now", pushing it onto the persisted undo-tree.
  *
  * The single file write (one undo step): stamp `@id` (+`@created`) if missing,
- * and — when `tsk.now.autoInProgress` is on (default) — set the marker to `[/]`.
- * Both are skipped when unnecessary, so marking an already-`[/]`, already-id'd
- * task touches no bytes. The `@id` is then RE-READ from the document (never
- * assumed — `promoteMissingMetadata` returns only a new *line*, not the id) and
- * handed to the store; a `content` snapshot is kept only when the cache can't
- * resolve the id yet (untitled / not-yet-scanned), so the view has a label
- * before the next rescan.
+ * and — when `tsk.now.autoInProgress` is on (default) — move the task into
+ * `[/]`, stamping `@started`, via the SAME `enterInprogress` the Alt+S
+ * in-progress toggle uses (no duplicated marker logic). Both are skipped when
+ * unnecessary, so marking an already-`[/]`, already-id'd task touches no bytes.
+ * The `@id` is then RE-READ from the document (never assumed —
+ * `promoteMissingMetadata` returns only a new *line*, not the id) and handed to
+ * the store; a `content` snapshot is kept only when the cache can't resolve the
+ * id yet (untitled / not-yet-scanned), so the view has a label before the next
+ * rescan.
  *
  * Operates on the PRIMARY cursor only — "now" is a single task, so a
  * multi-cursor mark wouldn't have a sensible meaning.
@@ -47,7 +49,7 @@ export function registerNowCommands(
             }
 
             let after = promoteMissingMetadata(before, deps) ?? before;
-            if (readAutoInProgress()) after = swapMarker(after, 'inprogress');
+            if (readAutoInProgress()) after = enterInprogress(after, deps);
             if (after !== before) {
                 const edit = new vscode.WorkspaceEdit();
                 replaceLine(edit, editor.document.uri, lineNo, before, after);

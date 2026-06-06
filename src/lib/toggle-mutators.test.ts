@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    enterInprogress,
     type ToggleDeps,
     toggleCancelledMutator,
     toggleCompletedMutator,
@@ -126,6 +127,36 @@ describe('toggleInprogressMutator', () => {
 
     it('no-ops on a non-task line', () => {
         expect(toggleInprogressMutator('plain text', FIXED_DEPS)).toBe('plain text');
+    });
+});
+
+describe('enterInprogress (shared by tsk.markNow auto-in-progress)', () => {
+    it('moves a todo into [/] and stamps @started — identical to the Alt+S set', () => {
+        expect(enterInprogress('- [ ] thing', FIXED_DEPS)).toBe(
+            '- [/] thing <!-- @started:2026-05-27T10:00:00+08:00 -->',
+        );
+    });
+
+    it('moves a completed task into [/], preserving prior @completed', () => {
+        expect(
+            enterInprogress(
+                '- [x] thing <!-- @completed:2026-05-25T10:00:00+08:00 -->',
+                FIXED_DEPS,
+            ),
+        ).toBe(
+            '- [/] thing <!-- @completed:2026-05-25T10:00:00+08:00 @started:2026-05-27T10:00:00+08:00 -->',
+        );
+    });
+
+    it('is idempotent on an already-[/] task — never re-stamps @started', () => {
+        // markNow re-marking an in-progress task keeps its original start time;
+        // unlike the toggle, enterInprogress never flips [/] back off.
+        const line = '- [/] thing <!-- @started:2026-05-25T09:00:00+08:00 -->';
+        expect(enterInprogress(line, FIXED_DEPS)).toBe(line);
+    });
+
+    it('no-ops on a non-task line', () => {
+        expect(enterInprogress('plain text', FIXED_DEPS)).toBe('plain text');
     });
 });
 

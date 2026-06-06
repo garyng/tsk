@@ -125,7 +125,7 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 |-----|--------|
 | `Alt+W` | mark the task as your current "now" |
 
-`Alt+W` stamps a missing `@id`, flips the task to `[/]`, and pushes it onto a persistent undo-**tree** of "what am I working on now" — the marked line gets a left-edge highlight. Open the tree from the `target` button in this editor's title bar (or **Tsk: Open Now Stack**); it docks beside the file like a Markdown preview — click a node to jump straight back to it.
+`Alt+W` stamps a missing `@id`, flips the task to `[/]` (stamping `@started`, just like `Alt+S`), and pushes it onto a persistent undo-**tree** of "what am I working on now" — the marked line gets a left-edge highlight. Open the tree from the `target` button in this editor's title bar (or **Tsk: Open Now Stack**); it docks beside the file like a Markdown preview — click a node to jump straight back to it.
 
 Mark the first line, then the second (it becomes a *child*). Open the stack, click the first to switch back, then mark the third — the tree keeps **both** branches, so your history is never lost:
 

@@ -64,8 +64,8 @@ suite('now feature (M45 mark + M48 tree actions)', () => {
         const line = doc.lineAt(0).text;
         assert.match(
             line,
-            /^- \[\/\] write the spec <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ -->$/,
-            'should stamp @id + @created and set the [/] marker',
+            /^- \[\/\] write the spec <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ @started:[\d\-T:+]+ -->$/,
+            'should stamp @id + @created + @started and set the [/] marker (same as Alt+S)',
         );
         const id = /@id:([a-z0-9]+)/.exec(line)?.[1];
         assert.ok(id);
