@@ -70,15 +70,17 @@ export function registerNowTreeCommands(
         if (entry?.parentId) nowStore.switchTo(entry.parentId);
     }
 
-    /** Wipe the whole now-history (tasks untouched) — modal-confirmed, the only destructive one. */
+    /**
+     * Wipe the whole now-history (tasks untouched). Confirms first via a
+     * NON-modal notification toast (not a blocking modal popup): click "Clear"
+     * to proceed, dismiss to cancel. Skips the toast when the tree is already
+     * empty so a no-op clear never nags; NowStore.clear self-guards on empty too.
+     */
     async function clear(): Promise<void> {
-        // Match NowStore.clear's guard: skip the modal only when TRULY empty (no
-        // entries AND no current), so a dangling pointer can still be reset.
         const state = nowStore.getState();
         if (state.entries.length === 0 && state.currentEntryId === null) return;
         const choice = await vscode.window.showWarningMessage(
             'Clear the entire "now" history? Your tasks are not affected.',
-            { modal: true },
             'Clear',
         );
         if (choice === 'Clear') nowStore.clear();

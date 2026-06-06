@@ -129,7 +129,7 @@ The tree uses **linear-compaction**: the path from root to the current now rende
 | **Delete branch** | Drop a node and its whole subtree. |
 | **Remove children** | Drop a node's descendants, keeping the node itself. |
 | **Prune off-path** (toolbar) | Drop every branch not on the path to the current now (linearize). |
-| **Clear** (toolbar, or **Tsk: Clear Now History**) | Wipe the whole tree — modal-confirmed; your tasks are untouched. |
+| **Clear** (toolbar, or **Tsk: Clear Now History**) | Wipe the whole tree — confirm via a notification toast (not a blocking modal); your tasks are untouched. |
 
 **Persistence.** The now-tree lives in its own SQLite `state.db` (default `${workspaceFolder}/.vscode/tsk/state.db`, set via `tsk.state.path`) — **separate from `cache.db`**, so **Tsk: Rebuild Cache** leaves it intact. With no workspace folder it's session-only (in-memory). Like the cache, it's single-root today.
 

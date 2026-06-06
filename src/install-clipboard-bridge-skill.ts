@@ -73,9 +73,10 @@ export function registerInstallClipboardBridgeSkillCommand(
             const target = resolveSkillInstallPath(input, workspaceFolder);
 
             if (existsSync(target)) {
+                // Non-modal confirmation toast (not a blocking modal): click
+                // "Overwrite" to proceed, dismiss to cancel.
                 const choice = await vscode.window.showWarningMessage(
                     `Tsk: ${input.trim()} already exists. Overwrite it?`,
-                    { modal: true },
                     'Overwrite',
                 );
                 if (choice !== 'Overwrite') {
