@@ -3,9 +3,9 @@ import { COMMANDS, INTERNAL_COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import type { NowStore } from './lib/now-store';
+import { navigateTo, targetNotFoundMessage } from './navigation';
 import type { NavigationHighlight } from './navigation-highlight';
 import { resolveNowTarget } from './now-resolve';
-import { pointRange } from './range-helpers';
 
 /**
  * Register the now-stack tree actions. All but `clear` are
@@ -38,27 +38,22 @@ export function registerNowTreeCommands(
         const located = resolveNowTarget(cache, id);
         if (!located) {
             logger.warn(`${INTERNAL_COMMANDS.nowJump}: task @id "${id}" not found.`);
-            void vscode.window.showInformationMessage(
-                `Tsk: task @id "${id}" not found in the workspace.`,
-            );
+            void vscode.window.showInformationMessage(targetNotFoundMessage(id));
             return;
         }
-        const doc = await vscode.workspace.openTextDocument(located.uri);
-        const range = pointRange(located.line);
-        // Prefer the column already showing this doc (reuse that exact tab);
-        // else the panel's source column; else the first group.
-        const visible = vscode.window.visibleTextEditors.find(
-            (e) => e.document.uri.toString() === doc.uri.toString(),
+        // Reuse the tab already showing this doc (markdown-preview-source style);
+        // else the panel's source column; else the first group — never a stray
+        // tab over the panel itself.
+        await navigateTo(
+            { uri: located.uri, line: located.line },
+            {
+                highlight: navigationHighlight,
+                reuseVisible: true,
+                viewColumn: sourceColumn ?? vscode.ViewColumn.One,
+                preview: false,
+                preserveFocus: false,
+            },
         );
-        const viewColumn = visible?.viewColumn ?? sourceColumn ?? vscode.ViewColumn.One;
-        const editor = await vscode.window.showTextDocument(doc, {
-            viewColumn,
-            preserveFocus: false,
-            preview: false,
-            selection: range,
-        });
-        editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-        navigationHighlight.set(editor, located.line);
     }
 
     /** Switch the current "now" to the parent of the current node (undo one step). */
