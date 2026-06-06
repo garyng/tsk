@@ -92,6 +92,23 @@ Empty / missing / malformed `tags.yml` is tolerated — the loader returns an em
 
 **Search semantics.** The `#tag` query is a literal substring, so `#project` also matches lines containing `#project/tsk` — read this as a feature: parent-tag searches naturally include their children. For exact matches, toggle regex in the Search Editor's toolbar (e.g. `(?<![\w/-])#project(?![\w/-])`).
 
+## Autolinks
+
+Turn text matching a regular expression into a clickable link in `.tsk` editors — `Ctrl`/`Cmd`+Click to open. Rules live in `tsk.autolinks` (an array, empty by default — opt-in):
+
+```jsonc
+"tsk.autolinks": [
+  { "pattern": "([A-Z]+)-([0-9]+)", "target": "https://jira.example.com/browse/$1-$2" }
+]
+```
+
+Every line is scanned (not only task lines), so a tagged `#JIRAID-123` and a bare `JIRAID-123` both link. Per rule:
+
+- **`pattern`** — a JavaScript regex; the `g` flag is always applied. Capture groups (including named `(?<name>…)`) feed the template. Optional **`flags`** may add any of `i` `m` `s` `u`.
+- **`target`** — a URL template with `String.replace` substitution: `$1`/`$2` (numbered groups), `$<name>` (named), `$&` (whole match), `$$` (a literal `$`).
+
+Earlier rules win where matches overlap. Substitution is **raw** — the captured text drops into the URL as-is, so anchor your pattern to capture exactly what the URL needs. A pattern relying on **look-behind/look-ahead** positions the link correctly but won't substitute (the URL falls back to the raw match, and is skipped when that isn't a valid URI).
+
 ## Relationships, code lenses & navigation
 
 Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>` / `movedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N` / `movedHereFrom: N`). `@movedTo` (a `[>]` task's "moved to" pointer) is a first-class graph edge: it shows the forward `movedTo: <id>` lens, the move target gains an inverse `movedHereFrom: N` lens, and a dangling `@movedTo` squiggles like any other broken reference. Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
@@ -199,6 +216,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.pasteImage.baseDirectory` | `./images` | Base directory (under the document) for pasted images. Blank ⇒ beside the document. |
 | `tsk.state.path` | `${workspaceFolder}/.vscode/tsk/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
 | `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]` and stamp `@started` (like `Alt+S`). Turn off to leave the marker unchanged. |
+| `tsk.autolinks` | `[]` | Regex→URL rules; text matching a rule becomes a `Ctrl`/`Cmd`+clickable link in `.tsk` editors. See *Autolinks*. |
 
 Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. These drive the Search Editor result rows; in `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 

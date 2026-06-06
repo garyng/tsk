@@ -50,6 +50,8 @@ Colors the whole line; the same number clears it.
 - [ ] chase the ticket #JIRAID-123 <!-- @id:tag-a -->
 - [ ] mount the NAS #inventory/homelab/nas1 <!-- @id:tag-b -->
 
+`JIRAID-123` above is also a **link** — this folder's `.vscode/settings.json` has an autolink rule (regex → URL), so Ctrl/Cmd+Click opens the ticket.
+
 ## 4. Links
 
 | Key | Link |
