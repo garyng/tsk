@@ -13,11 +13,13 @@ interface PaintedNow {
 }
 
 /**
- * The PERSISTENT whole-line highlight on the current "now" task. Copies
- * {@link NavigationHighlight}'s shape (one `isWholeLine` decoration over a
- * `ThemeColor`) but deliberately DROPS its auto-clear — the now-mark must stay
- * put across cursor moves and tab switches, so instead of clearing on those
- * events it *re-resolves* and re-paints.
+ * The PERSISTENT whole-line BORDER on the current "now" task — a box around the
+ * line (a `border` over an `isWholeLine` decoration), deliberately a different
+ * visual channel from the priority line-background *fill* so the two never read
+ * as the same tint. Like {@link NavigationHighlight} it paints one `isWholeLine`
+ * decoration over a `ThemeColor`, but it borders rather than fills, and DROPS the
+ * auto-clear — the now-mark must stay put across cursor moves and tab switches,
+ * so instead of clearing on those events it *re-resolves* and re-paints.
  *
  * `reapply()` resolves the current-now `@id` to its canonical `(uri, line)` via
  * `cache.lookupById` (so it matches the jump target), falling back to a live
@@ -43,7 +45,13 @@ export class NowDecoration implements vscode.Disposable {
         private readonly nowStore: NowStore,
     ) {
         this.decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: new vscode.ThemeColor(NOW_HIGHLIGHT_COLOR_ID),
+            // A whole-line BORDER (not a background fill) so "now" reads as a box
+            // around the line — a distinct visual channel from the priority
+            // line-background tint. The ThemeColor must go on `borderColor`; it
+            // can't be embedded in the `border` shorthand string.
+            border: '1px solid',
+            borderColor: new vscode.ThemeColor(NOW_HIGHLIGHT_COLOR_ID),
+            borderRadius: '3px',
             isWholeLine: true,
         });
         this.subscriptions.push(

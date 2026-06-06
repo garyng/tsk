@@ -133,7 +133,7 @@ These commands are invoked exclusively by lens clicks — no palette entries, no
 
 ## Now task & tree
 
-`Alt+W` (**Tsk: Mark Now**) marks the task under the cursor as your current "now". In a single undo step it stamps a missing `@id` (+ `@created`) and — unless you turn off `tsk.now.autoInProgress` — flips the marker to `[/]` and stamps `@started`, the same transition the `Alt+S` in-progress toggle applies. The current now-task carries a persistent left-edge highlight (the `tsk.now.highlight` color, a soft blue readable on light and dark).
+`Alt+W` (**Tsk: Mark Now**) marks the task under the cursor as your current "now". In a single undo step it stamps a missing `@id` (+ `@created`) and — unless you turn off `tsk.now.autoInProgress` — flips the marker to `[/]` and stamps `@started`, the same transition the `Alt+S` in-progress toggle applies. The current now-task carries a persistent border around its line (the `tsk.now.highlight` color), a box kept visually distinct from the priority line-background tint.
 
 Marks accumulate into an **undo-tree**, not a stack: each new mark becomes a child of the current one, and switching to an earlier node and marking again *branches* rather than overwriting — history is never pruned implicitly. Open the tree from the `target` button in a `.tsk` editor's title bar, or **Tsk: Open Now Stack**. It's a React webview that docks **beside** the file like a Markdown preview (and pops out via *Move / Copy into a New Window*), rendered with [`@grida/tree-view`](https://grida.co/packages/@grida/tree-view) for a native tree feel — keyboard nav (`↑`/`↓` move, `←`/`→` collapse/expand, `Enter` jumps), twisties, collapse-state that persists.
 
