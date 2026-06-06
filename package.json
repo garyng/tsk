@@ -106,6 +106,11 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.findAllTasksByStatus",
+                "title": "Find All Tasks by Status",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.toggleTodo",
                 "title": "Toggle Todo",
                 "category": "Tsk"

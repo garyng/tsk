@@ -45,7 +45,7 @@ Colors the whole line; the same number clears it.
 - [ ] sketch the architecture #
 - [ ] order the parts #
 
-`Alt+T` → searchable tag list with counts → opens a search of matching tasks.
+`Alt+T` → searchable tag list with counts → opens a search of matching tasks. Its sibling **Tsk: Find All Tasks by Status** (Command Palette) does the same by status marker — pick `[/]` to find every in-progress task, `[x]` every done one, and so on.
 
 - [ ] chase the ticket #JIRAID-123 <!-- @id:tag-a -->
 - [ ] mount the NAS #inventory/homelab/nas1 <!-- @id:tag-b -->

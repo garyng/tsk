@@ -18,6 +18,7 @@ import { type DecorationSnapshot, DecorationsController } from './decorations-co
 import { DiagnosticsManager } from './diagnostics-manager';
 import { registerDuplicateCommands } from './duplicate-commands';
 import { isPersistableDocument, isTskDocument } from './editor-guards';
+import { registerFindAllTasksByStatusCommand } from './find-tasks-by-marker';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerHoverProvider } from './hover';
 import { registerInstallClipboardBridgeSkillCommand } from './install-clipboard-bridge-skill';
@@ -368,6 +369,7 @@ function registerAllCommands(
     registerDuplicateCommands(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
+    registerFindAllTasksByStatusCommand(context, cache, logger);
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
     registerNowCommands(context, nowStore, cache, logger);
