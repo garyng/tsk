@@ -165,6 +165,39 @@ suite('code actions — Add missing id + created', () => {
         // Undo so the file fixture isn't dirtied for the next test run.
         await vscode.commands.executeCommand('undo');
     });
+
+    test('offers Remove/Replace quick-fixes on a dangling @movedTo (M8 parity)', async () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder);
+        const movedUri = vscode.Uri.joinPath(folder.uri, 'moved.tsk');
+        const doc = await vscode.workspace.openTextDocument(movedUri);
+        await vscode.window.showTextDocument(doc);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const movedDiag = vscode.languages
+            .getDiagnostics(movedUri)
+            .find((d) => d.code === 'broken-ref:movedTo');
+        assert.ok(movedDiag, 'expected the dangling @movedTo diagnostic');
+
+        const line = movedDiag.range.start.line;
+        const range = new vscode.Range(line, 0, line, 0);
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            movedUri,
+            range,
+            vscode.CodeActionKind.QuickFix.value,
+        );
+        const titles = (actions ?? []).map((a) => a.title);
+        assert.ok(titles.includes('Tsk: Remove broken @movedTo'), `got: ${titles.join(', ')}`);
+        assert.ok(
+            titles.includes('Tsk: Replace @movedTo via picker…'),
+            `got: ${titles.join(', ')}`,
+        );
+        const replace = (actions ?? []).find(
+            (a) => a.title === 'Tsk: Replace @movedTo via picker…',
+        );
+        assert.deepStrictEqual(replace?.command?.arguments?.[2], 'movedTo');
+    });
 });
 
 /**

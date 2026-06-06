@@ -94,7 +94,7 @@ Empty / missing / malformed `tags.yml` is tolerated — the loader returns an em
 
 ## Relationships, code lenses & navigation
 
-Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N`). A moved task (`[>]`) carrying an `@movedTo` target also shows a `movedTo: <id>` lens pointing at where the work went. Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
+Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>` / `movedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N` / `movedHereFrom: N`). `@movedTo` (a `[>]` task's "moved to" pointer) is a first-class graph edge: it shows the forward `movedTo: <id>` lens, the move target gains an inverse `movedHereFrom: N` lens, and a dangling `@movedTo` squiggles like any other broken reference. Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
 
 | Lens                       | Command                  | Behavior |
 |----------------------------|--------------------------|----------|
@@ -105,6 +105,7 @@ Every task with relationship metadata grows code lenses showing forward edges (`
 | `relatedTo: <id>`          | `tsk.goToRelated`        | Open the related task's location. |
 | `related: N`               | `tsk.findAllRelated`     | Peek view of every task `@relatedTo`-pointing here. |
 | `movedTo: <id>`            | `tsk.goToMovedTo`        | Open the move target's location (a `[>]` task's `@movedTo`). |
+| `movedHereFrom: N`         | `tsk.findAllMovedHereFrom` | Peek view of every task that `@movedTo`-points here. |
 | `<key>: <id> (missing)`    | `tsk.codelens.missing`   | Info toast — the referenced `@id` isn't in the workspace. |
 
 These commands are invoked exclusively by lens clicks — no palette entries, no keybindings; the lens *is* the invocation.
@@ -147,7 +148,7 @@ Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't
 Two `Ctrl+.` helpers:
 
 - **Add missing id.** A markered task with no `@id` (any marker, not only `[ ]`) offers *"Tsk: Add missing id + created"* (or *"…Add missing id"* when `@created` is already present), writing the same metadata `Alt+A` would. Unlike the `Alt+A` toggle — which fires only on its own target marker — the quick-fix is marker-agnostic, so you can promote a hand-typed `- [x] done` imported from elsewhere.
-- **Broken references.** When a task's `@parent` / `@dependsOn` / `@relatedTo` points at an `@id` with no canonical occurrence in the workspace, the line gets a `Warning` squiggle. The lightbulb offers *"Tsk: Remove broken @parent"* to drop it, or *"Tsk: Replace @parent via picker…"* to pick a real task.
+- **Broken references.** When a task's `@parent` / `@dependsOn` / `@relatedTo` / `@movedTo` points at an `@id` with no canonical occurrence in the workspace, the line gets a `Warning` squiggle. The lightbulb offers *"Tsk: Remove broken @parent"* (or `@movedTo`, etc.) to drop it, or *"Tsk: Replace @parent via picker…"* to pick a real task.
 
 Warnings surface in both the `tsk` Output channel and the Problems panel: today's categories are duplicate `@id` and task-without-`@id`.
 

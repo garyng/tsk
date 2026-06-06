@@ -8,11 +8,12 @@ type NavigateCommand = (typeof INTERNAL_COMMANDS)[
     | 'goToRelated'
     | 'goToMovedTo'];
 
-/** Union of the three peek command ids (source uri + line + target ids). */
+/** Union of the peek command ids (source uri + line + target ids). */
 type PeekCommand = (typeof INTERNAL_COMMANDS)[
     | 'findAllChildren'
     | 'findAllDependents'
-    | 'findAllRelated'];
+    | 'findAllRelated'
+    | 'findAllMovedHereFrom'];
 
 /**
  * Vscode-free descriptor for a single code lens. The activation layer
@@ -71,7 +72,8 @@ export type GraphLookup = (id: string) => GraphNode | undefined;
  *     a free-form pointer, not a hierarchy slot.
  *   - **`forward`** marks the `movedTo` lifecycle pointer — this task was
  *     relocated to another. Neither a hierarchy slot nor a lateral link,
- *     so it gets its own glyph.
+ *     so it gets its own glyph. Its inverse, **`reply`**, marks
+ *     `movedHereFrom` — work that landed on this task from elsewhere.
  *   - **`warning`** marks dangling forward edges, since the click opens
  *     an info toast rather than navigating.
  */
@@ -83,11 +85,12 @@ export const CODICONS = {
     relatedTo: 'arrow-right',
     related: 'arrow-left',
     movedTo: 'forward',
+    movedHereFrom: 'reply',
     missing: 'warning',
 } as const;
 
 type ForwardLabel = 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo';
-type InverseLabel = 'children' | 'dependents' | 'related';
+type InverseLabel = 'children' | 'dependents' | 'related' | 'movedHereFrom';
 
 /** The minimum projection of a parsed task the lens computer needs. */
 export interface TaskForLenses {
@@ -159,15 +162,22 @@ export function computeLensesForTask(
         );
     }
 
-    // `movedTo` is read from this task's metadata, not `node.forward` — it's
-    // a lifecycle pointer, deliberately not a relationship-graph edge (so it
-    // gets no inverse "moved here from" tracking). Past the canonical gate
-    // above, `task.metadata` IS the canonical node's metadata, so this matches
-    // what a forward graph edge would hold. A null/empty value (a `@movedTo`
-    // with no id) renders nothing.
-    const movedTo = task.metadata.get('movedTo');
-    if (movedTo) {
-        out.push(forwardLens(task.line, 'movedTo', movedTo, INTERNAL_COMMANDS.goToMovedTo, lookup));
+    // `movedTo` is a real forward graph edge (M8): read from `node.forward` like
+    // the others, so it gains an inverse "moved here from" bucket and a
+    // dangling-target diagnostic. A falsy value (a bare `@movedTo` flag, or
+    // `@movedTo:` with no id) renders nothing — unlike parent/dependsOn/relatedTo,
+    // whose empty values render a "(missing)" lens; the lifecycle pointer stays
+    // silent when target-less.
+    if (node.forward.movedTo) {
+        out.push(
+            forwardLens(
+                task.line,
+                'movedTo',
+                node.forward.movedTo,
+                INTERNAL_COMMANDS.goToMovedTo,
+                lookup,
+            ),
+        );
     }
 
     if (node.inverse.children.length > 0) {
@@ -199,6 +209,17 @@ export function computeLensesForTask(
                 'related',
                 node.inverse.related,
                 INTERNAL_COMMANDS.findAllRelated,
+                fileUri,
+            ),
+        );
+    }
+    if (node.inverse.movedHereFrom.length > 0) {
+        out.push(
+            inverseLens(
+                task.line,
+                'movedHereFrom',
+                node.inverse.movedHereFrom,
+                INTERNAL_COMMANDS.findAllMovedHereFrom,
                 fileUri,
             ),
         );

@@ -8,13 +8,15 @@ import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
 import { pickTaskId } from './picker';
 import { replaceLine } from './range-helpers';
 
-type BrokenRefKey = 'parent' | 'dependsOn' | 'relatedTo';
+type BrokenRefKey = 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo';
 
 function brokenRefKey(diagnostic: vscode.Diagnostic): BrokenRefKey | undefined {
     const code = diagnostic.code;
     if (typeof code !== 'string' || !code.startsWith('broken-ref:')) return undefined;
     const key = code.slice('broken-ref:'.length);
-    if (key === 'parent' || key === 'dependsOn' || key === 'relatedTo') return key;
+    if (key === 'parent' || key === 'dependsOn' || key === 'relatedTo' || key === 'movedTo') {
+        return key;
+    }
     return undefined;
 }
 

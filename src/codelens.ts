@@ -147,6 +147,11 @@ export function registerCodelens(
                 peek(sourceUri, sourceLine, ids),
         ),
         vscode.commands.registerCommand(
+            INTERNAL_COMMANDS.findAllMovedHereFrom,
+            (sourceUri: string, sourceLine: number, ids: string[]) =>
+                peek(sourceUri, sourceLine, ids),
+        ),
+        vscode.commands.registerCommand(
             INTERNAL_COMMANDS.codelensMissing,
             (targetId: string, label: string) => missingTarget(targetId, label),
         ),

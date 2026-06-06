@@ -1,7 +1,9 @@
 /**
  * Pure relationship-graph builder. Takes a flat list of task → forward-edge
- * tuples (id + the three relationship metadata keys), groups them into a map
- * of `GraphNode`s, computes inverse edges, and reports duplicate `@id`s.
+ * tuples (id + the four forward keys: `parent` / `dependsOn` / `relatedTo` /
+ * `movedTo`), groups them into a map of `GraphNode`s, computes inverse edges
+ * (`children` / `dependents` / `related` / `movedHereFrom`), and reports
+ * duplicate `@id`s.
  *
  * No I/O. No `vscode`. The M9/B wiring layer is responsible for extracting
  * `TaskRelationshipInput`s from the cache (joining the `tasks` + `metadata`
@@ -41,6 +43,7 @@ export interface TaskRelationshipInput {
     readonly parent?: string;
     readonly dependsOn?: string;
     readonly relatedTo?: string;
+    readonly movedTo?: string;
 }
 
 export interface GraphNode {
@@ -57,12 +60,15 @@ export interface GraphNode {
         readonly parent?: string;
         readonly dependsOn?: string;
         readonly relatedTo?: string;
+        readonly movedTo?: string;
     };
     /** Inverse edges — ids of nodes whose forward edge points here. */
     readonly inverse: {
         readonly children: readonly string[];
         readonly dependents: readonly string[];
         readonly related: readonly string[];
+        /** Ids of nodes whose `@movedTo` points here ("moved here from"). */
+        readonly movedHereFrom: readonly string[];
     };
 }
 
@@ -84,7 +90,7 @@ export interface BrokenEdgeReport {
     readonly sourceId: string;
     readonly sourceFile: string;
     readonly sourceLine: number;
-    readonly key: 'parent' | 'dependsOn' | 'relatedTo';
+    readonly key: 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo';
     readonly targetId: string;
 }
 
@@ -97,6 +103,7 @@ interface MutableInverse {
     children: string[];
     dependents: string[];
     related: string[];
+    movedHereFrom: string[];
 }
 
 /**
@@ -144,6 +151,7 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
         parent?: string;
         dependsOn?: string;
         relatedTo?: string;
+        movedTo?: string;
     }
     const inverseBuckets = new Map<string, MutableInverse>();
     const nodeStubs = new Map<
@@ -159,7 +167,13 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
         if (entry.canonical.parent !== undefined) forward.parent = entry.canonical.parent;
         if (entry.canonical.dependsOn !== undefined) forward.dependsOn = entry.canonical.dependsOn;
         if (entry.canonical.relatedTo !== undefined) forward.relatedTo = entry.canonical.relatedTo;
-        const inverse: MutableInverse = { children: [], dependents: [], related: [] };
+        if (entry.canonical.movedTo !== undefined) forward.movedTo = entry.canonical.movedTo;
+        const inverse: MutableInverse = {
+            children: [],
+            dependents: [],
+            related: [],
+            movedHereFrom: [],
+        };
         inverseBuckets.set(id, inverse);
         nodeStubs.set(id, { canonical: entry.canonical, forward, inverse });
     }
@@ -181,6 +195,10 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
             const targetBucket = inverseBuckets.get(forward.relatedTo);
             if (targetBucket) targetBucket.related.push(sourceId);
         }
+        if (forward.movedTo !== undefined) {
+            const targetBucket = inverseBuckets.get(forward.movedTo);
+            if (targetBucket) targetBucket.movedHereFrom.push(sourceId);
+        }
     }
 
     // Pass 6: sort inverse-edge arrays and freeze final nodes.
@@ -189,6 +207,7 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
         stub.inverse.children.sort();
         stub.inverse.dependents.sort();
         stub.inverse.related.sort();
+        stub.inverse.movedHereFrom.sort();
         graph.set(id, {
             id,
             fileUri: stub.canonical.fileUri,

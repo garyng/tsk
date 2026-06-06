@@ -35,11 +35,27 @@ suite('graph', () => {
         const child = api.lookupGraph('e2e-graph-child');
         assert.ok(child, 'child node should exist');
         assert.strictEqual(child.forward.parent, 'e2e-graph-parent');
-        assert.deepStrictEqual(child.inverse, { children: [], dependents: [], related: [] });
+        assert.deepStrictEqual(child.inverse, {
+            children: [],
+            dependents: [],
+            related: [],
+            movedHereFrom: [],
+        });
     });
 
     test('lookupGraph returns undefined for an unknown id', () => {
         assert.strictEqual(api.lookupGraph('never-existed-anywhere'), undefined);
+    });
+
+    test('movedTo is a real forward edge with a movedHereFrom inverse (M8)', () => {
+        // moved.tsk: e2e-moved-src `@movedTo` e2e-moved-target.
+        const src = api.lookupGraph('e2e-moved-src');
+        assert.ok(src, 'moved source node should exist');
+        assert.strictEqual(src.forward.movedTo, 'e2e-moved-target');
+
+        const target = api.lookupGraph('e2e-moved-target');
+        assert.ok(target, 'move target node should exist');
+        assert.deepStrictEqual(target.inverse.movedHereFrom, ['e2e-moved-src']);
     });
 
     test('duplicate @id occurrences produce diagnostics on every occurrence', async () => {

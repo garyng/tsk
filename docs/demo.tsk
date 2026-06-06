@@ -103,7 +103,7 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 
 ## 8. Move
 
-`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`. Pick a target and the task gains an `@movedTo` plus a `movedTo: <id>` lens (the `forward` codicon) — click it to jump to where the work went.
+`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`. Pick a target and the task gains an `@movedTo` plus a `movedTo: <id>` lens (the `forward` codicon) — click it to jump to where the work went. `@movedTo` is a real graph edge: the target shows a `movedHereFrom: N` lens back, and a `@movedTo` pointing at an unknown id squiggles like any broken reference.
 
 - [ ] belongs in another project <!-- @id:move-demo -->
 

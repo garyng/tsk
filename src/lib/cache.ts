@@ -99,6 +99,7 @@ export class CacheService {
                     parent: task.metadata.get('parent') ?? undefined,
                     dependsOn: task.metadata.get('dependsOn') ?? undefined,
                     relatedTo: task.metadata.get('relatedTo') ?? undefined,
+                    movedTo: task.metadata.get('movedTo') ?? undefined,
                 });
 
                 const ok = this.db.insertTask({
@@ -171,6 +172,7 @@ export class CacheService {
                 parent: metadata.get('parent') ?? undefined,
                 dependsOn: metadata.get('dependsOn') ?? undefined,
                 relatedTo: metadata.get('relatedTo') ?? undefined,
+                movedTo: metadata.get('movedTo') ?? undefined,
             });
         }
         return out;

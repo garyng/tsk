@@ -88,4 +88,28 @@ suite('missing-reference diagnostics', () => {
         // to a task in the same file. No broken-ref squiggle should appear.
         assert.strictEqual(ds.length, 0, 'expected zero broken-ref diagnostics in dup.tsk');
     });
+
+    test('emits a broken-ref:movedTo Warning for a dangling @movedTo (M8)', async () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder);
+        const movedUri = vscode.Uri.joinPath(folder.uri, 'moved.tsk');
+        const doc = await vscode.workspace.openTextDocument(movedUri);
+        await vscode.window.showTextDocument(doc);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const ds = tskDiagnostics(movedUri);
+        const dangling = ds.find((d) => d.message.includes('e2e-moved-gone'));
+        assert.ok(dangling, 'expected a broken-ref diagnostic for the dangling @movedTo');
+        assert.strictEqual(dangling.severity, vscode.DiagnosticSeverity.Warning);
+        assert.strictEqual(dangling.code, 'broken-ref:movedTo');
+        assert.match(
+            dangling.message,
+            /^Tsk: @movedTo references unknown task id "e2e-moved-gone"\.$/,
+        );
+        // The resolvable move (e2e-moved-src -> e2e-moved-target) must NOT squiggle.
+        assert.ok(
+            !ds.some((d) => d.message.includes('e2e-moved-target')),
+            'a resolvable @movedTo must not produce a diagnostic',
+        );
+    });
 });

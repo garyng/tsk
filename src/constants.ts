@@ -206,6 +206,7 @@ export const INTERNAL_COMMANDS = {
     findAllChildren: 'tsk.findAllChildren',
     findAllDependents: 'tsk.findAllDependents',
     findAllRelated: 'tsk.findAllRelated',
+    findAllMovedHereFrom: 'tsk.findAllMovedHereFrom',
     codelensMissing: 'tsk.codelens.missing',
     // Now-stack actions — the webview posts an action message, the panel routes
     // it to one of these (jump takes a task `@id`; the rest a tree `entryId`,
