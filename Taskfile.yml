@@ -2,7 +2,8 @@ version: "3"
 
 tasks:
   # `watch` rebuilds the extension host; `watch:webview` the now-stack React
-  # bundle. `build` / `package` already cover both (build chains host+webview).
+  # bundle; `watch:all` runs both in one terminal (labelled output via
+  # concurrently). `build` / `package` already cover both (build chains host+webview).
   watch:
     dir: "{{ .TASKFILE_DIR }}"
     cmds:
@@ -12,6 +13,11 @@ tasks:
     dir: "{{ .TASKFILE_DIR }}"
     cmds:
       - npm run dev:webview
+
+  watch:all:
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm run dev:all
 
   build:
     dir: "{{ .TASKFILE_DIR }}"
