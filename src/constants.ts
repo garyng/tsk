@@ -118,6 +118,15 @@ export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
 
 // ── Theme color ids ─────────────────────────────────────────────────────────
 
+// Metadata-dim is colored TWO ways that must be kept visually in sync — they
+// can't share a runtime source: a semantic-token color is hex-only and can't
+// reference a workbench ThemeColor id, and this decoration's theme-aware alpha
+// dimming is deliberately richer than a flat token value.
+//   • `.tsk` editors → the `taskMetadata` semantic token (default `#808080` in
+//     package.json `configurationDefaults.editor.semanticTokenColorCustomizations`).
+//   • Search-Editor result rows → this `tsk.metadata.foreground` decoration
+//     (theme-aware + user-overridable; semantic tokens don't apply to the
+//     `search-result` language). Mirror of the token above — edit both together.
 export const METADATA_FOREGROUND_COLOR_ID = 'tsk.metadata.foreground';
 export const NAVIGATION_HIGHLIGHT_COLOR_ID = 'tsk.navigation.highlight';
 export const NOW_HIGHLIGHT_COLOR_ID = 'tsk.now.highlight';
