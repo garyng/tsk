@@ -138,7 +138,7 @@ export function pruneChildren(state: NowTreeState, entryId: string): NowTreeStat
 export function pruneOffPath(state: NowTreeState): NowTreeState {
     if (state.currentEntryId === null) return state;
     if (!state.entries.some((e) => e.entryId === state.currentEntryId)) return state;
-    const keep = new Set(pathToRoot(state.entries, state.currentEntryId));
+    const keep = new Set(pathToRoot(state.entries, state.currentEntryId).map((e) => e.entryId));
     const entries = state.entries.filter((e) => keep.has(e.entryId));
     return { ...state, entries };
 }
@@ -251,16 +251,25 @@ function descendantIds(entries: NowEntry[], rootId: string): Set<string> {
     return out;
 }
 
-/** The chain `[entryId, parent, …, root]`. Cycle-safe; stops at the first absent node. */
-function pathToRoot(entries: NowEntry[], entryId: string): string[] {
-    const parentOf = new Map(entries.map((e) => [e.entryId, e.parentId]));
-    const path: string[] = [];
+/**
+ * The chain `[entry, parent, …, root]` as entries, walking `parentId` up from
+ * `entryId`. Cycle-safe (stops if the chain revisits a node) and stops at the
+ * first absent node. Returns entries (not ids) so a caller needing the node
+ * payload — the view-model's trunk — gets it; id-only callers `.map(e => e.entryId)`.
+ * Shared by {@link pruneOffPath} and the view-model's `layoutNowTree` (the two
+ * walks were byte-identical bar this return type).
+ */
+export function pathToRoot(entries: NowEntry[], entryId: string): NowEntry[] {
+    const byId = new Map(entries.map((e) => [e.entryId, e]));
+    const path: NowEntry[] = [];
     const seen = new Set<string>();
     let cur: string | null = entryId;
-    while (cur !== null && parentOf.has(cur) && !seen.has(cur)) {
-        path.push(cur);
+    while (cur !== null && !seen.has(cur)) {
+        const entry = byId.get(cur);
+        if (entry === undefined) break;
+        path.push(entry);
         seen.add(cur);
-        cur = parentOf.get(cur) ?? null;
+        cur = entry.parentId;
     }
     return path;
 }

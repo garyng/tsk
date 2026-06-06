@@ -1,6 +1,6 @@
 import { formatRelativeTime } from './hover-logic';
 import { MISSING_NOW_LABEL, type NowRow, type NowRowView, type ResolveContent } from './now-row';
-import type { NowEntry, NowTreeState } from './now-tree';
+import { type NowEntry, type NowTreeState, pathToRoot } from './now-tree';
 
 // The row view-model types live in the leaf `now-row` module (no host-only
 // imports, so the webview can consume them); re-exported here so callers keep a
@@ -44,7 +44,7 @@ export function layoutNowTree(state: NowTreeState): NowRow[] {
         return rows;
     }
 
-    const trunk = pathFromCurrentToRoot(state.entries, state.currentEntryId);
+    const trunk = pathToRoot(state.entries, state.currentEntryId);
     const onTrunk = new Set(trunk.map((e) => e.entryId));
     for (const node of trunk) {
         const offTrunk = childrenOf(node.entryId).filter((k) => !onTrunk.has(k.entryId));
@@ -117,19 +117,4 @@ function groupChildren(entries: NowEntry[]): Map<string | null, NowEntry[]> {
     }
     for (const list of byParent.values()) list.sort((a, b) => a.createdSeq - b.createdSeq);
     return byParent;
-}
-
-/** `[current, parent, …, root]` as entries. Cycle-safe; stops at the first absent node. */
-function pathFromCurrentToRoot(entries: NowEntry[], currentEntryId: string): NowEntry[] {
-    const byId = new Map(entries.map((e) => [e.entryId, e]));
-    const path: NowEntry[] = [];
-    const seen = new Set<string>();
-    let cur: string | null = currentEntryId;
-    while (cur !== null && byId.has(cur) && !seen.has(cur)) {
-        const entry = byId.get(cur) as NowEntry;
-        path.push(entry);
-        seen.add(cur);
-        cur = entry.parentId;
-    }
-    return path;
 }

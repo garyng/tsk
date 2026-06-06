@@ -8,6 +8,7 @@ import {
     NOW_TREE_VERSION,
     type NowTreeState,
     normalizeNowTreeState,
+    pathToRoot,
     pruneChildren,
     pruneOffPath,
     pruneSubtree,
@@ -242,6 +243,42 @@ describe('pruneOffPath', () => {
     it('is a same-state no-op when nothing is current', () => {
         const noCurrent: NowTreeState = { ...tree, currentEntryId: null };
         expect(pruneOffPath(noCurrent)).toBe(noCurrent);
+    });
+});
+
+describe('pathToRoot (shared by pruneOffPath + the view-model trunk)', () => {
+    // a → b → c (each markNow childs the current); current = c.
+    const chainState = (): NowTreeState => {
+        let s = markNow(emptyNowTree(), mk('a'));
+        s = markNow(s, mk('b'));
+        return markNow(s, mk('c'));
+    };
+
+    it('returns the [entry, parent, …, root] chain as entries', () => {
+        const chain = pathToRoot(chainState().entries, 'c');
+        expect(chain.map((e) => e.entryId)).toEqual(['c', 'b', 'a']);
+        expect(chain[0]?.id).toBe('task-c'); // entries, not ids
+    });
+
+    it('stops at the root', () => {
+        expect(pathToRoot(chainState().entries, 'a').map((e) => e.entryId)).toEqual(['a']);
+    });
+
+    it('is empty for an unknown id', () => {
+        expect(pathToRoot(chainState().entries, 'nope')).toEqual([]);
+    });
+
+    it('is cycle-safe — a parent cycle terminates without looping', () => {
+        // Hand-forge a 2-node cycle (a↔b) the reducers would never build.
+        const cyclic: NowTreeState = {
+            version: NOW_TREE_VERSION,
+            entries: [
+                { entryId: 'a', id: 'task-a', markedAt: 'm', parentId: 'b', createdSeq: 0 },
+                { entryId: 'b', id: 'task-b', markedAt: 'm', parentId: 'a', createdSeq: 1 },
+            ],
+            currentEntryId: 'a',
+        };
+        expect(pathToRoot(cyclic.entries, 'a').map((e) => e.entryId)).toEqual(['a', 'b']);
     });
 });
 
