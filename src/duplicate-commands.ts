@@ -7,16 +7,15 @@ import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
 import { replaceLine } from './range-helpers';
 
 /**
- * Register `tsk.duplicateLineDown` / `tsk.duplicateLineUp`, bound to
- * Shift+Alt+Down / Shift+Alt+Up in `.tsk` files (shadowing the built-in line
- * duplication only there).
+ * Register `tsk.duplicateLineDown` / `tsk.duplicateLineUp`, which shadow VS
+ * Code's built-in line-duplication commands in `.tsk` files only.
  *
  * **Why wrap the built-in instead of reimplementing.** `editor.action.
  * copyLines{Down,Up}Action` already owns every duplication mechanic — multi-
  * cursor, column selections, scroll reveal. We run it verbatim, then rewrite
  * the `@id` + `@created` of each *copied* task line so the duplicate doesn't
  * collide with its source on the cache primary key. The catch is that this is a
- * **second** edit, so it costs a second Ctrl+Z (accepted — decision #1 in the
+ * **second** edit, so it costs a second undo (accepted — decision #1 in the
  * Phase 4 plan). The upside: multi-cursor duplication "just works", because the
  * post-command selection is exactly the set of freshly-created copies.
  *

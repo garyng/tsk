@@ -410,7 +410,7 @@
             },
             {
                 "id": "tsk.now.highlight",
-                "description": "Background tint on the line of the current \"now\" task (the one marked with Alt+W). Persistent — distinct from the transient tsk.navigation.highlight jump flash. Defaults to the in-progress blue at low alpha so text stays readable on light and dark themes; override via workbench.colorCustomizations.",
+                "description": "Background tint on the line of the current \"now\" task (the one marked via Tsk: Mark Now). Persistent — distinct from the transient tsk.navigation.highlight jump flash. Defaults to the in-progress blue at low alpha so text stays readable on light and dark themes; override via workbench.colorCustomizations.",
                 "defaults": {
                     "light": "#3794ff33",
                     "dark": "#3794ff40"
@@ -478,7 +478,7 @@
                 "tsk.now.autoInProgress": {
                     "type": "boolean",
                     "default": true,
-                    "description": "When marking a task as \"now\" (Alt+W), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
+                    "description": "When marking a task as \"now\" (via Tsk: Mark Now), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
                 }
             }
         }

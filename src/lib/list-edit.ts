@@ -197,7 +197,7 @@ function computeBulletEnter(line: string, cursorCol: number, opts: EditorOpts): 
  *   - Anything else (non-empty item, cursor inside the marker or metadata, or a
  *     non-list line) → `noop`, so the editor's default Backspace applies.
  *
- * So Backspace walks `task → bullet → (indent →) empty`, the inverse of Alt+A's
+ * So Backspace walks `task → bullet → (indent →) empty`, the inverse of `toggleTodo`'s
  * `bullet → task`. Pure — no `vscode` import.
  */
 export function computeBackspaceEdit(line: string, cursorCol: number): ListEditAction {

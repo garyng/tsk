@@ -108,7 +108,7 @@ export function tagsToPickItems(
  *   user's last regex-toggle state from a prior search).
  * - `triggerSearch: true` — run immediately so the editor opens already
  *   populated rather than waiting on the user to confirm.
- * - `focusResults: true` — land the cursor in the results so Ctrl+Click
+ * - `focusResults: true` — land the cursor in the results so click-to-jump
  *   / arrow-navigation works without a manual focus shift.
  * - `showIncludesExcludes: true` — reveal the include/exclude inputs so
  *   the `*.tsk` scope is visible (and tweakable) rather than hidden.
@@ -118,7 +118,7 @@ export function tagsToPickItems(
  *   (default 1) for tsk tag searches specifically.
  *
  * **Why the Search Editor over `findInFiles` (the side panel).** Search-
- * editor results render in a real editor tab that inherits Ctrl+Click-to-jump,
+ * editor results render in a real editor tab that inherits click-to-jump,
  * regex/case toggles, and result folding for free, and (unlike the side panel)
  * is a `vscode.TextEditor` we can decorate. Note: the result document's
  * `search-result` grammar only embeds ~50 built-in languages, so it does NOT

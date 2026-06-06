@@ -19,7 +19,7 @@ import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
  * `editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible &&
  * !inSnippetMode`. The pure helpers in `lib/list-edit.ts` decide the
  * edit; this layer translates the result into a `WorkspaceEdit` (single
- * Ctrl+Z reverts) and repositions the cursor. On a `noop` result, we
+ * undo reverts) and repositions the cursor. On a `noop` result, we
  * fall through to the editor's default key behavior.
  *
  * `deps` exists for tests (M7/C drives the suite); defaults to

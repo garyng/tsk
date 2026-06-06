@@ -39,7 +39,7 @@ export const defaultToggleDeps: ToggleDeps = {
  *   - Same-marker non-empty task missing `@id` → promote to a "proper
  *     todo" by filling in `@id` (always) and `@created` (if also
  *     missing). Mirrors `wrapAsTask`'s shape so a hand-typed task
- *     becomes indistinguishable from one Alt+A produced from scratch.
+ *     becomes indistinguishable from one the todo-toggle produced from scratch.
  *   - Otherwise → no-op (don't blow away content; don't disturb a
  *     different marker's state; don't re-stamp an already-proper task).
  */
@@ -113,15 +113,15 @@ function makeStateToggle(targetMarker: StateMarker) {
 export const toggleTodoMutator = makeCreationToggle('todo');
 
 /**
- * `toggleNote` is a hybrid — it keeps the creation pattern (so Alt+N still turns
- * a plain line into a note) *and* swaps the marker on an existing task (so Alt+N
- * flips any task to/from a note, the way Alt+S/C/X flip their own markers):
+ * `toggleNote` is a hybrid — it keeps the creation pattern (so the note toggle still turns
+ * a plain line into a note) *and* swaps the marker on an existing task (so it
+ * flips any task to/from a note, the way the state toggles flip their own markers):
  *
  *   - Non-task line → wrap into a `[n]` note (`@id` + `@created`).
  *   - Task with a non-note marker → swap the marker to `[n]`.
  *   - `[n]` task, empty → unwrap back to a blank line.
  *   - `[n]` task, id-less → promote (fill `@id` + `@created`).
- *   - `[n]` task, proper → swap back to `[ ]` todo (so Alt+N is reversible).
+ *   - `[n]` task, proper → swap back to `[ ]` todo (so the note toggle is reversible).
  */
 export const toggleNoteMutator = (line: string, deps: ToggleDeps): string => {
     const parsed = parseLine(line);
@@ -145,7 +145,7 @@ export const toggleCancelledMutator = makeStateToggle('cancelled');
 
 /**
  * Idempotently move a task INTO `[/] inprogress`, stamping `@started` exactly
- * the way the Alt+S toggle ({@link toggleInprogressMutator}) does on entry —
+ * the way the in-progress toggle ({@link toggleInprogressMutator}) does on entry —
  * reused by `tsk.markNow`'s auto-in-progress so the two share one definition of
  * "start a task" instead of re-implementing the marker swap.
  *

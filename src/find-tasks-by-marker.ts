@@ -22,7 +22,7 @@ const SEARCH_EDITOR_COMMAND = 'search.action.openNewEditor';
  *      is marker-agnostic, so no change there).
  *   3. On cancel → no-op.
  *
- * Palette-only (no keybinding): Alt+T is the tag search, and this secondary
+ * Palette-only (no keybinding): the find-by-tag command already takes a chord, and this secondary
  * search isn't worth a second global chord — users can bind it themselves. The
  * picker counts come from `cache.listAllTasks()` (markers are flat, so an
  * in-memory tally; no new query needed), mirroring how the tag picker counts.

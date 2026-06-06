@@ -25,7 +25,7 @@ type LineMutator = (line: string) => string;
 /**
  * Run `mutator(line)` once per unique cursor line in `editor`, build a
  * single `WorkspaceEdit` covering all the replacements, and apply it in
- * one shot. One Ctrl+Z reverts the whole operation.
+ * one shot. One undo reverts the whole operation.
  *
  * Multi-cursor handling: cursors on the same line are deduped (one edit
  * per unique line) — toggling a marker with two cursors on the same row

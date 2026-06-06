@@ -10,12 +10,12 @@ import { defaultToggleDeps, enterInprogress, type ToggleDeps } from './lib/toggl
 import { replaceLine } from './range-helpers';
 
 /**
- * Register `tsk.markNow` (Alt+W) — mark the task on the primary cursor line as
+ * Register `tsk.markNow` — mark the task on the primary cursor line as
  * the current "now", pushing it onto the persisted undo-tree.
  *
  * The single file write (one undo step): stamp `@id` (+`@created`) if missing,
  * and — when `tsk.now.autoInProgress` is on (default) — move the task into
- * `[/]`, stamping `@started`, via the SAME `enterInprogress` the Alt+S
+ * `[/]`, stamping `@started`, via the SAME `enterInprogress` the
  * in-progress toggle uses (no duplicated marker logic). Both are skipped when
  * unnecessary, so marking an already-`[/]`, already-id'd task touches no bytes.
  * The `@id` is then RE-READ from the document (never assumed —

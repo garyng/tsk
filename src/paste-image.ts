@@ -86,7 +86,7 @@ async function promptForPath(
  *
  * The file is *not* written here directly. Instead its creation rides on the
  * edit's `additionalEdit` (`WorkspaceEdit.createFile`), so VSCode applies the
- * inserted Markdown and the file write as one atomic, undoable step: Ctrl+Z
+ * inserted Markdown and the file write as one atomic, undoable step: a single undo
  * removes the text *and* deletes the saved image. `createFile` also makes any
  * intermediate directories, and `overwrite: true` lets the caller's
  * overwrite-anyway decision stick.

@@ -78,7 +78,9 @@ function NowStack() {
         <main className="now-stack">
             {empty ? (
                 // `null` (pre-handshake) and `[]` (empty tree) both render empty.
-                <p className="now-stack__empty">No task marked as "now" — press Alt+W on a task.</p>
+                <p className="now-stack__empty">
+                    No task marked as "now" — run <strong>Tsk: Mark Now</strong> on a task.
+                </p>
             ) : (
                 <NowTree rows={rows} />
             )}
