@@ -25,6 +25,11 @@ export default defineConfig(({ mode }) => ({
         emptyOutDir: true,
         sourcemap: true,
         minify: mode !== 'development',
+        // Some bind mounts (9p/drvfs and similar) deliver no inotify events, so
+        // poll or `--watch` never fires. Gated on dev mode so the one-shot
+        // production build stays unwatched. See vite.config.host.ts for the full
+        // rationale.
+        watch: mode === 'development' ? { chokidar: { usePolling: true, interval: 300 } } : null,
         lib: {
             entry: 'src/webview/now-stack/main.tsx',
             formats: ['es'],
