@@ -18,9 +18,16 @@ function brokenRefKey(diagnostic: vscode.Diagnostic): BrokenRefKey | undefined {
     return undefined;
 }
 
+/** The duplicated `@id` carried by an M7 `duplicate-id:<id>` diagnostic, else undefined. */
+function duplicateIdValue(diagnostic: vscode.Diagnostic): string | undefined {
+    const code = diagnostic.code;
+    if (typeof code !== 'string' || !code.startsWith('duplicate-id:')) return undefined;
+    return code.slice('duplicate-id:'.length);
+}
+
 /**
  * Register the QuickFix provider plus the internal
- * `tsk.replaceBrokenReference` command. Two families of actions:
+ * `tsk.replaceBrokenReference` command. Three families of actions:
  *
  *   - **Add missing id + created** (M19/C): surfaces on any markered task
  *     line lacking `@id`. Edit precomputed via {@link promoteMissingMetadata}.
@@ -29,6 +36,11 @@ function brokenRefKey(diagnostic: vscode.Diagnostic): BrokenRefKey | undefined {
  *     "Remove" is a precomputed edit via `removeMetadataEntry`; "Replace"
  *     fires the internal command which opens the task picker and applies
  *     `setMetadataEntry(line, key, picked)` on resolve.
+ *   - **Regenerate @id** (M7): surfaces when the cursor's line has a
+ *     `duplicate-id:<id>` diagnostic (the non-canonical occurrence of a
+ *     collided id). Precomputed edit that stamps a fresh `@id` via
+ *     `setMetadataEntry`; non-interactive, so no command needed. `@created`
+ *     is left intact — the task isn't re-created, just disambiguated.
  *
  * **Why two backings (edit vs command).** Precomputed edits show a
  * preview and don't need the user to interact further. The replace flow
@@ -102,6 +114,27 @@ export function registerCodeActionsProvider(
                     action.diagnostics = [diagnostic];
                     actions.push(action);
                 }
+            }
+
+            // M7 — regenerate @id to resolve a duplicate. Per `duplicate-id:<id>`
+            // diagnostic on this line, offer a precomputed fresh-@id edit.
+            for (const diagnostic of codeActionContext.diagnostics) {
+                const dupId = duplicateIdValue(diagnostic);
+                if (dupId === undefined) continue;
+                if (diagnostic.range.start.line !== lineNumber) continue;
+                // Skip a stale diagnostic whose line no longer carries that id.
+                if (parsed.metadata.get('id') !== dupId) continue;
+                const next = setMetadataEntry(lineText, 'id', deps.generateId());
+                if (next === lineText) continue;
+                const action = new vscode.CodeAction(
+                    'Tsk: Regenerate @id (resolve duplicate)',
+                    vscode.CodeActionKind.QuickFix,
+                );
+                const edit = new vscode.WorkspaceEdit();
+                replaceLine(edit, document.uri, lineNumber, lineText, next);
+                action.edit = edit;
+                action.diagnostics = [diagnostic];
+                actions.push(action);
             }
 
             return actions.length > 0 ? actions : undefined;
