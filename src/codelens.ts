@@ -62,7 +62,7 @@ export interface CodelensHandle {
 }
 
 /**
- * Register the `.tsk` CodeLensProvider plus the seven navigation /
+ * Register the `.tsk` CodeLensProvider plus the navigation /
  * peek commands it dispatches to, plus the dangling-edge "(missing)"
  * handler that pops an info toast.
  *

@@ -15,8 +15,8 @@ import { replaceLine } from './range-helpers';
  * cursor, column selections, scroll reveal. We run it verbatim, then rewrite
  * the `@id` + `@created` of each *copied* task line so the duplicate doesn't
  * collide with its source on the cache primary key. The catch is that this is a
- * **second** edit, so it costs a second undo (accepted — decision #1 in the
- * Phase 4 plan). The upside: multi-cursor duplication "just works", because the
+ * **second** edit, so it costs a second undo (an accepted trade for reusing
+ * the built-in verbatim). The upside: multi-cursor duplication "just works", because the
  * post-command selection is exactly the set of freshly-created copies.
  *
  * `deps` is injected for tests; the default wires the real nanoid + timestamp.

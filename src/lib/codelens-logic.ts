@@ -21,8 +21,8 @@ type PeekCommand = (typeof INTERNAL_COMMANDS)[
  * arguments; tests can assert against this shape without instantiating a
  * VSCode host.
  *
- * Discriminated on `command`: the three command families have distinct
- * argument shapes, and the union here lets TypeScript narrow `args` at
+ * Discriminated on `command`: each command family has a distinct
+ * argument shape, and the union here lets TypeScript narrow `args` at
  * each call site once the command is known.
  *
  *   - **Navigate** (`tsk.goToParent` / `goToDependsOn` / `goToRelated` /
@@ -30,7 +30,7 @@ type PeekCommand = (typeof INTERNAL_COMMANDS)[
  *     via the graph at invocation time (the graph may have shifted between
  *     lens render and click; deferring the lookup is the only correct option).
  *   - **Peek** (`tsk.findAllChildren` / `findAllDependents` /
- *     `findAllRelated`): args = `[sourceUri, sourceLine, targetIds]`.
+ *     `findAllRelated` / `findAllMovedHereFrom`): args = `[sourceUri, sourceLine, targetIds]`.
  *     The handler resolves each `targetId` to a Location at invocation
  *     time, then anchors the peek view at `(sourceUri, sourceLine)`.
  *   - **Missing** (`tsk.codelens.missing`): args = `[targetId, label]`

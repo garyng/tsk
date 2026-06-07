@@ -19,7 +19,7 @@ Open any `.tsk` file — or the bundled `docs/demo.tsk`, a hands-on tour where e
 
 ## Status markers & toggles
 
-Thirteen commands operate on the cursor line (or every unique cursor line in a multi-cursor selection). Each command builds a single edit, so one `Ctrl+Z` reverts the whole operation.
+The commands below operate on the cursor line (or every unique cursor line in a multi-cursor selection). Each builds a single edit, so one `Ctrl+Z` reverts the whole operation.
 
 | Keybinding   | Command                                       | Behavior |
 |--------------|-----------------------------------------------|----------|
@@ -33,7 +33,7 @@ Thirteen commands operate on the cursor line (or every unique cursor line in a m
 | `Alt+1 / 2 / 3` | `tsk.toggleP1` / `P2` / `P3`                | Toggle `@priority:N`; switching levels overwrites in one step. |
 | `` Alt+` ``  | `tsk.copyTaskId`                             | Copy the current task's `@id` to the system clipboard. |
 
-The four picker-driven commands (move + the three relationships) open an input box prefilled with the sanitized first token of clipboard text. Click the **Browse tasks…** button (search icon) to switch to a list of every cached task across the workspace.
+The picker-driven commands (move + the relationships) open an input box prefilled with the sanitized first token of clipboard text. Click the **Browse tasks…** button (search icon) to switch to a list of every cached task across the workspace.
 
 **Keybinding caveats:**
 - `Alt+1` / `Alt+2` / `Alt+3` are globally bound to "Focus N-th Editor Group" in VS Code defaults. The `when: editorLangId == 'tsk'` clause makes the toggle win inside `.tsk` files; the editor-group focus still works elsewhere.
@@ -42,11 +42,11 @@ The four picker-driven commands (move + the three relationships) open an input b
 
 ## Marker, priority & metadata coloring
 
-Three visual layers on `.tsk` documents. Two run through VS Code's **semantic tokens** — the same pipeline as syntax highlighting, so they recolor *instantly* with the text — and one stays a decoration:
+Visual layers on `.tsk` documents — most run through VS Code's **semantic tokens** (the same pipeline as syntax highlighting, so they recolor *instantly* with the text), while the priority background stays a decoration:
 
 - **Marker color (semantic token).** Each `[X]` triplet is colored per status — `[ ]` yellow, `[/]` blue, `[x]` green, `[>]` orange, `[!]` gray (struck through), `[n]` purple. Colors ship as defaults under token type `taskMarker` (one modifier per status); recolor any via `editor.semanticTokenColorCustomizations`, e.g. `"taskMarker.completed": "#9ece6a"`. Toggling a status recolors with no delay.
 - **Inline metadata dim (semantic token).** Every `<!-- @key:value -->` block is dimmed (token type `taskMetadata`) so the comments recede; the hover popup surfaces the parsed values when you need them. Recolor via `"taskMetadata"` in the same setting.
-- **Priority line background (decoration).** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); applies live. This stays a decoration — nothing else paints a whole-line background — so it refreshes on editor focus, after save, and on a short post-change debounce rather than instantly.
+- **Priority line background (decoration).** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); applies live. This stays a decoration — only `setDecorations` can paint a whole-line background (a semantic token can't) — so it refreshes on editor focus, after save, and on a short post-change debounce rather than instantly.
 
 On top of these, a task's *text* is ordinary Markdown: `.tsk` extends the Markdown grammar, so inline `code`, **bold**, *italic*, and `[links](…)` render inside task lines exactly as they do elsewhere in the document — while the marker triplet and `<!-- … -->` metadata keep their own coloring. (The grammar wraps each task line so the embedded Markdown engages mid-line, which a flat checkbox match wouldn't.)
 
@@ -218,7 +218,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]` and stamp `@started` (like `Alt+S`). Turn off to leave the marker unchanged. |
 | `tsk.autolinks` | `[]` | Regex→URL rules; text matching a rule becomes a `Ctrl`/`Cmd`+clickable link in `.tsk` editors. See *Autolinks*. |
 
-Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. These drive the Search Editor result rows; in `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
+Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. The marker and metadata colors drive the **Search Editor result rows** (which can't carry semantic tokens); `tsk.navigation.highlight` and `tsk.now.highlight` are in-editor line decorations (the navigate-flash and the now-task border). In `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 
 ## Limitations
 

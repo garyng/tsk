@@ -41,7 +41,7 @@
  * **TODO — configurability**
  *
  * Entries marked `// TODO: configurable` are candidates to be exposed as
- * user settings in a future plan (`2026-XX-XX_tsk-configurable-constants.md`).
+ * user settings in a future iteration.
  * They are values where a power-user might reasonably want a different
  * trade-off (e.g. debounce latency vs. responsiveness) but where we haven't
  * yet seen the demand. When such a setting lands, the constant here becomes
@@ -223,7 +223,7 @@ export const INTERNAL_COMMANDS = {
     nowPruneOffPath: 'tsk.now.pruneOffPath',
     /**
      * Quick-fix backing for broken-ref diagnostics (M20/C). Takes
-     * `(uri: vscode.Uri, line: number, key: 'parent' | 'dependsOn' | 'relatedTo')`,
+     * `(uri: vscode.Uri, line: number, key: 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo')`,
      * opens the task picker, and rewrites `@<key>:<picked-id>` on the
      * given line. Hidden from the palette because the args make no
      * sense outside a code-action invocation.

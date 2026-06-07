@@ -13,8 +13,8 @@ import type { Logger } from './lib/logger';
 import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
 
 /**
- * Register the three M7 list-edit commands (`tsk.handleEnter` /
- * `tsk.handleTab` / `tsk.handleShiftTab`). Each intercepts the
+ * Register the M7 list-edit commands (`tsk.handleEnter` /
+ * `tsk.handleTab` / `tsk.handleShiftTab` / `tsk.handleBackspace`). Each intercepts the
  * corresponding keypress in `.tsk` files via a keybinding gated by
  * `editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible &&
  * !inSnippetMode`. The pure helpers in `lib/list-edit.ts` decide the

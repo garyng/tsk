@@ -6,7 +6,7 @@ project/tsk:
     description: The tsk extension itself
     parent: project
 project/test:
-    description: Test cases (used by M8 demo to illustrate sibling tags under `project`)
+    description: A sibling tag under `project`, to illustrate tag completion
     parent: project
 
 milestone/M2: Parser milestone

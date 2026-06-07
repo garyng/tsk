@@ -356,11 +356,12 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Register every contributed command: the toggle set, the copy-id
- * command, the relationship picker commands, the list-edit handlers,
- * the tags completion provider, the find-by-tag command, and the
- * `tsk.rebuildCache` palette entry. Commands registered via the
- * codelens provider are attached separately during initial setup.
+ * Register the contributed command + provider families: the toggle set,
+ * copy-id, the relationship pickers, list-edit, duplicate-line, the tags
+ * completion provider, find-by-tag, find-by-status, code actions, hover,
+ * and the now + now-tree commands, plus the `tsk.rebuildCache` palette
+ * entry. (Codelens, semantic-token, autolinks, clipboard-bridge and
+ * paste-image providers are registered separately in `activate()`.)
  */
 function registerAllCommands(
     context: vscode.ExtensionContext,

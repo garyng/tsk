@@ -4,8 +4,6 @@
  * Mirrors the {@link MARKERS} pattern (see `markers.ts`). Today only M4/B
  * (priority line decorations) will consume this; M5 (`toggleP1`/`P2`/`P3`)
  * will pick up the `keybinding` / `commandSuffix` fields when those land.
- *
- * See "Registry pattern for finite enumerations" in `plans/2026-05-24_tsk.md`.
  */
 export interface PriorityDef {
     /** Priority level. Spec pins this to {1, 2, 3}. */

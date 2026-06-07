@@ -37,7 +37,7 @@ export function countTasksByMarker(tasks: Iterable<{ marker: Marker }>): Map<Mar
 
 /**
  * Project the canonical {@link MARKERS} into QuickPick rows — one per marker, in
- * registry order, each showing its `[glyph]` and current task count. All six are
+ * registry order, each showing its `[glyph]` and current task count. Every marker is
  * always listed (even at `0 tasks`) since the set is small and fixed.
  */
 export function markersToPickItems(counts: ReadonlyMap<Marker, number>): MarkerPickItem[] {

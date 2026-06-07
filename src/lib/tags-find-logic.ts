@@ -123,7 +123,7 @@ export function tagsToPickItems(
  * is a `vscode.TextEditor` we can decorate. Note: the result document's
  * `search-result` grammar only embeds ~50 built-in languages, so it does NOT
  * apply tsk's *grammar* to result rows — instead the extension paints tsk
- * *decorations* onto the match rows itself (see `applySearchResultDecorations`
+ * *decorations* onto the match rows itself (see `DecorationsController.applySearchResult`
  * / `computeSearchResultRanges`, M30/B).
  *
  * Substring semantics (intended): searching `#project` also surfaces

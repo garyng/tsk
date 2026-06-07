@@ -7,8 +7,8 @@
  * one entry here, then mirroring it into `package.json` and the grammar JSON;
  * `markers.test.ts` fails the build if those JSON files drift.
  *
- * See "Registry pattern for finite enumerations" in `plans/2026-05-24_tsk.md`
- * for the broader convention this file implements.
+ * The same registry pattern — one source of truth per finite enumeration —
+ * also backs `priorities.ts`.
  */
 export interface MarkerDef {
     /** Canonical lowercase name. The derived {@link Marker} type is the union of these. */
@@ -34,7 +34,7 @@ export interface MarkerDef {
     strikethrough: boolean;
     /**
      * TextMate scope this marker contributes via `syntaxes/tsk.tmLanguage.json`.
-     * Mirrored hand by hand into the grammar JSON; the drift test verifies
+     * Mirrored by hand into the grammar JSON; the drift test verifies
      * every scope name listed here actually appears in the grammar source.
      */
     scopeName: string;

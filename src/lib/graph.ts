@@ -1,6 +1,6 @@
 /**
  * Pure relationship-graph builder. Takes a flat list of task → forward-edge
- * tuples (id + the four forward keys: `parent` / `dependsOn` / `relatedTo` /
+ * tuples (id + the forward keys `parent` / `dependsOn` / `relatedTo` /
  * `movedTo`), groups them into a map of `GraphNode`s, computes inverse edges
  * (`children` / `dependents` / `related` / `movedHereFrom`), and reports
  * duplicate `@id`s.

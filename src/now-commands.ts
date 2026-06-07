@@ -15,8 +15,8 @@ import { replaceLine } from './range-helpers';
  *
  * The single file write (one undo step): stamp `@id` (+`@created`) if missing,
  * and — when `tsk.now.autoInProgress` is on (default) — move the task into
- * `[/]`, stamping `@started`, via the SAME `enterInprogress` the
- * in-progress toggle uses (no duplicated marker logic). Both are skipped when
+ * `[/]`, stamping `@started`, via `enterInprogress` — the shared in-progress
+ * transition the toggle also applies (no duplicated marker logic). Both are skipped when
  * unnecessary, so marking an already-`[/]`, already-id'd task touches no bytes.
  * The `@id` is then RE-READ from the document (never assumed —
  * `promoteMissingMetadata` returns only a new *line*, not the id) and handed to
