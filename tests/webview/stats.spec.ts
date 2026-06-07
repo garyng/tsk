@@ -142,4 +142,24 @@ test('surfaces the best-effort caveat only for a metric with no events', async (
     await expect(page.locator('.tsk-stats__note')).toBeVisible();
 });
 
+// ── golden snapshots ───────────────────────────────────────────────────────
+
+test.describe('golden snapshots', () => {
+    // Wider than the global 480×320 so the whole 53-week calendar shows. No clock
+    // needed — the panel renders off the fixed `range`/counts, not `new Date()`.
+    test.use({ viewport: { width: 860, height: 380 } });
+
+    test('the populated panel', async ({ page }) => {
+        await mount(page);
+        await expect(page).toHaveScreenshot('stats-populated.png');
+    });
+
+    test('an empty-metric view (caveat note)', async ({ page }) => {
+        await mount(page);
+        await page.getByRole('button', { name: 'Cancelled' }).click();
+        await expect(page.locator('.tsk-stats__note')).toBeVisible();
+        await expect(page).toHaveScreenshot('stats-empty-metric.png');
+    });
+});
+
 

@@ -184,3 +184,26 @@ test('clear filters resets every active filter', async ({ page }) => {
     await page.getByRole('button', { name: 'Clear filters' }).click();
     await expect(page.locator('.tsk-row')).toHaveCount(4);
 });
+
+// ── golden snapshots ───────────────────────────────────────────────────────
+
+test.describe('golden snapshots', () => {
+    // Wider than the global 480×320 so every column shows; a fixed clock so the
+    // relative `Created` column ("5h ago" / "2d ago") is deterministic.
+    test.use({ viewport: { width: 720, height: 360 } });
+    test.beforeEach(async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2026-06-07T17:00:00Z'));
+    });
+
+    test('the populated table', async ({ page }) => {
+        await mount(page);
+        await expect(page).toHaveScreenshot('task-list-populated.png');
+    });
+
+    test('a header filter dropdown open', async ({ page }) => {
+        await mount(page);
+        await page.locator('.tsk-th[data-col="tags"] .tsk-th__filter').click();
+        await page.locator('.tsk-filter').waitFor();
+        await expect(page).toHaveScreenshot('task-list-tags-filter.png');
+    });
+});
