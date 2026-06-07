@@ -126,6 +126,7 @@ function Stats() {
 
     return (
         <main className="tsk-stats">
+            <h1 className="tsk-stats__title">Tsk: Stats</h1>
             <header className="tsk-stats__tiles">
                 <div className="tsk-tile tsk-tile--total">
                     <span className="tsk-tile__count">{view.total}</span>

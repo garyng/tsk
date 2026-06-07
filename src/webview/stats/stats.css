@@ -5,6 +5,11 @@
         var(--vscode-font-size, 13px) / 1.5
         var(--vscode-font-family, system-ui, "Segoe UI", sans-serif);
 }
+.tsk-stats__title {
+    margin: 0 0 14px;
+    font-size: 1.1em;
+    font-weight: 600;
+}
 .tsk-stats__empty,
 .tsk-stats__note {
     color: var(--vscode-descriptionForeground, #8c8c8c);
