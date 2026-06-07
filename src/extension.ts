@@ -154,8 +154,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     // Created before the scan controller so its `refresh()` can ride the
     // rescan-tail (a cache rebuild changes labels without touching the tree).
     const nowPanel = registerNowPanel(context, nowStore, cache, logger);
-    const statsPanel = registerStatsPanel(context, cache, logger);
+    // Task list first: the stats panel's calendar-day jump opens it with a filter.
     const taskListPanel = registerTaskListPanel(context, cache, logger);
+    const statsPanel = registerStatsPanel(context, cache, logger, (ids, label) =>
+        taskListPanel.openWithDayFilter(ids, label),
+    );
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
     const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger, () => {
         nowDecoration.reapply();

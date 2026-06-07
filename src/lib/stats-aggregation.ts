@@ -87,3 +87,21 @@ export function buildStatsSeries(
     series.all = toDayCounts(bucketByDay(rows, EVENT_METRIC_SET));
     return series;
 }
+
+/**
+ * The task `@id`s whose `metric` event (or any event, for `all`) was stamped on
+ * the local calendar day `date` (a `YYYY-MM-DD`). Powers the stats → task-list
+ * jump: click a calendar day and the task list filters to that day's tasks.
+ */
+export function taskIdsForDay(
+    metadata: Iterable<{ taskId: string; key: string; value: string | null }>,
+    metric: Metric,
+    date: string,
+): string[] {
+    const keys = metric === 'all' ? EVENT_METRIC_SET : new Set<string>([metric]);
+    const ids = new Set<string>();
+    for (const { taskId, key, value } of metadata) {
+        if (keys.has(key) && value != null && value.slice(0, 10) === date) ids.add(taskId);
+    }
+    return [...ids];
+}

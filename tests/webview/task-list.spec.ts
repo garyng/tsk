@@ -185,6 +185,20 @@ test('clear filters resets every active filter', async ({ page }) => {
     await expect(page.locator('.tsk-row')).toHaveCount(4);
 });
 
+test('a dayFilter message narrows to the given ids with a dismissible banner', async ({ page }) => {
+    await mount(page);
+    await page.evaluate(() =>
+        window.postMessage(
+            { type: 'dayFilter', ids: ['t1', 't3'], label: 'Completed · 2026-05-20' },
+            '*',
+        ),
+    );
+    await expect(page.locator('.tsk-row')).toHaveCount(2); // only t1 + t3
+    await expect(page.locator('.tsk-daybanner')).toContainText('Completed · 2026-05-20');
+    await page.locator('.tsk-daybanner__clear').click();
+    await expect(page.locator('.tsk-row')).toHaveCount(4); // banner dismissed → all rows
+});
+
 // ── golden snapshots ───────────────────────────────────────────────────────
 
 test.describe('golden snapshots', () => {
@@ -207,3 +221,4 @@ test.describe('golden snapshots', () => {
         await expect(page).toHaveScreenshot('task-list-tags-filter.png');
     });
 });
+

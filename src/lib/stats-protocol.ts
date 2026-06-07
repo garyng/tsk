@@ -37,5 +37,11 @@ export interface StatsView {
 /** Extension → webview. */
 export type StatsHostToWebview = { type: 'render'; view: StatsView };
 
-/** Webview → extension. `ready` triggers the first render; nothing else is needed. */
-export type StatsWebviewToHost = { type: 'ready' };
+/**
+ * Webview → extension. `ready` triggers the first render; `jumpToDay` (a calendar
+ * day click) asks the host to open the task list filtered to that day's tasks for
+ * the active `metric`.
+ */
+export type StatsWebviewToHost =
+    | { type: 'ready' }
+    | { type: 'jumpToDay'; date: string; metric: Metric };

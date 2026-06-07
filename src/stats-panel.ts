@@ -2,11 +2,22 @@ import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
+import { type Metric, taskIdsForDay } from './lib/stats-aggregation';
 import type { StatsHostToWebview, StatsWebviewToHost } from './lib/stats-protocol';
 import { buildStatsView } from './lib/stats-view-model';
 import { buildWebviewHtml, webviewLocalResourceRoots } from './webview-html';
 
 const VIEW_TYPE = 'tsk.stats';
+
+/** Banner label per metric for the stats → task-list day jump (`all` → "Activity"). */
+const METRIC_LABEL: Record<Metric, string> = {
+    all: 'Activity',
+    created: 'Created',
+    started: 'Started',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+    moved: 'Moved',
+};
 
 /**
  * Owns the "Tsk Stats" webview panel — an editor-area `WebviewPanel` (like
@@ -27,6 +38,8 @@ export class StatsPanel implements vscode.Disposable {
         private readonly extensionUri: vscode.Uri,
         private readonly cache: CacheService,
         private readonly logger: Logger,
+        /** Open the task list filtered to a day's tasks (wired to {@link TaskListPanel}). */
+        private readonly onJumpToDay?: (ids: string[], label: string) => void,
     ) {}
 
     /** Open the panel, or reveal it if already open. */
@@ -75,6 +88,7 @@ export class StatsPanel implements vscode.Disposable {
         );
         panel.webview.onDidReceiveMessage((message: StatsWebviewToHost) => {
             if (message?.type === 'ready') this.postRender();
+            else if (message?.type === 'jumpToDay') this.jumpToDay(message.date, message.metric);
         });
         panel.onDidDispose(() => {
             if (this.panel === panel) this.panel = undefined;
@@ -97,6 +111,12 @@ export class StatsPanel implements vscode.Disposable {
         void this.panel.webview.postMessage(message);
     }
 
+    /** A calendar-day click: resolve the day's task ids for `metric` and hand off. */
+    private jumpToDay(date: string, metric: Metric): void {
+        const ids = taskIdsForDay(this.cache.listAllMetadata(), metric, date);
+        this.onJumpToDay?.(ids, `${METRIC_LABEL[metric]} · ${date}`);
+    }
+
     private webviewOptions(): vscode.WebviewPanelOptions & vscode.WebviewOptions {
         return {
             enableScripts: true,
@@ -115,8 +135,9 @@ export function registerStatsPanel(
     context: vscode.ExtensionContext,
     cache: CacheService,
     logger: Logger,
+    onJumpToDay?: (ids: string[], label: string) => void,
 ): StatsPanel {
-    const panel = new StatsPanel(context.extensionUri, cache, logger);
+    const panel = new StatsPanel(context.extensionUri, cache, logger, onJumpToDay);
     context.subscriptions.push(
         panel,
         vscode.commands.registerCommand(COMMANDS.openStats, () => panel.open()),

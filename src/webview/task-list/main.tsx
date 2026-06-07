@@ -103,6 +103,8 @@ function TaskList() {
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [sorting, setSorting] = useState<SortingState>([{ id: 'created', desc: true }]);
     const [openFilter, setOpenFilter] = useState<{ col: FilterCol; rect: DOMRect } | null>(null);
+    // A cross-surface filter from the stats calendar (a set of task ids + a label).
+    const [dayFilter, setDayFilter] = useState<{ ids: Set<string>; label: string } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -110,6 +112,10 @@ function TaskList() {
         const onMessage = (event: MessageEvent): void => {
             const data = event.data as Partial<TaskListHostToWebview> | undefined;
             if (data?.type === 'render' && data.view) setView(data.view);
+            else if (data?.type === 'dayFilter')
+                setDayFilter(
+                    data.ids?.length ? { ids: new Set(data.ids), label: data.label ?? '' } : null,
+                );
         };
         window.addEventListener('message', onMessage);
         post({ type: 'ready' });
@@ -222,8 +228,15 @@ function TaskList() {
         [],
     );
 
+    // The day-filter (from a stats jump) pre-narrows the rows; the column filters,
+    // search, and sort then apply on top.
+    const data = useMemo(() => {
+        const all = view?.rows ?? [];
+        return dayFilter ? all.filter((r) => dayFilter.ids.has(r.id)) : all;
+    }, [view, dayFilter]);
+
     const table = useReactTable({
-        data: view?.rows ?? [],
+        data,
         columns,
         state: { globalFilter, columnFilters, sorting },
         globalFilterFn: fuzzy,
@@ -289,7 +302,12 @@ function TaskList() {
         setOpenFilter((cur) => (cur?.col === col ? null : { col, rect }));
     };
 
-    const anyFilter = columnFilters.length > 0 || globalFilter.length > 0;
+    const anyFilter = columnFilters.length > 0 || globalFilter.length > 0 || dayFilter !== null;
+    const clearAll = (): void => {
+        setColumnFilters([]);
+        setGlobalFilter('');
+        setDayFilter(null);
+    };
 
     return (
         <main className="tsk-tasks">
@@ -332,15 +350,21 @@ function TaskList() {
                             </button>
                         ))}
                     </nav>
+                    {dayFilter && (
+                        <span className="tsk-daybanner">
+                            {dayFilter.label}
+                            <button
+                                type="button"
+                                className="tsk-daybanner__clear"
+                                aria-label="Clear day filter"
+                                onClick={() => setDayFilter(null)}
+                            >
+                                ✕
+                            </button>
+                        </span>
+                    )}
                     {anyFilter && (
-                        <button
-                            type="button"
-                            className="tsk-clear"
-                            onClick={() => {
-                                setColumnFilters([]);
-                                setGlobalFilter('');
-                            }}
-                        >
+                        <button type="button" className="tsk-clear" onClick={clearAll}>
                             Clear filters
                         </button>
                     )}

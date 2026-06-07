@@ -1,4 +1,4 @@
-import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
+import { cloneElement, StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { createRoot } from 'react-dom/client';
 import { MARKERS, type Marker } from '../../lib/markers';
@@ -184,7 +184,11 @@ function Stats() {
                             onClick={() => setMetric(m)}
                         >
                             {marker && (
-                                <span className="tsk-marker" data-marker={marker} aria-hidden="true">
+                                <span
+                                    className="tsk-marker"
+                                    data-marker={marker}
+                                    aria-hidden="true"
+                                >
                                     [{GLYPH[marker]}]
                                 </span>
                             )}
@@ -209,6 +213,17 @@ function Stats() {
                     tooltips={{
                         activity: { text: (a) => dayTooltip(a.date, view.series, metric) },
                     }}
+                    renderBlock={(block, activity) =>
+                        // Click a day with activity → open the task list filtered to
+                        // that day's tasks for the current metric.
+                        cloneElement(block, {
+                            cursor: activity.count > 0 ? 'pointer' : undefined,
+                            onClick: () => {
+                                if (activity.count > 0)
+                                    post({ type: 'jumpToDay', date: activity.date, metric });
+                            },
+                        })
+                    }
                 />
                 {!hasEvents && (
                     <p className="tsk-stats__note">

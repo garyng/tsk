@@ -23,6 +23,8 @@ export class TaskListPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
     /** Last viewmodel posted (serialized) — to skip re-posting an identical one. */
     private lastPosted: string | undefined;
+    /** A day-filter awaiting the webview handshake (set when opening from the stats jump). */
+    private pendingDayFilter: { ids: string[]; label: string } | undefined;
     private readonly editorSub: vscode.Disposable;
     /** The editor group a jump navigates to — the last active non-panel editor. */
     private sourceColumn: vscode.ViewColumn = vscode.ViewColumn.One;
@@ -60,6 +62,21 @@ export class TaskListPanel implements vscode.Disposable {
         this.adopt(panel);
     }
 
+    /**
+     * Open (or reveal) the panel filtered to a set of task ids, e.g. from a stats
+     * calendar-day click. If the panel is fresh, the directive waits for the
+     * webview's `ready`; if it's already up, it posts immediately.
+     */
+    openWithDayFilter(ids: string[], label: string): void {
+        this.pendingDayFilter = { ids, label };
+        if (this.panel) {
+            this.panel.reveal(vscode.ViewColumn.Active);
+            this.postDayFilter();
+        } else {
+            this.open();
+        }
+    }
+
     /** Re-render from the current cache state. A no-op when the panel is closed. */
     refresh(): void {
         this.postRender();
@@ -85,8 +102,10 @@ export class TaskListPanel implements vscode.Disposable {
             'Tsk Task List',
         );
         panel.webview.onDidReceiveMessage((message: TaskListWebviewToHost) => {
-            if (message?.type === 'ready') this.postRender();
-            else if (message?.type === 'jump') void this.jump(message.id);
+            if (message?.type === 'ready') {
+                this.postRender();
+                this.postDayFilter();
+            } else if (message?.type === 'jump') void this.jump(message.id);
         });
         panel.onDidDispose(() => {
             if (this.panel === panel) this.panel = undefined;
@@ -104,6 +123,15 @@ export class TaskListPanel implements vscode.Disposable {
         if (serialized === this.lastPosted) return;
         this.lastPosted = serialized;
         const message: TaskListHostToWebview = { type: 'render', view };
+        void this.panel.webview.postMessage(message);
+    }
+
+    /** Flush a queued day-filter directive to the webview (once it's mounted). */
+    private postDayFilter(): void {
+        if (!this.panel || !this.pendingDayFilter) return;
+        const { ids, label } = this.pendingDayFilter;
+        this.pendingDayFilter = undefined;
+        const message: TaskListHostToWebview = { type: 'dayFilter', ids, label };
         void this.panel.webview.postMessage(message);
     }
 

@@ -263,3 +263,32 @@
     opacity: 0.5;
     cursor: default;
 }
+
+/* Cross-surface "day filter" banner (set by a stats calendar-day click). */
+.tsk-daybanner {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px 2px 10px;
+    border-radius: 999px;
+    font-size: 0.9em;
+    color: var(--vscode-button-foreground, #ffffff);
+    background: var(--vscode-button-background, #0e639c);
+}
+.tsk-daybanner__clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    background: rgba(255, 255, 255, 0.2);
+}
+.tsk-daybanner__clear:hover {
+    background: rgba(255, 255, 255, 0.35);
+}

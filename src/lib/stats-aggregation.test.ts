@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketByDay, buildStatsSeries, EVENT_METRICS } from './stats-aggregation';
+import { bucketByDay, buildStatsSeries, EVENT_METRICS, taskIdsForDay } from './stats-aggregation';
 
 /** A metadata row, the structural shape the aggregation consumes. */
 const meta = (key: string, value: string | null) => ({ key, value });
@@ -100,5 +100,32 @@ describe('buildStatsSeries', () => {
             yield meta('created', '2026-05-24T09:00:00+08:00');
         }
         expect(buildStatsSeries(gen()).created).toEqual([{ date: '2026-05-24', count: 1 }]);
+    });
+});
+
+describe('taskIdsForDay', () => {
+    const m = (taskId: string, key: string, value: string | null) => ({ taskId, key, value });
+    const ROWS = [
+        m('a', 'created', '2026-05-24T09:00:00+08:00'),
+        m('b', 'created', '2026-05-24T20:00:00+08:00'),
+        m('a', 'completed', '2026-05-25T10:00:00+08:00'),
+        m('c', 'completed', '2026-05-24T10:00:00+08:00'),
+        m('d', 'started', '2026-05-24T10:00:00+08:00'),
+        m('b', 'priority', '2'), // a non-event key — ignored
+    ];
+
+    it('returns the task ids with that metric event on that day', () => {
+        expect(taskIdsForDay(ROWS, 'created', '2026-05-24').sort()).toEqual(['a', 'b']);
+        expect(taskIdsForDay(ROWS, 'completed', '2026-05-24')).toEqual(['c']);
+        expect(taskIdsForDay(ROWS, 'completed', '2026-05-25')).toEqual(['a']);
+    });
+
+    it('"all" unions every event type that day, deduped', () => {
+        expect(taskIdsForDay(ROWS, 'all', '2026-05-24').sort()).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('is empty for a day (or metric) with no matching events', () => {
+        expect(taskIdsForDay(ROWS, 'created', '2026-06-01')).toEqual([]);
+        expect(taskIdsForDay(ROWS, 'moved', '2026-05-24')).toEqual([]);
     });
 });

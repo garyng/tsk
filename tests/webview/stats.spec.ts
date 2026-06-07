@@ -92,6 +92,14 @@ async function mount(page: Page, view: unknown = VIEW): Promise<string[]> {
     return errors;
 }
 
+/** Messages the bundle posted back to the (mocked) host. */
+const posted = (page: Page): Promise<unknown[]> =>
+    page.evaluate(() => (window as unknown as { __posted: unknown[] }).__posted);
+
+/** A calendar day rect by its ISO date (the lib stamps `data-date` on each). */
+const day = (page: Page, date: string) =>
+    page.locator(`svg.react-activity-calendar__calendar rect[data-date="${date}"]`);
+
 test('mounts cleanly and renders a tile per status with its count', async ({ page }) => {
     const errors = await mount(page);
     expect(errors).toEqual([]);
@@ -142,6 +150,27 @@ test('surfaces the best-effort caveat only for a metric with no events', async (
     await expect(page.locator('.tsk-stats__note')).toBeVisible();
 });
 
+test('clicking a day with activity posts a jumpToDay for the current metric', async ({ page }) => {
+    await mount(page);
+    await day(page, '2026-05-10').click(); // active under 'all'
+    expect(await posted(page)).toContainEqual({ type: 'jumpToDay', date: '2026-05-10', metric: 'all' });
+    // Switch metric → the jump carries it (2026-05-12 has a completed event).
+    await page.getByRole('button', { name: 'Completed' }).click();
+    await day(page, '2026-05-12').click();
+    expect(await posted(page)).toContainEqual({
+        type: 'jumpToDay',
+        date: '2026-05-12',
+        metric: 'completed',
+    });
+});
+
+test('clicking an empty day posts nothing', async ({ page }) => {
+    await mount(page);
+    await day(page, '2026-01-02').click(); // no activity
+    const jumps = (await posted(page)).filter((m) => (m as { type: string }).type === 'jumpToDay');
+    expect(jumps).toEqual([]);
+});
+
 // ── golden snapshots ───────────────────────────────────────────────────────
 
 test.describe('golden snapshots', () => {
@@ -161,5 +190,4 @@ test.describe('golden snapshots', () => {
         await expect(page).toHaveScreenshot('stats-empty-metric.png');
     });
 });
-
 

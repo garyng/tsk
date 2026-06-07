@@ -42,8 +42,14 @@ export interface TaskListView {
     total: number;
 }
 
-/** Extension → webview. */
-export type TaskListHostToWebview = { type: 'render'; view: TaskListView };
+/**
+ * Extension → webview. `render` ships the viewmodel; `dayFilter` (from a stats
+ * calendar-day click) narrows the table to a set of task `@id`s, with a `label`
+ * for the dismissible banner. An empty `ids` / label clears it.
+ */
+export type TaskListHostToWebview =
+    | { type: 'render'; view: TaskListView }
+    | { type: 'dayFilter'; ids: string[]; label: string };
 
 /** Webview → extension. `ready` triggers the first render; `jump` reveals a task by `@id`. */
 export type TaskListWebviewToHost = { type: 'ready' } | { type: 'jump'; id: string };
