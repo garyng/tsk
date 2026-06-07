@@ -40,23 +40,35 @@
     font-size: 0.82em;
     color: var(--vscode-descriptionForeground, #8c8c8c);
 }
-.tsk-tile[data-marker="todo"] .tsk-tile__count {
-    color: var(--vscode-tsk-marker-todo, #e5c07b);
+/* The status colour is a small legend dot by the label — the count stays neutral
+   so the colour reads as an accent, not a loud number. */
+.tsk-tile[data-marker] .tsk-tile__label::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    vertical-align: middle;
+    background: var(--vscode-descriptionForeground, #8c8c8c);
 }
-.tsk-tile[data-marker="inprogress"] .tsk-tile__count {
-    color: var(--vscode-tsk-marker-inprogress, #3794ff);
+.tsk-tile[data-marker="todo"] .tsk-tile__label::before {
+    background: var(--vscode-tsk-marker-todo, #e5c07b);
 }
-.tsk-tile[data-marker="completed"] .tsk-tile__count {
-    color: var(--vscode-tsk-marker-completed, #67c23a);
+.tsk-tile[data-marker="inprogress"] .tsk-tile__label::before {
+    background: var(--vscode-tsk-marker-inprogress, #3794ff);
 }
-.tsk-tile[data-marker="moved"] .tsk-tile__count {
-    color: var(--vscode-tsk-marker-moved, #ff9d00);
+.tsk-tile[data-marker="completed"] .tsk-tile__label::before {
+    background: var(--vscode-tsk-marker-completed, #67c23a);
 }
-.tsk-tile[data-marker="cancelled"] .tsk-tile__count {
-    color: var(--vscode-tsk-marker-cancelled, #9e9e9e);
+.tsk-tile[data-marker="moved"] .tsk-tile__label::before {
+    background: var(--vscode-tsk-marker-moved, #ff9d00);
 }
-.tsk-tile[data-marker="notes"] .tsk-tile__count {
-    color: var(--vscode-tsk-marker-notes, #bb6dd9);
+.tsk-tile[data-marker="cancelled"] .tsk-tile__label::before {
+    background: var(--vscode-tsk-marker-cancelled, #9e9e9e);
+}
+.tsk-tile[data-marker="notes"] .tsk-tile__label::before {
+    background: var(--vscode-tsk-marker-notes, #bb6dd9);
 }
 .tsk-stats__toggle {
     display: flex;

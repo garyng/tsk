@@ -33,6 +33,23 @@ const METRIC_LABEL: Record<Metric, string> = {
     moved: 'Moved',
 };
 
+/**
+ * Tooltip text for a calendar day: a per-type breakdown ("2 created · 1 completed
+ * on 2026-05-24"). With a metric selected only that type shows; with `all`, every
+ * non-zero event type that day. "no activity" for an empty day.
+ */
+function dayTooltip(date: string, series: StatsView['series'], metric: Metric): string {
+    const metrics = metric === 'all' ? EVENT_METRICS : [metric];
+    const parts = metrics
+        .map((m) => ({
+            label: METRIC_LABEL[m],
+            n: series[m].find((d) => d.date === date)?.count ?? 0,
+        }))
+        .filter((p) => p.n > 0)
+        .map((p) => `${p.n} ${p.label.toLowerCase()}`);
+    return `${parts.length ? parts.join(' · ') : 'no activity'} on ${date}`;
+}
+
 // Blue intensity ramp (levels 0..4) for light + dark. A first-guess palette —
 // a fully `--vscode-*`-derived ramp is a deferred refinement (see plan M2 notes).
 const THEME = {
@@ -149,10 +166,7 @@ function Stats() {
                     showWeekdayLabels
                     labels={{ legend: { less: 'Less', more: 'More' } }}
                     tooltips={{
-                        activity: {
-                            text: (a) =>
-                                `${a.count} ${a.count === 1 ? 'event' : 'events'} on ${a.date}`,
-                        },
+                        activity: { text: (a) => dayTooltip(a.date, view.series, metric) },
                     }}
                 />
                 {!hasEvents && (
