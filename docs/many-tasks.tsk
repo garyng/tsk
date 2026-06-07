@@ -1,0 +1,146 @@
+# Helios — engineering backlog
+
+A realistic dummy backlog for exercising the Stats heatmap + Task List panels. Not a tutorial (see `demo.tsk`).
+
+## UI
+
+- [ ] Wire up the error boundary #ui/spike <!-- @id:XUvIGPDI @created:2026-05-15T12:08:00+08:00 -->
+- [x] Optimize the avatar uploader #ui/core <!-- @id:3UPwWCv5 @created:2026-02-07T13:35:00+08:00 @started:2026-02-09T13:52:00+08:00 @completed:2026-02-23T08:10:00+08:00 @priority:1 -->
+- [x] Backfill the data table #ui <!-- @id:R9sCLsp5 @created:2026-02-22T16:57:00+08:00 @started:2026-03-03T09:17:00+08:00 @completed:2026-03-08T18:26:00+08:00 @priority:3 -->
+- [/] Refactor the command palette #ui <!-- @id:dUd0pprq @created:2025-07-11T19:20:00+08:00 @started:2025-07-17T11:01:00+08:00 -->
+- [>] Fix the command palette #ui <!-- @id:EsLm97fI @created:2026-04-18T09:47:00+08:00 @moved:2026-05-05T09:39:00+08:00 @movedTo:XUvIGPDI -->
+- [ ] Optimize the data table #ui <!-- @id:c9yIude1 @created:2026-05-13T09:36:00+08:00 -->
+- [ ] Implement the avatar uploader #ui/core <!-- @id:GA61hAbW @created:2026-04-05T09:23:00+08:00 -->
+- [>] Rework the command palette #ui <!-- @id:p7Mquj8i @created:2025-09-20T11:29:00+08:00 @moved:2025-09-28T12:30:00+08:00 @movedTo:EsLm97fI @priority:1 -->
+- [>] Cache the error boundary #ui <!-- @id:U_nJttR8 @created:2026-05-21T17:33:00+08:00 @moved:2026-05-24T09:18:00+08:00 @movedTo:c9yIude1 @priority:2 -->
+- [n] Cache the pagination controls #ui <!-- @id:I2nBu8kq @created:2026-05-02T11:40:00+08:00 -->
+- [/] Design the onboarding wizard #ui/perf <!-- @id:43D-uBXC @created:2025-12-18T08:09:00+08:00 @started:2025-12-25T18:14:00+08:00 -->
+- [x] Document the settings page #ui <!-- @id:u1djjTLF @created:2026-05-12T15:35:00+08:00 @started:2026-05-18T08:17:00+08:00 @completed:2026-05-25T11:18:00+08:00 -->
+- [ ] Instrument the notification center #ui/bug <!-- @id:8MTvNY8l @created:2026-02-05T18:01:00+08:00 @priority:2 -->
+- [n] Prototype the toast stack #ui/v2 <!-- @id:kdhRk860 @created:2026-03-25T14:34:00+08:00 -->
+- [!] Refactor the keyboard shortcuts #ui <!-- @id:0DHwzihj @created:2025-07-16T15:48:00+08:00 @cancelled:2025-08-02T13:27:00+08:00 -->
+
+## API
+
+- [ ] Cache the API versioning #api/v2 <!-- @id:5ybGRa52 @created:2026-05-25T11:52:00+08:00 @priority:3 -->
+- [x] Harden the request validation #api <!-- @id:g_wx0gCB @created:2026-05-20T12:28:00+08:00 @started:2026-05-24T16:31:00+08:00 @completed:2026-05-30T14:06:00+08:00 @priority:3 -->
+- [ ] Refactor the pagination cursors #api <!-- @id:gagV1uFp @created:2026-02-16T19:16:00+08:00 -->
+- [x] Audit the error envelope #api <!-- @id:lLc-4pSQ @created:2026-05-22T18:37:00+08:00 @started:2026-05-24T10:04:00+08:00 @completed:2026-05-31T18:41:00+08:00 @priority:3 -->
+- [x] Optimize the rate limiter #api <!-- @id:iN4F2-FF @created:2025-11-11T13:20:00+08:00 @started:2025-11-19T09:28:00+08:00 @completed:2025-11-29T12:53:00+08:00 -->
+- [x] Prototype the GraphQL resolvers #api/spike <!-- @id:y19AIbtn @created:2025-11-24T13:47:00+08:00 @started:2025-11-29T16:34:00+08:00 @completed:2025-12-09T10:49:00+08:00 -->
+- [x] Wire up the bulk endpoint #api/bug <!-- @id:jjoXnImA @created:2026-04-12T09:32:00+08:00 @started:2026-04-15T14:13:00+08:00 @completed:2026-04-19T09:54:00+08:00 @priority:1 -->
+- [x] Deprecate the rate limiter #api <!-- @id:QmGi0gHH @created:2025-12-03T16:02:00+08:00 @started:2025-12-06T15:23:00+08:00 @completed:2025-12-13T12:46:00+08:00 -->
+- [>] Migrate the pagination cursors #api/core <!-- @id:eWuFH3c0 @created:2025-09-22T18:35:00+08:00 @moved:2025-10-08T08:58:00+08:00 @movedTo:gagV1uFp -->
+- [>] Optimize the retry logic #api/perf <!-- @id:Ktv2i-ot @created:2026-05-21T12:47:00+08:00 @moved:2026-05-25T09:22:00+08:00 @movedTo:lLc-4pSQ @priority:2 -->
+- [x] Cache the pagination cursors #api <!-- @id:Zg-hADWm @created:2026-01-28T13:24:00+08:00 @started:2026-02-06T17:55:00+08:00 @completed:2026-02-15T15:05:00+08:00 -->
+- [ ] Prototype the rate limiter #api <!-- @id:2Kjw-vwu @created:2025-10-07T10:29:00+08:00 -->
+- [/] Rework the request validation #api/perf <!-- @id:8sx_yDAO @created:2026-01-11T10:12:00+08:00 @started:2026-01-16T17:54:00+08:00 -->
+- [x] Backfill the webhook handler #api <!-- @id:FUc8dXE9 @created:2026-06-06T16:59:00+08:00 @started:2026-06-07T16:33:00+08:00 @completed:2026-06-07T11:14:00+08:00 -->
+- [x] Validate the pagination cursors #api/core <!-- @id:26WHPHm0 @created:2025-09-30T08:12:00+08:00 @started:2025-10-07T19:54:00+08:00 @completed:2025-10-21T13:37:00+08:00 -->
+
+## Database
+
+- [x] Migrate the partitioning #db/core <!-- @id:s80jVF3p @created:2026-05-10T16:47:00+08:00 @started:2026-05-22T08:47:00+08:00 @completed:2026-06-02T14:53:00+08:00 -->
+- [ ] Wire up the index coverage #db/spike <!-- @id:UN9JpOiL @created:2025-10-26T11:37:00+08:00 -->
+- [ ] Implement the partitioning #db <!-- @id:a6UOhRgV @created:2026-05-27T17:04:00+08:00 -->
+- [/] Instrument the schema migration #db <!-- @id:ZxxywzC- @created:2026-05-20T09:13:00+08:00 @started:2026-05-22T11:40:00+08:00 -->
+- [x] Wire up the slow query #db/bug <!-- @id:lK9d1G99 @created:2026-04-06T09:58:00+08:00 @started:2026-04-08T08:36:00+08:00 @completed:2026-04-19T18:48:00+08:00 -->
+- [x] Validate the audit log table #db/v2 <!-- @id:bW4srm8v @created:2025-11-29T10:20:00+08:00 @started:2025-12-07T08:55:00+08:00 @completed:2025-12-16T14:31:00+08:00 @priority:3 -->
+- [ ] Investigate the audit log table #db <!-- @id:yRG9lXy_ @created:2026-05-14T09:07:00+08:00 -->
+- [x] Rework the soft-delete #db <!-- @id:I9-Au1VQ @created:2026-04-29T09:25:00+08:00 @started:2026-05-10T19:30:00+08:00 @completed:2026-05-21T09:52:00+08:00 -->
+- [ ] Instrument the audit log table #db/bug <!-- @id:yjFFjfP0 @created:2026-03-16T18:13:00+08:00 -->
+- [ ] Migrate the index coverage #db <!-- @id:9M2WSK_f @created:2025-09-18T14:37:00+08:00 -->
+- [x] Refactor the index coverage #db <!-- @id:tj40cfPQ @created:2025-06-23T12:14:00+08:00 @started:2025-06-30T14:58:00+08:00 @completed:2025-07-04T17:04:00+08:00 -->
+- [/] Implement the partitioning #db/v2 <!-- @id:zf8_f_S9 @created:2026-04-15T10:39:00+08:00 @started:2026-04-22T19:20:00+08:00 -->
+- [>] Deprecate the read replica #db/perf <!-- @id:92us-gyU @created:2025-12-02T08:51:00+08:00 @moved:2025-12-20T12:35:00+08:00 @movedTo:26WHPHm0 -->
+- [x] Wire up the connection pool #db/v2 <!-- @id:_ZzHFvwH @created:2025-09-13T18:10:00+08:00 @started:2025-09-21T11:58:00+08:00 @completed:2025-09-29T12:47:00+08:00 -->
+- [/] Document the read replica #db <!-- @id:1DUTIFpQ @created:2026-05-21T19:11:00+08:00 @started:2026-05-29T09:43:00+08:00 -->
+- [n] Add the partitioning #db <!-- @id:5G206pbk @created:2026-01-25T17:29:00+08:00 -->
+- [ ] Optimize the partitioning #db/bug <!-- @id:X1cqFz2p @created:2025-09-24T12:20:00+08:00 -->
+- [x] Wire up the partitioning #db <!-- @id:nYGzpd_3 @created:2025-12-29T13:33:00+08:00 @started:2026-01-08T19:45:00+08:00 @completed:2026-01-09T18:49:00+08:00 -->
+
+## Infra
+
+- [x] Deprecate the health check #infra/spike <!-- @id:Ox372gFs @created:2026-01-16T13:19:00+08:00 @started:2026-01-24T18:15:00+08:00 @completed:2026-02-04T19:55:00+08:00 @priority:2 -->
+- [x] Prototype the deploy pipeline #infra <!-- @id:jEIsrXRb @created:2026-02-09T19:40:00+08:00 @started:2026-02-15T12:21:00+08:00 @completed:2026-02-24T08:57:00+08:00 -->
+- [ ] Validate the cost dashboard #infra <!-- @id:pdhahP3N @created:2025-10-17T14:41:00+08:00 -->
+- [>] Instrument the secrets rotation #infra/v2 <!-- @id:tBf6Fce0 @created:2026-02-04T08:46:00+08:00 @moved:2026-02-20T19:03:00+08:00 @movedTo:5ybGRa52 -->
+- [!] Audit the health check #infra <!-- @id:DqKXvkLY @created:2025-12-21T12:28:00+08:00 @cancelled:2026-01-05T13:28:00+08:00 @priority:2 -->
+- [x] Instrument the log shipping #infra <!-- @id:RR4iM9G6 @created:2026-04-29T19:50:00+08:00 @started:2026-05-04T09:55:00+08:00 @completed:2026-05-17T18:58:00+08:00 @priority:1 -->
+- [/] Polish the health check #infra <!-- @id:m4Bo9z83 @created:2026-01-12T13:57:00+08:00 @started:2026-01-22T16:57:00+08:00 -->
+- [/] Deprecate the secrets rotation #infra <!-- @id:X3hhQAb_ @created:2025-10-03T09:57:00+08:00 @started:2025-10-06T14:53:00+08:00 @priority:1 -->
+- [ ] Audit the deploy pipeline #infra/spike <!-- @id:KM-2wozS @created:2025-07-30T19:13:00+08:00 -->
+- [!] Backfill the deploy pipeline #infra/core <!-- @id:hFdhqQ4- @created:2026-02-12T15:48:00+08:00 @cancelled:2026-02-23T15:02:00+08:00 -->
+- [x] Prototype the cost dashboard #infra/bug <!-- @id:bHq_jpNo @created:2025-11-30T15:40:00+08:00 @started:2025-12-08T10:08:00+08:00 @completed:2025-12-19T12:53:00+08:00 -->
+- [ ] Audit the secrets rotation #infra/bug <!-- @id:nmafMcKl @created:2026-06-05T19:10:00+08:00 -->
+- [ ] Cache the deploy pipeline #infra <!-- @id:REBbRY9A @created:2025-09-30T13:15:00+08:00 -->
+- [/] Document the autoscaler #infra/core <!-- @id:EDuAotZk @created:2026-05-19T08:43:00+08:00 @started:2026-05-23T12:35:00+08:00 @priority:2 -->
+- [ ] Add the autoscaler #infra/perf <!-- @id:e3BhYG_Q @created:2026-05-28T16:49:00+08:00 @priority:2 -->
+- [>] Cache the deploy pipeline #infra/bug <!-- @id:4pfo-PZ8 @created:2026-03-21T13:17:00+08:00 @moved:2026-04-08T12:28:00+08:00 @movedTo:u1djjTLF -->
+
+## Auth
+
+- [!] Document the login flow #auth/bug <!-- @id:hwFrLprg @created:2026-02-20T14:04:00+08:00 @cancelled:2026-02-24T18:50:00+08:00 -->
+- [x] Migrate the OAuth callback #auth/perf <!-- @id:vhDNJqD_ @created:2026-05-21T11:23:00+08:00 @started:2026-05-31T14:31:00+08:00 @completed:2026-06-05T10:20:00+08:00 -->
+- [/] Implement the session store #auth/spike <!-- @id:A0FRyh6j @created:2026-03-06T12:27:00+08:00 @started:2026-03-16T15:58:00+08:00 -->
+- [ ] Instrument the password reset #auth <!-- @id:_VzhcvVw @created:2025-10-08T14:00:00+08:00 -->
+- [x] Design the MFA enrolment #auth/spike <!-- @id:SNNLeQTr @created:2026-05-04T09:40:00+08:00 @started:2026-05-12T16:23:00+08:00 @completed:2026-05-22T16:06:00+08:00 @priority:3 -->
+- [n] Investigate the OAuth callback #auth/bug <!-- @id:yPI82pfQ @created:2026-01-24T18:05:00+08:00 -->
+- [x] Migrate the device list #auth/core <!-- @id:xc8AqB2D @created:2026-04-12T18:02:00+08:00 @started:2026-04-17T10:52:00+08:00 @completed:2026-04-19T11:27:00+08:00 -->
+- [x] Add the token refresh #auth <!-- @id:D5D3VDBx @created:2025-09-09T10:43:00+08:00 @started:2025-09-14T12:13:00+08:00 @completed:2025-09-18T17:48:00+08:00 -->
+- [x] Deprecate the SSO mapping #auth/core <!-- @id:JS-lKri_ @created:2026-01-06T19:47:00+08:00 @started:2026-01-13T09:20:00+08:00 @completed:2026-01-15T09:34:00+08:00 @priority:1 -->
+- [x] Validate the OAuth callback #auth/v2 <!-- @id:gz6O0p5v @created:2025-06-25T11:56:00+08:00 @started:2025-07-02T08:09:00+08:00 @completed:2025-07-10T14:51:00+08:00 -->
+- [x] Migrate the device list #auth/core <!-- @id:I4Lg5hL0 @created:2026-04-28T16:20:00+08:00 @started:2026-04-30T15:35:00+08:00 @completed:2026-05-12T09:15:00+08:00 @priority:2 -->
+- [>] Add the session store #auth/v2 <!-- @id:VPyImH8e @created:2025-09-11T09:56:00+08:00 @moved:2025-09-23T09:16:00+08:00 @movedTo:g_wx0gCB -->
+- [x] Deprecate the password reset #auth/perf <!-- @id:YD7mANLT @created:2026-03-25T08:20:00+08:00 @started:2026-04-05T12:02:00+08:00 @completed:2026-04-15T19:25:00+08:00 @priority:1 -->
+- [ ] Validate the device list #auth/v2 <!-- @id:iuM9qqZw @created:2025-10-18T15:15:00+08:00 -->
+- [ ] Fix the OAuth callback #auth <!-- @id:cQCnUQv0 @created:2026-03-14T15:34:00+08:00 -->
+- [x] Design the session store #auth <!-- @id:85sME4-L @created:2026-03-20T13:49:00+08:00 @started:2026-03-24T18:51:00+08:00 @completed:2026-04-05T16:04:00+08:00 -->
+- [x] Polish the password reset #auth/core <!-- @id:p7MOxdT5 @created:2026-02-13T10:25:00+08:00 @started:2026-02-18T08:25:00+08:00 @completed:2026-02-24T08:35:00+08:00 -->
+
+## QA
+
+- [ ] Deprecate the e2e suite #qa/bug <!-- @id:-re90fSA @created:2026-03-19T16:46:00+08:00 -->
+- [/] Fix the smoke checks #qa <!-- @id:lJHS6nrF @created:2026-04-06T18:20:00+08:00 @started:2026-04-17T16:36:00+08:00 -->
+- [x] Harden the visual snapshots #qa <!-- @id:73QJwPLu @created:2025-12-18T16:17:00+08:00 @started:2025-12-26T08:47:00+08:00 @completed:2026-01-05T11:55:00+08:00 @priority:1 -->
+- [x] Refactor the load test #qa <!-- @id:e69T0ouF @created:2025-08-12T14:53:00+08:00 @started:2025-08-15T12:17:00+08:00 @completed:2025-08-18T17:13:00+08:00 @priority:2 -->
+- [x] Design the flaky retries #qa <!-- @id:k_9piqwz @created:2026-04-09T17:28:00+08:00 @started:2026-04-21T09:26:00+08:00 @completed:2026-04-24T16:43:00+08:00 -->
+- [x] Audit the contract tests #qa/core <!-- @id:k_7skGs_ @created:2026-01-22T09:21:00+08:00 @started:2026-02-03T17:18:00+08:00 @completed:2026-02-04T17:59:00+08:00 -->
+- [/] Investigate the smoke checks #qa <!-- @id:R2cGIuAR @created:2026-05-31T18:31:00+08:00 @started:2026-06-05T13:59:00+08:00 @priority:3 -->
+- [/] Add the contract tests #qa/spike <!-- @id:3z1o9ht_ @created:2025-12-05T11:00:00+08:00 @started:2025-12-12T09:33:00+08:00 -->
+- [ ] Cache the contract tests #qa/spike <!-- @id:YR1FgSwh @created:2026-04-01T10:03:00+08:00 -->
+- [x] Validate the e2e suite #qa <!-- @id:6O-4uqoE @created:2026-05-21T10:40:00+08:00 @started:2026-05-27T10:17:00+08:00 @completed:2026-06-07T15:58:00+08:00 -->
+- [ ] Prototype the load test #qa <!-- @id:90VgvUKH @created:2026-05-28T14:57:00+08:00 @priority:3 -->
+- [x] Optimize the visual snapshots #qa/spike <!-- @id:Q35csc4D @created:2026-01-22T08:02:00+08:00 @started:2026-01-29T12:47:00+08:00 @completed:2026-02-07T18:18:00+08:00 @priority:3 -->
+- [x] Validate the load test #qa/spike <!-- @id:5ZNhznB6 @created:2025-12-21T14:23:00+08:00 @started:2025-12-25T16:30:00+08:00 @completed:2025-12-29T19:49:00+08:00 @priority:3 -->
+- [x] Investigate the load test #qa <!-- @id:FUozET70 @created:2026-01-22T14:28:00+08:00 @started:2026-02-03T14:26:00+08:00 @completed:2026-02-06T18:47:00+08:00 -->
+- [x] Migrate the smoke checks #qa <!-- @id:TR_SrXl3 @created:2025-07-29T13:43:00+08:00 @started:2025-08-07T14:43:00+08:00 @completed:2025-08-16T18:39:00+08:00 -->
+- [!] Investigate the smoke checks #qa <!-- @id:KOLqBTnb @created:2026-05-16T12:38:00+08:00 @cancelled:2026-05-25T19:02:00+08:00 -->
+- [ ] Deprecate the flaky retries #qa/core <!-- @id:mfQh_19W @created:2026-01-02T15:44:00+08:00 -->
+- [>] Harden the e2e suite #qa <!-- @id:YjUv8DjQ @created:2025-07-10T10:57:00+08:00 @moved:2025-07-19T09:54:00+08:00 @movedTo:EsLm97fI @priority:1 -->
+- [>] Migrate the coverage gate #qa <!-- @id:AkMEad7C @created:2026-02-03T10:11:00+08:00 @moved:2026-02-08T17:05:00+08:00 @movedTo:KOLqBTnb -->
+- [ ] Backfill the coverage gate #qa <!-- @id:jorPTrCa @created:2025-09-25T08:51:00+08:00 @priority:2 -->
+
+## Docs
+
+- [>] Audit the API reference #docs <!-- @id:ZLkK_7Tr @created:2026-06-03T12:23:00+08:00 @moved:2026-06-07T12:19:00+08:00 @movedTo:Ktv2i-ot -->
+- [/] Cache the migration guide #docs <!-- @id:7pZvs2SI @created:2026-05-22T09:31:00+08:00 @started:2026-05-27T18:08:00+08:00 -->
+- [ ] Audit the changelog #docs/bug <!-- @id:pD2vlpLv @created:2026-05-18T14:06:00+08:00 -->
+- [ ] Migrate the quickstart #docs <!-- @id:zxsYhOaO @created:2025-09-24T18:29:00+08:00 -->
+- [!] Add the API reference #docs <!-- @id:OvNM8I0Y @created:2026-05-06T12:03:00+08:00 @cancelled:2026-05-22T13:25:00+08:00 -->
+- [x] Migrate the architecture notes #docs <!-- @id:VMkifGgH @created:2025-11-09T15:54:00+08:00 @started:2025-11-12T10:13:00+08:00 @completed:2025-11-19T18:54:00+08:00 -->
+- [ ] Prototype the quickstart #docs/core <!-- @id:ooGNEIlN @created:2026-04-18T10:28:00+08:00 -->
+- [x] Investigate the architecture notes #docs/core <!-- @id:Q-GAKVqZ @created:2026-03-01T18:17:00+08:00 @started:2026-03-09T19:55:00+08:00 @completed:2026-03-21T19:11:00+08:00 -->
+- [x] Implement the API reference #docs/v2 <!-- @id:JTmW_ivy @created:2026-05-07T19:15:00+08:00 @started:2026-05-18T08:37:00+08:00 @completed:2026-06-01T17:49:00+08:00 @priority:2 -->
+- [ ] Polish the runbook #docs <!-- @id:CBJ9Trya @created:2025-10-11T18:42:00+08:00 @priority:1 -->
+- [x] Prototype the architecture notes #docs/spike <!-- @id:CJlJWIm0 @created:2026-05-28T16:47:00+08:00 @started:2026-06-05T15:35:00+08:00 @completed:2026-06-06T15:32:00+08:00 -->
+- [!] Refactor the quickstart #docs/v2 <!-- @id:UzmoxSoN @created:2025-11-08T17:39:00+08:00 @cancelled:2025-11-27T17:55:00+08:00 @priority:1 -->
+- [/] Rework the migration guide #docs/bug <!-- @id:QRTsWtz8 @created:2025-08-15T14:32:00+08:00 @started:2025-08-23T11:00:00+08:00 -->
+- [x] Document the quickstart #docs/perf <!-- @id:rPXApFvZ @created:2026-01-13T08:10:00+08:00 @started:2026-01-23T11:02:00+08:00 @completed:2026-02-02T17:57:00+08:00 -->
+- [x] Deprecate the changelog #docs/spike <!-- @id:NcdReE_K @created:2025-10-29T15:51:00+08:00 @started:2025-11-09T08:11:00+08:00 @completed:2025-11-15T16:39:00+08:00 @priority:3 -->
+- [/] Implement the quickstart #docs/v2 <!-- @id:l4J66G0z @created:2025-07-31T18:14:00+08:00 @started:2025-08-07T13:47:00+08:00 @priority:1 -->
+- [x] Deprecate the quickstart #docs <!-- @id:M9gf1UOC @created:2026-04-30T18:02:00+08:00 @started:2026-05-05T16:01:00+08:00 @completed:2026-05-12T16:33:00+08:00 -->
+- [ ] Prototype the migration guide #docs/v2 <!-- @id:u-EPGKSi @created:2026-03-31T18:41:00+08:00 @priority:2 -->
+- [x] Rework the migration guide #docs/perf <!-- @id:IOM8GdMz @created:2025-07-01T16:07:00+08:00 @started:2025-07-04T14:42:00+08:00 @completed:2025-07-12T10:40:00+08:00 -->
+- [n] Harden the architecture notes #docs/perf <!-- @id:tANPtEc2 @created:2026-05-19T14:43:00+08:00 @priority:2 -->
+
