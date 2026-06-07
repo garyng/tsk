@@ -34,9 +34,10 @@ const METRIC_LABEL: Record<Metric, string> = {
 };
 
 /**
- * Tooltip text for a calendar day: a per-type breakdown ("2 created · 1 completed
- * on 2026-05-24"). With a metric selected only that type shows; with `all`, every
- * non-zero event type that day. "no activity" for an empty day.
+ * Tooltip text for a calendar day: the date, then a per-type breakdown one line
+ * each ("2 created" / "1 completed"). With a metric selected only that type
+ * shows; with `all`, every non-zero event type. "no activity" for an empty day.
+ * `.react-activity-calendar__tooltip` sets `white-space: pre-line` so the `\n`s render.
  */
 function dayTooltip(date: string, series: StatsView['series'], metric: Metric): string {
     const metrics = metric === 'all' ? EVENT_METRICS : [metric];
@@ -47,7 +48,7 @@ function dayTooltip(date: string, series: StatsView['series'], metric: Metric): 
         }))
         .filter((p) => p.n > 0)
         .map((p) => `${p.n} ${p.label.toLowerCase()}`);
-    return `${parts.length ? parts.join(' · ') : 'no activity'} on ${date}`;
+    return [date, ...(parts.length ? parts : ['no activity'])].join('\n');
 }
 
 // Blue intensity ramp (levels 0..4) for light + dark. A first-guess palette —

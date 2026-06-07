@@ -101,3 +101,18 @@
 .tsk-stats__calendar {
     overflow-x: auto;
 }
+/* react-activity-calendar ships NO styling for its tooltip and portals it to
+   <body>, so style it globally: a readable VS Code hover-widget surface, with
+   `pre-line` to honor the per-type line breaks from `dayTooltip`. */
+.react-activity-calendar__tooltip {
+    white-space: pre-line;
+    background: var(--vscode-editorHoverWidget-background, #252526);
+    color: var(--vscode-editorHoverWidget-foreground, #cccccc);
+    border: 1px solid var(--vscode-editorHoverWidget-border, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    padding: 6px 9px;
+    font-size: 0.85em;
+    line-height: 1.45;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    z-index: 10;
+}
