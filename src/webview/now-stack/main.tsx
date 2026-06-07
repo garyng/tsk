@@ -21,6 +21,8 @@ import { createRoot } from 'react-dom/client';
 import type { HostToWebview, WebviewToHost } from '../../lib/now-protocol';
 import type { NowRowView } from '../../lib/now-row';
 import { buildNowTreeSource, expandedNowIds } from '../../lib/now-tree-source';
+import { injectStyle } from '../shared/inject-style';
+import styles from './now-stack.css?raw';
 
 /**
  * The "now stack" webview client. Receives the resolved, linear-compaction rows
@@ -330,50 +332,14 @@ function Codicon({ name }: { name: string }) {
 }
 
 /**
- * Theme-aware styles + the codicon font, injected once at load. Kept in-bundle
- * (the font is a `?inline` data-URI) so the single shipped JS carries its own
- * skin AND icons — the host and the standalone Playwright harness both get them
- * for free. Colors are `var(--vscode-*, <dark-fallback>)`.
+ * Inject the codicon font + the now-stack stylesheet (`now-stack.css`) once at
+ * load. The codicon CSS ships a relative `url(./codicon.ttf)`; rewrite it to the
+ * inlined data-URI font so nothing external loads. Kept in-bundle so the host
+ * panel and the standalone Playwright harness both get the skin + icons for free.
  */
-const STYLE = `
-.now-stack { display: flex; flex-direction: column; height: 100vh; color: var(--vscode-foreground, #cccccc);
-    font: var(--vscode-font-size, 13px) / 1.4 var(--vscode-font-family, system-ui, "Segoe UI", sans-serif); }
-.now-stack__empty { padding: 8px 12px; color: var(--vscode-descriptionForeground, #8c8c8c); }
-.now-toolbar { display: flex; justify-content: flex-end; gap: 2px; padding: 3px 6px;
-    border-bottom: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.1)); }
-.now-tree { flex: 1; list-style: none; margin: 0; padding: 4px 0; overflow: auto; outline: none; }
-.now-row { position: relative; display: flex; align-items: center; height: 22px; padding-right: 8px;
-    user-select: none; white-space: nowrap; cursor: pointer; outline: none; }
-.now-row:hover { background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.07)); }
-.now-row[data-state="current"] { background: var(--vscode-list-inactiveSelectionBackground, rgba(255,255,255,0.10));
-    box-shadow: inset 2px 0 0 var(--vscode-focusBorder, #007fd4); }
-.now-row[data-focused] { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: -1px; }
-.now-row__twistie { flex: 0 0 16px; width: 16px; height: 22px; padding: 0; margin: 0;
-    display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
-    background: none; border: none; cursor: pointer; color: var(--vscode-icon-foreground, #c5c5c5); }
-.now-row__icon { flex: 0 0 16px; display: inline-flex; align-items: center; justify-content: center;
-    color: var(--vscode-charts-blue, #3794ff); }
-.now-row__label { overflow: hidden; text-overflow: ellipsis; }
-.now-row__label--missing { font-style: italic; color: var(--vscode-descriptionForeground, #8c8c8c); }
-.now-row__when { margin-left: auto; padding-left: 12px; font-size: 0.9em;
-    color: var(--vscode-descriptionForeground, #8c8c8c); }
-.now-row__actions { display: none; align-items: center; gap: 1px; padding-left: 6px; }
-.now-row:hover .now-row__actions, .now-row[data-focused] .now-row__actions { display: inline-flex; }
-.now-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
-    padding: 0; background: none; border: none; cursor: pointer; border-radius: 4px;
-    color: var(--vscode-icon-foreground, #c5c5c5); }
-.now-icon-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12)); }
-`;
-
 function injectStyles(): void {
-    if (document.getElementById('now-stack-style')) return;
-    // Codicon CSS ships with a relative `url(./codicon.ttf)`; point it at the
-    // inlined data-URI font so nothing external needs loading.
     const codicons = codiconCss.replace(/url\([^)]*codicon\.ttf[^)]*\)/, `url(${codiconFont})`);
-    const el = document.createElement('style');
-    el.id = 'now-stack-style';
-    el.textContent = `${codicons}\n${STYLE}`;
-    document.head.appendChild(el);
+    injectStyle('now-stack-style', `${codicons}\n${styles}`);
 }
 
 injectStyles();

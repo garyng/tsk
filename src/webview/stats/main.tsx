@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { EVENT_METRICS, type Metric } from '../../lib/stats-aggregation';
 import { toCalendarData } from '../../lib/stats-calendar';
 import type { StatsHostToWebview, StatsView, StatsWebviewToHost } from '../../lib/stats-protocol';
+import { injectStyle } from '../shared/inject-style';
+import styles from './stats.css?raw';
 
 /**
  * The Stats webview client. Receives a host-built {@link StatsView} over the
@@ -163,42 +165,7 @@ function Stats() {
     );
 }
 
-const STYLE = `
-.tsk-stats { padding: 14px 18px; color: var(--vscode-foreground, #cccccc);
-    font: var(--vscode-font-size, 13px) / 1.5 var(--vscode-font-family, system-ui, "Segoe UI", sans-serif); }
-.tsk-stats__empty, .tsk-stats__note { color: var(--vscode-descriptionForeground, #8c8c8c); }
-.tsk-stats__note { margin: 10px 0 0; font-size: 0.9em; max-width: 56ch; line-height: 1.5; }
-.tsk-stats__tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.tsk-tile { display: flex; flex-direction: column; gap: 2px; min-width: 68px; padding: 8px 12px;
-    border-radius: 6px; background: var(--vscode-editorWidget-background, rgba(255,255,255,0.04));
-    border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08)); }
-.tsk-tile__count { font-size: 1.5em; font-weight: 600; line-height: 1.1; }
-.tsk-tile__label { font-size: 0.82em; color: var(--vscode-descriptionForeground, #8c8c8c); }
-.tsk-tile[data-marker="todo"] .tsk-tile__count { color: var(--vscode-tsk-marker-todo, #e5c07b); }
-.tsk-tile[data-marker="inprogress"] .tsk-tile__count { color: var(--vscode-tsk-marker-inprogress, #3794ff); }
-.tsk-tile[data-marker="completed"] .tsk-tile__count { color: var(--vscode-tsk-marker-completed, #67c23a); }
-.tsk-tile[data-marker="moved"] .tsk-tile__count { color: var(--vscode-tsk-marker-moved, #ff9d00); }
-.tsk-tile[data-marker="cancelled"] .tsk-tile__count { color: var(--vscode-tsk-marker-cancelled, #9e9e9e); }
-.tsk-tile[data-marker="notes"] .tsk-tile__count { color: var(--vscode-tsk-marker-notes, #bb6dd9); }
-.tsk-stats__toggle { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
-.tsk-chip { padding: 3px 11px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 0.9em;
-    color: var(--vscode-foreground, #cccccc); border: 1px solid transparent;
-    background: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.08)); }
-.tsk-chip:hover { background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12)); }
-.tsk-chip--active { background: var(--vscode-button-background, #0e639c);
-    color: var(--vscode-button-foreground, #ffffff); }
-.tsk-stats__calendar { overflow-x: auto; }
-`;
-
-function injectStyles(): void {
-    if (document.getElementById('tsk-stats-style')) return;
-    const el = document.createElement('style');
-    el.id = 'tsk-stats-style';
-    el.textContent = STYLE;
-    document.head.appendChild(el);
-}
-
-injectStyles();
+injectStyle('tsk-stats-style', styles);
 
 const container = document.getElementById('root');
 if (container) {

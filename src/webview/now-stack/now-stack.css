@@ -1,0 +1,112 @@
+.now-stack {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    color: var(--vscode-foreground, #cccccc);
+    font:
+        var(--vscode-font-size, 13px) / 1.4
+        var(--vscode-font-family, system-ui, "Segoe UI", sans-serif);
+}
+.now-stack__empty {
+    padding: 8px 12px;
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+.now-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+.now-tree {
+    flex: 1;
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    overflow: auto;
+    outline: none;
+}
+.now-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 22px;
+    padding-right: 8px;
+    user-select: none;
+    white-space: nowrap;
+    cursor: pointer;
+    outline: none;
+}
+.now-row:hover {
+    background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.07));
+}
+.now-row[data-state="current"] {
+    background: var(--vscode-list-inactiveSelectionBackground, rgba(255, 255, 255, 0.1));
+    box-shadow: inset 2px 0 0 var(--vscode-focusBorder, #007fd4);
+}
+.now-row[data-focused] {
+    outline: 1px solid var(--vscode-focusBorder, #007fd4);
+    outline-offset: -1px;
+}
+.now-row__twistie {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 22px;
+    padding: 0;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--vscode-icon-foreground, #c5c5c5);
+}
+.now-row__icon {
+    flex: 0 0 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vscode-charts-blue, #3794ff);
+}
+.now-row__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.now-row__label--missing {
+    font-style: italic;
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+.now-row__when {
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: 0.9em;
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+.now-row__actions {
+    display: none;
+    align-items: center;
+    gap: 1px;
+    padding-left: 6px;
+}
+.now-row:hover .now-row__actions,
+.now-row[data-focused] .now-row__actions {
+    display: inline-flex;
+}
+.now-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--vscode-icon-foreground, #c5c5c5);
+}
+.now-icon-btn:hover {
+    background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.12));
+}
