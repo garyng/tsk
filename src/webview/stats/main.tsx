@@ -43,6 +43,20 @@ const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as 
 >;
 
 /**
+ * The status marker each metric reads as, for the toggle-chip glyph (consistent
+ * with the task-list status chips). `all` carries none; `created` shows the todo
+ * glyph since a new task enters as `[ ]`.
+ */
+const METRIC_MARKER: Record<Metric, Marker | undefined> = {
+    all: undefined,
+    created: 'todo',
+    started: 'inprogress',
+    completed: 'completed',
+    cancelled: 'cancelled',
+    moved: 'moved',
+};
+
+/**
  * Tooltip text for a calendar day: the date, then a per-type breakdown one line
  * each ("2 created" / "1 completed"). With a metric selected only that type
  * shows; with `all`, every non-zero event type. "no activity" for an empty day.
@@ -159,17 +173,25 @@ function Stats() {
             </header>
 
             <nav className="tsk-stats__toggle" aria-label="Activity metric">
-                {METRICS.map((m) => (
-                    <button
-                        type="button"
-                        key={m}
-                        className={`tsk-chip${m === metric ? ' tsk-chip--active' : ''}`}
-                        aria-pressed={m === metric}
-                        onClick={() => setMetric(m)}
-                    >
-                        {METRIC_LABEL[m]}
-                    </button>
-                ))}
+                {METRICS.map((m) => {
+                    const marker = METRIC_MARKER[m];
+                    return (
+                        <button
+                            type="button"
+                            key={m}
+                            className={`tsk-chip${m === metric ? ' tsk-chip--active' : ''}`}
+                            aria-pressed={m === metric}
+                            onClick={() => setMetric(m)}
+                        >
+                            {marker && (
+                                <span className="tsk-marker" data-marker={marker} aria-hidden="true">
+                                    [{GLYPH[marker]}]
+                                </span>
+                            )}
+                            {METRIC_LABEL[m]}
+                        </button>
+                    );
+                })}
             </nav>
 
             <section className="tsk-stats__calendar" ref={calendarRef}>

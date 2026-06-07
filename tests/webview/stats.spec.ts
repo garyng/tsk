@@ -131,7 +131,8 @@ test('sizes the calendar to fit the panel width (no horizontal overflow)', async
 test('switching metric updates the active chip', async ({ page }) => {
     await mount(page);
     await page.getByRole('button', { name: 'Completed' }).click();
-    await expect(page.locator('.tsk-chip--active')).toHaveText('Completed');
+    // The active chip now carries its marker glyph + label, so match loosely.
+    await expect(page.locator('.tsk-chip--active')).toContainText('Completed');
 });
 
 test('surfaces the best-effort caveat only for a metric with no events', async ({ page }) => {
@@ -140,4 +141,5 @@ test('surfaces the best-effort caveat only for a metric with no events', async (
     await page.getByRole('button', { name: 'Cancelled' }).click();
     await expect(page.locator('.tsk-stats__note')).toBeVisible();
 });
+
 
