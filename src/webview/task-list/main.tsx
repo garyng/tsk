@@ -5,13 +5,15 @@ import {
     type FilterFn,
     flexRender,
     getCoreRowModel,
+    getFacetedRowModel,
+    getFacetedUniqueValues,
     getFilteredRowModel,
     getSortedRowModel,
     type SortingState,
     useReactTable,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MARKERS, type Marker } from '../../lib/markers';
 import { formatRelativeShort } from '../../lib/relative-time';
@@ -29,10 +31,10 @@ import styles from './task-list.css?raw';
 /**
  * The Task-list webview client. Receives a host-built {@link TaskListView} (every
  * row, once) and renders a `@tanstack/react-table` table — fuzzy content search,
- * a sortable created column, status-chip quick-filters that drive the marker
- * column filter — windowed by `@tanstack/react-virtual`. All filter/sort/search
- * is client-side (no round-trip); a row click posts `jump`, which the host
- * re-resolves by `@id` and reveals.
+ * a sortable created column, Excel-style header filters on the Status + Tags
+ * columns (the status chips are quick-filters over the same marker filter) —
+ * windowed by `@tanstack/react-virtual`. All filter/sort/search is client-side
+ * (no round-trip); a row click posts `jump`, which the host re-resolves and reveals.
  */
 
 declare function acquireVsCodeApi(): {
@@ -50,6 +52,17 @@ const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as 
 >;
 
 const ROW_HEIGHT = 28;
+/** Columns that carry an Excel-style header filter dropdown. */
+const FILTERABLE = new Set(['marker', 'tags']);
+/** Popover width (px) — used to clamp it on-screen. Keep in sync with `.tsk-filter`. */
+const POPOVER_WIDTH = 220;
+
+/** One row in a header filter dropdown — a faceted value with its count. */
+interface FilterOption {
+    value: string;
+    label: string;
+    count: number;
+}
 
 /** Fuzzy text match (match-sorter), used as the global filter over the content column. */
 const fuzzy: FilterFn<TaskRow> = (row, columnId, value) =>
@@ -79,7 +92,11 @@ function TaskList() {
     const [globalFilter, setGlobalFilter] = useState('');
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [sorting, setSorting] = useState<SortingState>([{ id: 'created', desc: true }]);
+    const [openFilter, setOpenFilter] = useState<{ col: 'marker' | 'tags'; rect: DOMRect } | null>(
+        null,
+    );
     const scrollRef = useRef<HTMLDivElement>(null);
+    const popoverRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const onMessage = (event: MessageEvent): void => {
@@ -90,6 +107,26 @@ function TaskList() {
         post({ type: 'ready' });
         return () => window.removeEventListener('message', onMessage);
     }, []);
+
+    // Close the open dropdown on an outside click or Escape. A click on any filter
+    // trigger is left for that button's own toggle handler.
+    useEffect(() => {
+        if (!openFilter) return;
+        const onDown = (e: globalThis.MouseEvent): void => {
+            const t = e.target as HTMLElement | null;
+            if (popoverRef.current?.contains(t) || t?.closest('.tsk-th__filter')) return;
+            setOpenFilter(null);
+        };
+        const onKey = (e: KeyboardEvent): void => {
+            if (e.key === 'Escape') setOpenFilter(null);
+        };
+        document.addEventListener('mousedown', onDown);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', onDown);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [openFilter]);
 
     const columns = useMemo<ColumnDef<TaskRow>[]>(
         () => [
@@ -125,6 +162,9 @@ function TaskList() {
                 enableGlobalFilter: false,
                 enableSorting: false,
                 filterFn: tagsIncludeSome,
+                // Facet over individual tags, not the whole array, so the dropdown
+                // lists each #tag with its own count.
+                getUniqueValues: (row) => row.tags,
                 cell: ({ row }) =>
                     row.original.tags.map((t) => (
                         <span key={t} className="tsk-tag">
@@ -169,6 +209,8 @@ function TaskList() {
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        getFacetedRowModel: getFacetedRowModel(),
+        getFacetedUniqueValues: getFacetedUniqueValues(),
     });
 
     const rows = table.getRowModel().rows;
@@ -179,14 +221,37 @@ function TaskList() {
         overscan: 12,
     });
 
-    const markerCol = table.getColumn('marker');
-    const markerFilter = (markerCol?.getFilterValue() as Marker[] | undefined) ?? [];
-    const toggleMarker = (m: Marker): void => {
-        const next = markerFilter.includes(m)
-            ? markerFilter.filter((x) => x !== m)
-            : [...markerFilter, m];
-        markerCol?.setFilterValue(next.length ? next : undefined);
+    const filterOf = (col: 'marker' | 'tags'): string[] =>
+        (table.getColumn(col)?.getFilterValue() as string[] | undefined) ?? [];
+    const toggleInColumn = (col: 'marker' | 'tags', value: string): void => {
+        const cur = filterOf(col);
+        const next = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
+        table.getColumn(col)?.setFilterValue(next.length ? next : undefined);
     };
+    const markerFilter = filterOf('marker');
+
+    // Marker dropdown lists every status (registry order, matching the chips);
+    // tags dropdown is faceted off the live data.
+    const markerOptions: FilterOption[] = (view?.counts ?? []).map((c) => ({
+        value: c.marker,
+        label: c.label,
+        count: c.count,
+    }));
+    const tagFacets = table.getColumn('tags')?.getFacetedUniqueValues();
+    const tagOptions: FilterOption[] = useMemo(
+        () =>
+            [...(tagFacets?.entries() ?? [])]
+                .map(([value, count]) => ({ value: String(value), label: String(value), count }))
+                .sort((a, b) => a.value.localeCompare(b.value)),
+        [tagFacets],
+    );
+
+    const openMenu = (col: 'marker' | 'tags', e: MouseEvent<HTMLButtonElement>): void => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setOpenFilter((cur) => (cur?.col === col ? null : { col, rect }));
+    };
+
+    const anyFilter = columnFilters.length > 0 || globalFilter.length > 0;
 
     return (
         <main className="tsk-tasks">
@@ -205,7 +270,7 @@ function TaskList() {
                             type="button"
                             className={`tsk-chip${markerFilter.length === 0 ? ' tsk-chip--active' : ''}`}
                             aria-pressed={markerFilter.length === 0}
-                            onClick={() => markerCol?.setFilterValue(undefined)}
+                            onClick={() => table.getColumn('marker')?.setFilterValue(undefined)}
                         >
                             All <span className="tsk-chip__count">{view.total}</span>
                         </button>
@@ -216,31 +281,60 @@ function TaskList() {
                                 data-marker={c.marker}
                                 className={`tsk-chip${markerFilter.includes(c.marker) ? ' tsk-chip--active' : ''}`}
                                 aria-pressed={markerFilter.includes(c.marker)}
-                                onClick={() => toggleMarker(c.marker)}
+                                onClick={() => toggleInColumn('marker', c.marker)}
                             >
                                 {c.label} <span className="tsk-chip__count">{c.count}</span>
                             </button>
                         ))}
                     </nav>
+                    {anyFilter && (
+                        <button
+                            type="button"
+                            className="tsk-clear"
+                            onClick={() => {
+                                setColumnFilters([]);
+                                setGlobalFilter('');
+                            }}
+                        >
+                            Clear filters
+                        </button>
+                    )}
                 </div>
             )}
 
             {view && (
                 <div className="tsk-table__head">
                     {table.getHeaderGroups()[0]?.headers.map((header) => {
-                        const sortDir = header.column.getIsSorted();
+                        const col = header.column;
+                        const label = flexRender(col.columnDef.header, header.getContext());
+                        const sortDir = col.getIsSorted();
+                        const active = FILTERABLE.has(col.id)
+                            ? filterOf(col.id as 'marker' | 'tags')
+                            : [];
                         return (
-                            <span key={header.id} className="tsk-th" data-col={header.column.id}>
-                                {header.column.getCanSort() ? (
+                            <span key={header.id} className="tsk-th" data-col={col.id}>
+                                {FILTERABLE.has(col.id) ? (
+                                    <button
+                                        type="button"
+                                        className={`tsk-th__filter${active.length ? ' tsk-th__filter--active' : ''}`}
+                                        aria-expanded={openFilter?.col === col.id}
+                                        onClick={(e) => openMenu(col.id as 'marker' | 'tags', e)}
+                                    >
+                                        <span className="tsk-th__label">{label}</span>
+                                        {active.length > 0 && (
+                                            <span className="tsk-th__badge">{active.length}</span>
+                                        )}
+                                        <span className="tsk-th__caret" aria-hidden="true">
+                                            ▾
+                                        </span>
+                                    </button>
+                                ) : col.getCanSort() ? (
                                     <button
                                         type="button"
                                         className="tsk-th__btn"
-                                        onClick={header.column.getToggleSortingHandler()}
+                                        onClick={col.getToggleSortingHandler()}
                                     >
-                                        {flexRender(
-                                            header.column.columnDef.header,
-                                            header.getContext(),
-                                        )}
+                                        <span className="tsk-th__label">{label}</span>
                                         <span className="tsk-th__sort" aria-hidden="true">
                                             {sortDir === 'asc'
                                                 ? '▲'
@@ -250,7 +344,7 @@ function TaskList() {
                                         </span>
                                     </button>
                                 ) : (
-                                    flexRender(header.column.columnDef.header, header.getContext())
+                                    <span className="tsk-th__label">{label}</span>
                                 )}
                             </span>
                         );
@@ -304,7 +398,93 @@ function TaskList() {
                     </div>
                 )}
             </div>
+
+            {openFilter && (
+                <div
+                    ref={popoverRef}
+                    className="tsk-filter"
+                    style={{
+                        top: `${openFilter.rect.bottom + 4}px`,
+                        left: `${Math.max(8, Math.min(openFilter.rect.left, window.innerWidth - POPOVER_WIDTH - 8))}px`,
+                    }}
+                >
+                    <FilterMenu
+                        options={openFilter.col === 'marker' ? markerOptions : tagOptions}
+                        selected={new Set(filterOf(openFilter.col))}
+                        searchable={openFilter.col === 'tags'}
+                        onToggle={(v) => toggleInColumn(openFilter.col, v)}
+                        onClear={() => table.getColumn(openFilter.col)?.setFilterValue(undefined)}
+                    />
+                </div>
+            )}
         </main>
+    );
+}
+
+function FilterMenu({
+    options,
+    selected,
+    searchable,
+    onToggle,
+    onClear,
+}: {
+    options: FilterOption[];
+    selected: Set<string>;
+    searchable: boolean;
+    onToggle: (value: string) => void;
+    onClear: () => void;
+}) {
+    const [q, setQ] = useState('');
+    const searchRef = useRef<HTMLInputElement>(null);
+    // Focus the search box when the menu opens (it remounts per open).
+    useEffect(() => {
+        searchRef.current?.focus();
+    }, []);
+    const shown =
+        searchable && q
+            ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
+            : options;
+    return (
+        <>
+            {searchable && (
+                <input
+                    ref={searchRef}
+                    className="tsk-filter__search"
+                    type="search"
+                    placeholder="Filter values…"
+                    aria-label="Filter values"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                />
+            )}
+            <div className="tsk-filter__list">
+                {shown.length === 0 ? (
+                    <p className="tsk-filter__empty">No values.</p>
+                ) : (
+                    shown.map((o) => (
+                        <label key={o.value} className="tsk-filter__item">
+                            <input
+                                type="checkbox"
+                                checked={selected.has(o.value)}
+                                onChange={() => onToggle(o.value)}
+                            />
+                            <span className="tsk-filter__label">{o.label}</span>
+                            <span className="tsk-filter__count">{o.count}</span>
+                        </label>
+                    ))
+                )}
+            </div>
+            <div className="tsk-filter__foot">
+                <button
+                    type="button"
+                    className="tsk-filter__clear"
+                    disabled={selected.size === 0}
+                    onClick={onClear}
+                >
+                    Clear
+                </button>
+            </div>
+        </>
     );
 }
 

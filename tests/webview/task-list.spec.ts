@@ -138,3 +138,36 @@ test('clicking a row posts a jump carrying the task @id', async ({ page }) => {
     await page.locator('.tsk-row', { hasText: 'write the parser' }).click();
     expect(await posted(page)).toContainEqual({ type: 'jump', id: 't2' });
 });
+
+test('the tags header dropdown facets tags and filters to rows carrying one', async ({ page }) => {
+    await mount(page);
+    await page.locator('.tsk-th[data-col="tags"] .tsk-th__filter').click();
+    const menu = page.locator('.tsk-filter');
+    await expect(menu).toBeVisible();
+    // Faceted over individual tags with per-tag counts (infra appears on 2 rows).
+    await expect(menu.locator('.tsk-filter__item', { hasText: 'infra' })).toContainText('2');
+    await menu.getByText('infra').click();
+    await expect(page.locator('.tsk-row')).toHaveCount(2); // t1 + t2 carry #infra
+    await expect(page.locator('.tsk-th[data-col="tags"] .tsk-th__badge')).toHaveText('1');
+});
+
+test('the status header dropdown shares its filter with the chips', async ({ page }) => {
+    await mount(page);
+    await page.locator('.tsk-th[data-col="marker"] .tsk-th__filter').click();
+    await page.locator('.tsk-filter').getByText('Completed').click();
+    await expect(page.locator('.tsk-row')).toHaveCount(1);
+    await expect(page.locator('.tsk-row')).toContainText('ship phase 7');
+    // The chip reflects the same underlying marker filter.
+    await expect(page.getByRole('button', { name: /Completed/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
+});
+
+test('clear filters resets every active filter', async ({ page }) => {
+    await mount(page);
+    await page.getByRole('button', { name: /In progress/ }).click();
+    await expect(page.locator('.tsk-row')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page.locator('.tsk-row')).toHaveCount(4);
+});
