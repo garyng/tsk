@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
+import type { Marker } from '../../src/lib/markers';
 
 /**
  * The now-stack webview is SERVED from a fake origin (via `page.route` in
@@ -44,7 +45,19 @@ const HARNESS = `<!DOCTYPE html>
  * twisties (B, A are forks), a missing-task label, and the relative-time column.
  */
 const SAMPLE_ROWS = [
-    row('C', 'B', 0, 'trunk', false, true, true, 'Write the parser', '2 minutes ago', true),
+    row(
+        'C',
+        'B',
+        0,
+        'trunk',
+        false,
+        true,
+        true,
+        'Write the parser',
+        '2 minutes ago',
+        true,
+        'inprogress',
+    ),
     row(
         'B',
         'A',
@@ -56,9 +69,34 @@ const SAMPLE_ROWS = [
         'Refactor the cache layer',
         '10 minutes ago',
         true,
+        'completed',
     ),
-    row('D', 'B', 1, 'branch', false, false, false, 'Add unit tests', '8 minutes ago', true),
-    row('A', null, 0, 'trunk', true, true, false, 'Ship phase 7', 'about 1 hour ago', true),
+    row(
+        'D',
+        'B',
+        1,
+        'branch',
+        false,
+        false,
+        false,
+        'Add unit tests',
+        '8 minutes ago',
+        true,
+        'todo',
+    ),
+    row(
+        'A',
+        null,
+        0,
+        'trunk',
+        true,
+        true,
+        false,
+        'Ship phase 7',
+        'about 1 hour ago',
+        true,
+        'inprogress',
+    ),
     row(
         'E',
         'A',
@@ -84,6 +122,7 @@ function row(
     label: string,
     when: string,
     resolved: boolean,
+    marker?: Marker,
 ) {
     return {
         entryId,
@@ -97,20 +136,81 @@ function row(
         label,
         when,
         resolved,
+        marker,
     };
 }
 
 /** A flat linear chain (no branches): current at top, all depth 0, no twisties. */
 const LINEAR_ROWS = [
-    row('L3', 'L2', 0, 'trunk', false, true, true, 'Wire the keymap', 'just now', true),
-    row('L2', 'L1', 0, 'trunk', false, true, false, 'Refactor the panel', '5 minutes ago', true),
-    row('L1', null, 0, 'trunk', false, true, false, 'Open the now stack', 'an hour ago', true),
+    row(
+        'L3',
+        'L2',
+        0,
+        'trunk',
+        false,
+        true,
+        true,
+        'Wire the keymap',
+        'just now',
+        true,
+        'inprogress',
+    ),
+    row(
+        'L2',
+        'L1',
+        0,
+        'trunk',
+        false,
+        true,
+        false,
+        'Refactor the panel',
+        '5 minutes ago',
+        true,
+        'completed',
+    ),
+    row(
+        'L1',
+        null,
+        0,
+        'trunk',
+        false,
+        true,
+        false,
+        'Open the now stack',
+        'an hour ago',
+        true,
+        'completed',
+    ),
 ];
 
 /** A no-current forest (e.g. after removing the current root): two depth-0 roots, nothing marked. */
 const FOREST_ROWS = [
-    row('F1', null, 0, 'branch', false, false, false, 'Orphaned root one', '2 hours ago', true),
-    row('F2', null, 0, 'branch', false, false, false, 'Orphaned root two', '3 hours ago', true),
+    row(
+        'F1',
+        null,
+        0,
+        'branch',
+        false,
+        false,
+        false,
+        'Orphaned root one',
+        '2 hours ago',
+        true,
+        'completed',
+    ),
+    row(
+        'F2',
+        null,
+        0,
+        'branch',
+        false,
+        false,
+        false,
+        'Orphaned root two',
+        '3 hours ago',
+        true,
+        'cancelled',
+    ),
 ];
 
 /**
@@ -309,6 +409,16 @@ test('exactly the current row shows the circle-filled marker', async ({ page }) 
     await render(page);
     await expect(page.locator('.now-row__icon .codicon-circle-filled')).toHaveCount(1);
     await expect(page.locator('[data-tree-row-id="C"] .codicon-circle-filled')).toBeVisible();
+});
+
+test('rich-renders each resolved row with its decorated marker glyph', async ({ page }) => {
+    await render(page);
+    // The four resolved rows carry a colored [glyph]; the unresolved E has none.
+    await expect(page.locator('.now-row__marker')).toHaveCount(4);
+    await expect(
+        page.locator('[data-tree-row-id="C"] .now-row__marker[data-marker="inprogress"]'),
+    ).toBeVisible();
+    await expect(page.locator('[data-tree-row-id="E"] .now-row__marker')).toHaveCount(0);
 });
 
 test('an unresolved task renders the italic missing-label style', async ({ page }) => {

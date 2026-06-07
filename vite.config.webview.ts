@@ -30,6 +30,20 @@ export default defineConfig(({ mode }) => ({
         emptyOutDir: true,
         sourcemap: true,
         minify: mode !== 'development',
+        // Pin React core (the only dep shared by all three entries) to a stable
+        // `vendor-*` chunk. Otherwise Rollup names that auto-generated shared
+        // chunk after whichever common module seeds it — it drifted to `marker`
+        // once `shared/marker.css` became a 3-entry import, confusing next to the
+        // `markers` lib chunk and churning on unrelated import changes. Scoped to
+        // React only so each entry still inlines its own rendering lib (grida /
+        // react-activity-calendar / react-virtual) rather than all panels paying
+        // for every lib in one fat chunk.
+        rollupOptions: {
+            output: {
+                manualChunks: (id) =>
+                    /node_modules\/(react|react-dom|scheduler)\//.test(id) ? 'vendor' : undefined,
+            },
+        },
         // Some bind mounts (9p/drvfs and similar) deliver no inotify events, so
         // poll or `--watch` never fires. Gated on dev mode so the one-shot
         // production build stays unwatched. See vite.config.host.ts for the full

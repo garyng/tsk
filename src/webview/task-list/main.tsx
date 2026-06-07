@@ -8,6 +8,7 @@ import type {
     TaskListWebviewToHost,
 } from '../../lib/task-list-protocol';
 import { injectStyle } from '../shared/inject-style';
+import markerStyles from '../shared/marker.css?raw';
 import styles from './task-list.css?raw';
 
 /**
@@ -114,7 +115,9 @@ function TaskList() {
                                     title={`${row.file}:${row.line + 1}`}
                                     onClick={() => post({ type: 'jump', id: row.id })}
                                 >
-                                    <span className="tsk-task__glyph">[{GLYPH[row.marker]}]</span>
+                                    <span className="tsk-marker" data-marker={row.marker}>
+                                        [{GLYPH[row.marker]}]
+                                    </span>
                                     <span className="tsk-task__content">
                                         {row.content || '(empty)'}
                                     </span>
@@ -131,6 +134,7 @@ function TaskList() {
     );
 }
 
+injectStyle('tsk-marker-style', markerStyles);
 injectStyle('tsk-task-list-style', styles);
 
 const container = document.getElementById('root');

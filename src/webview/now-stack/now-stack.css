@@ -70,6 +70,11 @@
     justify-content: center;
     color: var(--vscode-charts-blue, #3794ff);
 }
+/* Layout only — font + status colour come from the shared `.tsk-marker`. The
+   8px gap to the label matches the task-list's glyph→content spacing. */
+.now-row__marker {
+    margin-right: 8px;
+}
 .now-row__label {
     overflow: hidden;
     text-overflow: ellipsis;

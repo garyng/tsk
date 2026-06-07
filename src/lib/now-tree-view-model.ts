@@ -85,6 +85,7 @@ export function buildNowTreeView(
             label: live?.content ?? entry.content ?? MISSING_NOW_LABEL,
             when: formatRelativeTime(entry.markedAt, now),
             resolved: live !== undefined,
+            marker: live?.marker,
         };
     });
 }

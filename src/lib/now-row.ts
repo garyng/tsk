@@ -1,10 +1,12 @@
 /**
- * Row view-model types for the now-stack — deliberately a LEAF module with no
- * imports, so the webview bundle (and its DOM-only tsconfig) can pull these
+ * Row view-model types for the now-stack — a LEAF module importing only the pure
+ * `Marker` type, so the webview bundle (and its DOM-only tsconfig) can pull these
  * types without dragging in the host-only chain behind `now-tree-view-model`
  * (`hover-logic` → `date-fns`, and `db`'s `node:sqlite`). The functions that
  * PRODUCE these rows (`layoutNowTree`, `buildNowTreeView`) stay host-side.
  */
+
+import type { Marker } from './markers';
 
 /** One rendered row of the now-stack, after linear-compaction layout. */
 export interface NowRow {
@@ -21,7 +23,7 @@ export interface NowRow {
 }
 
 /** Resolve a task `@id` to its live workspace record (the `cache.lookupById` shape). */
-export type ResolveContent = (id: string) => { content: string } | undefined;
+export type ResolveContent = (id: string) => { content: string; marker?: Marker } | undefined;
 
 /** A `NowRow` decorated for rendering: resolved label, relative time, the task `@id`. */
 export interface NowRowView extends NowRow {
@@ -33,6 +35,8 @@ export interface NowRowView extends NowRow {
     when: string;
     /** Whether the `@id` currently resolves in the workspace cache. */
     resolved: boolean;
+    /** The resolved task's marker, for the decorated glyph; undefined when unresolved. */
+    marker?: Marker;
 }
 
 /** Label shown when an `@id` resolves to neither a live task nor a snapshot. */

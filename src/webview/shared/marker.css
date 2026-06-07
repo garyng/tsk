@@ -1,0 +1,40 @@
+/* Single source of truth for the task-marker palette + the inline `[glyph]`
+   decoration, shared by every webview surface (now-stack, task-list, stats) so
+   the marker styling can't drift between views. Each `--vscode-tsk-marker-*` is
+   a host-contributed theme colour; the hex after the comma is the fallback used
+   only when no theme provides it (e.g. the Playwright harness). Layout/spacing
+   stays with each view's row — this owns only font + colour. */
+:root {
+    --tsk-marker-todo: var(--vscode-tsk-marker-todo, #e5c07b);
+    --tsk-marker-inprogress: var(--vscode-tsk-marker-inprogress, #3794ff);
+    --tsk-marker-completed: var(--vscode-tsk-marker-completed, #67c23a);
+    --tsk-marker-moved: var(--vscode-tsk-marker-moved, #ff9d00);
+    --tsk-marker-cancelled: var(--vscode-tsk-marker-cancelled, #9e9e9e);
+    --tsk-marker-notes: var(--vscode-tsk-marker-notes, #bb6dd9);
+}
+/* The inline `[glyph]` decoration: monospace so the bracketed marker aligns
+   with editor text; coloured by status. Base rule first, then the `[data-marker]`
+   overrides (ascending specificity — Biome's noDescendingSpecificity). */
+.tsk-marker {
+    flex: 0 0 auto;
+    font-family: var(--vscode-editor-font-family, monospace);
+    color: var(--vscode-foreground, #cccccc);
+}
+.tsk-marker[data-marker="todo"] {
+    color: var(--tsk-marker-todo);
+}
+.tsk-marker[data-marker="inprogress"] {
+    color: var(--tsk-marker-inprogress);
+}
+.tsk-marker[data-marker="completed"] {
+    color: var(--tsk-marker-completed);
+}
+.tsk-marker[data-marker="moved"] {
+    color: var(--tsk-marker-moved);
+}
+.tsk-marker[data-marker="cancelled"] {
+    color: var(--tsk-marker-cancelled);
+}
+.tsk-marker[data-marker="notes"] {
+    color: var(--tsk-marker-notes);
+}

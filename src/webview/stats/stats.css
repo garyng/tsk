@@ -58,22 +58,22 @@
     background: var(--vscode-descriptionForeground, #8c8c8c);
 }
 .tsk-tile[data-marker="todo"] .tsk-tile__label::before {
-    background: var(--vscode-tsk-marker-todo, #e5c07b);
+    background: var(--tsk-marker-todo);
 }
 .tsk-tile[data-marker="inprogress"] .tsk-tile__label::before {
-    background: var(--vscode-tsk-marker-inprogress, #3794ff);
+    background: var(--tsk-marker-inprogress);
 }
 .tsk-tile[data-marker="completed"] .tsk-tile__label::before {
-    background: var(--vscode-tsk-marker-completed, #67c23a);
+    background: var(--tsk-marker-completed);
 }
 .tsk-tile[data-marker="moved"] .tsk-tile__label::before {
-    background: var(--vscode-tsk-marker-moved, #ff9d00);
+    background: var(--tsk-marker-moved);
 }
 .tsk-tile[data-marker="cancelled"] .tsk-tile__label::before {
-    background: var(--vscode-tsk-marker-cancelled, #9e9e9e);
+    background: var(--tsk-marker-cancelled);
 }
 .tsk-tile[data-marker="notes"] .tsk-tile__label::before {
-    background: var(--vscode-tsk-marker-notes, #bb6dd9);
+    background: var(--tsk-marker-notes);
 }
 .tsk-stats__toggle {
     display: flex;
