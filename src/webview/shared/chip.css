@@ -3,6 +3,9 @@
    padding). `__count` is the optional trailing badge (task-list counts; inert
    where a view's chips carry no count). */
 .tsk-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     padding: 2px 9px;
     border-radius: 999px;
     cursor: pointer;

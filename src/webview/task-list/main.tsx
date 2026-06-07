@@ -165,12 +165,7 @@ function TaskList() {
                 // Facet over individual tags, not the whole array, so the dropdown
                 // lists each #tag with its own count.
                 getUniqueValues: (row) => row.tags,
-                cell: ({ row }) =>
-                    row.original.tags.map((t) => (
-                        <span key={t} className="tsk-tag">
-                            {t}
-                        </span>
-                    )),
+                cell: ({ row }) => row.original.tags.map((t) => `#${t}`).join(' '),
             },
             {
                 id: 'created',
@@ -182,17 +177,13 @@ function TaskList() {
                 sortingFn: (a, b) =>
                     createdEpoch(a.original.created) - createdEpoch(b.original.created),
                 cell: ({ row }) =>
-                    row.original.created
-                        ? formatRelativeShort(row.original.created, new Date())
-                        : '',
-            },
-            {
-                id: 'loc',
-                header: 'Location',
-                enableGlobalFilter: false,
-                enableSorting: false,
-                enableColumnFilter: false,
-                cell: ({ row }) => `${row.original.file}:${row.original.line + 1}`,
+                    row.original.created ? (
+                        <span title={new Date(row.original.created).toLocaleString()}>
+                            {formatRelativeShort(row.original.created, new Date())}
+                        </span>
+                    ) : (
+                        ''
+                    ),
             },
         ],
         [],
@@ -283,6 +274,13 @@ function TaskList() {
                                 aria-pressed={markerFilter.includes(c.marker)}
                                 onClick={() => toggleInColumn('marker', c.marker)}
                             >
+                                <span
+                                    className="tsk-marker"
+                                    data-marker={c.marker}
+                                    aria-hidden="true"
+                                >
+                                    [{GLYPH[c.marker]}]
+                                </span>
                                 {c.label} <span className="tsk-chip__count">{c.count}</span>
                             </button>
                         ))}
@@ -307,6 +305,10 @@ function TaskList() {
                     {table.getHeaderGroups()[0]?.headers.map((header) => {
                         const col = header.column;
                         const label = flexRender(col.columnDef.header, header.getContext());
+                        const headerText =
+                            typeof col.columnDef.header === 'string'
+                                ? col.columnDef.header
+                                : col.id;
                         const sortDir = col.getIsSorted();
                         const active = FILTERABLE.has(col.id)
                             ? filterOf(col.id as 'marker' | 'tags')
@@ -314,13 +316,18 @@ function TaskList() {
                         return (
                             <span key={header.id} className="tsk-th" data-col={col.id}>
                                 {FILTERABLE.has(col.id) ? (
+                                    // The marker column is icon-only (the glyphs label it; the
+                                    // chips carry the visible status filter) — just a caret + badge.
                                     <button
                                         type="button"
                                         className={`tsk-th__filter${active.length ? ' tsk-th__filter--active' : ''}`}
+                                        aria-label={`Filter by ${headerText.toLowerCase()}`}
                                         aria-expanded={openFilter?.col === col.id}
                                         onClick={(e) => openMenu(col.id as 'marker' | 'tags', e)}
                                     >
-                                        <span className="tsk-th__label">{label}</span>
+                                        {col.id !== 'marker' && (
+                                            <span className="tsk-th__label">{label}</span>
+                                        )}
                                         {active.length > 0 && (
                                             <span className="tsk-th__badge">{active.length}</span>
                                         )}

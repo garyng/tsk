@@ -119,11 +119,11 @@ test('mounts cleanly and renders a chip per status plus All', async ({ page }) =
     await expect(page.getByRole('button', { name: /^All/ })).toContainText('4');
 });
 
-test('lists task rows with content and file:line', async ({ page }) => {
+test('lists task rows; file:line rides the row tooltip', async ({ page }) => {
     await mount(page);
     await expect(page.locator('.tsk-row')).toHaveCount(4);
     const row = page.locator('.tsk-row', { hasText: 'refactor the cache' });
-    await expect(row.locator('.tsk-cell[data-col="loc"]')).toHaveText('foo.tsk:5'); // line 4 → 1-indexed 5
+    await expect(row).toHaveAttribute('title', 'foo.tsk:5'); // line 4 → 1-indexed 5
 });
 
 test('filtering by a status chip shows only that status', async ({ page }) => {

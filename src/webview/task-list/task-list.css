@@ -9,8 +9,8 @@
     /* One column track shared by the header + every row so they align. Each
        virtual row is its own grid, so only fixed / fr tracks stay consistent
        across rows — no `auto`/`max-content` (those size per-row → drift).
-       marker · content (2fr) · tags (1fr) · created · location. */
-    --tsk-cols: 3.8rem minmax(0, 2fr) minmax(0, 1fr) 5rem 6rem;
+       status (icon-only) · content (2fr) · tags (1fr) · created. */
+    --tsk-cols: 2.2rem minmax(0, 2fr) minmax(0, 1fr) 5rem;
 }
 .tsk-tasks__empty {
     padding: 10px 14px;
@@ -152,29 +152,18 @@
     white-space: nowrap;
     min-width: 0;
 }
-.tsk-cell[data-col="created"],
-.tsk-cell[data-col="loc"] {
+.tsk-cell[data-col="created"] {
     color: var(--vscode-descriptionForeground, #8c8c8c);
     font-size: 0.9em;
 }
 .tsk-cell[data-col="tags"] {
-    display: flex;
-    gap: 3px;
+    color: var(--vscode-textLink-foreground, #4daafc);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 0.9em;
 }
 .tsk-row[data-marker="cancelled"] .tsk-cell[data-col="content"] {
     text-decoration: line-through;
     opacity: 0.7;
-}
-.tsk-tag {
-    flex: 0 0 auto;
-    max-width: 100%;
-    padding: 0 6px;
-    overflow: hidden;
-    border-radius: 999px;
-    text-overflow: ellipsis;
-    font-size: 0.82em;
-    color: var(--vscode-badge-foreground, #cccccc);
-    background: var(--vscode-badge-background, rgba(255, 255, 255, 0.12));
 }
 
 /* Excel-style header filter dropdown — fixed-positioned (escapes the header's
