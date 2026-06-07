@@ -12,14 +12,15 @@ function basename(fileUri: string): string {
     }
 }
 
-/** The metadata key carrying the `@created` stamp (stored bare — the `@` is display syntax). */
+/** Metadata keys (stored bare — the `@` is display syntax). */
 const CREATED_KEY = 'created';
+const PRIORITY_KEY = 'priority';
 
 /**
  * Build the {@link TaskListView}: a flat row per cached task (in `listAllTasks`
  * order — file then line), per-status counts for the filter chips (every marker,
  * registry order, even at 0), and the total. Each row is joined to its `#tags`
- * (sorted) and `@created` stamp from the two bulk side-tables. Pure — fed
+ * (sorted), `@created` stamp, and `@priority` level from the bulk side-tables. Pure — fed
  * `cache.listAllTasks()` / `listAllTaskTags()` / `listAllMetadata()`. Filtering,
  * sorting, and search are the webview's job, so the host ships the whole list once.
  */
@@ -47,8 +48,14 @@ export function buildTaskListView(
     for (const tags of tagsByTask.values()) tags.sort();
 
     const createdByTask = new Map<string, string>();
+    const priorityByTask = new Map<string, number>();
     for (const { taskId, key, value } of metadata) {
-        if (key === CREATED_KEY && value != null) createdByTask.set(taskId, value);
+        if (value == null) continue;
+        if (key === CREATED_KEY) createdByTask.set(taskId, value);
+        else if (key === PRIORITY_KEY) {
+            const level = Number(value);
+            if (level === 1 || level === 2 || level === 3) priorityByTask.set(taskId, level);
+        }
     }
 
     const rows: TaskRow[] = list.map((t) => ({
@@ -59,6 +66,7 @@ export function buildTaskListView(
         line: t.line,
         tags: tagsByTask.get(t.id) ?? [],
         created: createdByTask.get(t.id),
+        priority: priorityByTask.get(t.id),
     }));
     const byMarker = countTasksByMarker(list);
     const counts: TaskCount[] = MARKERS.map((def) => ({

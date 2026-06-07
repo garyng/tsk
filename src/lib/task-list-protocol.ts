@@ -21,6 +21,8 @@ export interface TaskRow {
     tags: string[];
     /** Raw ISO-8601-local `@created` stamp (undefined when unstamped); the webview formats it to a compact relative time so it stays live. */
     created?: string;
+    /** `@priority` level (1 High · 2 Medium · 3 Low); undefined when unset or out of range. */
+    priority?: number;
 }
 
 /** Per-status count, for a filter chip. */

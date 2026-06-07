@@ -95,13 +95,17 @@ describe('buildTaskListView', () => {
             [
                 { taskId: 'a', key: 'created', value: '2026-06-01T10:00:00+08:00' },
                 { taskId: 'a', key: 'completed', value: '2026-06-02T10:00:00+08:00' }, // not 'created'
+                { taskId: 'a', key: 'priority', value: '2' },
                 { taskId: 'b', key: 'started', value: '2026-06-01T10:00:00+08:00' }, // b has no created
+                { taskId: 'b', key: 'priority', value: '9' }, // out of range → dropped
             ],
         );
         const [a, b] = view.rows;
         expect(a?.tags).toEqual(['alpha', 'zeta']);
         expect(a?.created).toBe('2026-06-01T10:00:00+08:00');
+        expect(a?.priority).toBe(2);
         expect(b?.tags).toEqual([]);
         expect(b?.created).toBeUndefined();
+        expect(b?.priority).toBeUndefined(); // '9' is not 1–3
     });
 });

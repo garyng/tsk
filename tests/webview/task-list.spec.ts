@@ -45,6 +45,7 @@ const VIEW = {
             line: 4,
             tags: ['infra', 'perf'],
             created: '2026-06-07T11:50:00+00:00',
+            priority: 1,
         },
         {
             id: 't2',
@@ -54,6 +55,7 @@ const VIEW = {
             line: 0,
             tags: ['infra'],
             created: '2026-06-05T09:00:00+00:00',
+            priority: 2,
         },
         {
             id: 't3',
@@ -63,6 +65,7 @@ const VIEW = {
             line: 12,
             tags: [],
             created: '2026-05-20T09:00:00+00:00',
+            priority: 3,
         },
         {
             id: 't4',
@@ -149,6 +152,16 @@ test('the tags header dropdown facets tags and filters to rows carrying one', as
     await menu.getByText('infra').click();
     await expect(page.locator('.tsk-row')).toHaveCount(2); // t1 + t2 carry #infra
     await expect(page.locator('.tsk-th[data-col="tags"] .tsk-th__badge')).toHaveText('1');
+});
+
+test('the priority header dropdown filters by P-level', async ({ page }) => {
+    await mount(page);
+    await page.locator('.tsk-th[data-col="priority"] .tsk-th__filter').click();
+    const menu = page.locator('.tsk-filter');
+    await expect(menu).toBeVisible();
+    await menu.getByText(/^P1/).click(); // "P1 · High"
+    await expect(page.locator('.tsk-row')).toHaveCount(1); // only t1 is P1
+    await expect(page.locator('.tsk-row')).toContainText('refactor the cache');
 });
 
 test('the status header dropdown shares its filter with the chips', async ({ page }) => {

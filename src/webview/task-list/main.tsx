@@ -16,6 +16,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { type MouseEvent, StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MARKERS, type Marker } from '../../lib/markers';
+import { priorityForLevel } from '../../lib/priorities';
 import { formatRelativeShort } from '../../lib/relative-time';
 import type {
     TaskListHostToWebview,
@@ -52,8 +53,9 @@ const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as 
 >;
 
 const ROW_HEIGHT = 28;
-/** Columns that carry an Excel-style header filter dropdown. */
-const FILTERABLE = new Set(['marker', 'tags']);
+/** Columns whose header carries an Excel-style filter dropdown. */
+type FilterCol = 'marker' | 'tags' | 'priority';
+const FILTERABLE = new Set<string>(['marker', 'tags', 'priority']);
 /** Popover width (px) — used to clamp it on-screen. Keep in sync with `.tsk-filter`. */
 const POPOVER_WIDTH = 220;
 
@@ -80,6 +82,14 @@ const tagsIncludeSome: FilterFn<TaskRow> = (row, columnId, value) => {
     return selected.some((t) => tags.includes(t));
 };
 
+/** A row matches if its @priority level is among the selected set (level strings). */
+const priorityInSet: FilterFn<TaskRow> = (row, columnId, value) => {
+    const selected = value as string[];
+    if (!selected.length) return true;
+    const level = row.getValue<number | undefined>(columnId);
+    return level !== undefined && selected.includes(String(level));
+};
+
 /** Created sort key — parse to epoch; an unstamped row sorts oldest (bottom in desc). */
 const createdEpoch = (iso: string | undefined): number => {
     if (!iso) return 0;
@@ -92,9 +102,7 @@ function TaskList() {
     const [globalFilter, setGlobalFilter] = useState('');
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [sorting, setSorting] = useState<SortingState>([{ id: 'created', desc: true }]);
-    const [openFilter, setOpenFilter] = useState<{ col: 'marker' | 'tags'; rect: DOMRect } | null>(
-        null,
-    );
+    const [openFilter, setOpenFilter] = useState<{ col: FilterCol; rect: DOMRect } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -156,6 +164,31 @@ function TaskList() {
                 cell: ({ row }) => row.original.content || '(empty)',
             },
             {
+                id: 'priority',
+                accessorKey: 'priority',
+                header: 'Priority',
+                enableGlobalFilter: false,
+                enableSorting: false,
+                filterFn: priorityInSet,
+                getUniqueValues: (row) => (row.priority ? [String(row.priority)] : []),
+                cell: ({ row }) => {
+                    const def = row.original.priority
+                        ? priorityForLevel(row.original.priority)
+                        : undefined;
+                    return def ? (
+                        <span
+                            className="tsk-priority"
+                            style={{ color: `rgb(${def.rgb[0]}, ${def.rgb[1]}, ${def.rgb[2]})` }}
+                            title={`Priority ${def.level} — ${def.label}`}
+                        >
+                            P{def.level}
+                        </span>
+                    ) : (
+                        ''
+                    );
+                },
+            },
+            {
                 id: 'tags',
                 accessorKey: 'tags',
                 header: 'Tags',
@@ -212,9 +245,9 @@ function TaskList() {
         overscan: 12,
     });
 
-    const filterOf = (col: 'marker' | 'tags'): string[] =>
+    const filterOf = (col: FilterCol): string[] =>
         (table.getColumn(col)?.getFilterValue() as string[] | undefined) ?? [];
-    const toggleInColumn = (col: 'marker' | 'tags', value: string): void => {
+    const toggleInColumn = (col: FilterCol, value: string): void => {
         const cur = filterOf(col);
         const next = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
         table.getColumn(col)?.setFilterValue(next.length ? next : undefined);
@@ -236,8 +269,22 @@ function TaskList() {
                 .sort((a, b) => a.value.localeCompare(b.value)),
         [tagFacets],
     );
+    const priorityFacets = table.getColumn('priority')?.getFacetedUniqueValues();
+    const priorityOptions: FilterOption[] = useMemo(
+        () =>
+            [...(priorityFacets?.entries() ?? [])]
+                .map(([value, count]) => ({
+                    value: String(value),
+                    label: `P${value} · ${priorityForLevel(Number(value))?.label ?? ''}`,
+                    count,
+                }))
+                .sort((a, b) => a.value.localeCompare(b.value)),
+        [priorityFacets],
+    );
+    const optionsFor = (col: FilterCol): FilterOption[] =>
+        col === 'marker' ? markerOptions : col === 'tags' ? tagOptions : priorityOptions;
 
-    const openMenu = (col: 'marker' | 'tags', e: MouseEvent<HTMLButtonElement>): void => {
+    const openMenu = (col: FilterCol, e: MouseEvent<HTMLButtonElement>): void => {
         const rect = e.currentTarget.getBoundingClientRect();
         setOpenFilter((cur) => (cur?.col === col ? null : { col, rect }));
     };
@@ -310,9 +357,7 @@ function TaskList() {
                                 ? col.columnDef.header
                                 : col.id;
                         const sortDir = col.getIsSorted();
-                        const active = FILTERABLE.has(col.id)
-                            ? filterOf(col.id as 'marker' | 'tags')
-                            : [];
+                        const active = FILTERABLE.has(col.id) ? filterOf(col.id as FilterCol) : [];
                         return (
                             <span key={header.id} className="tsk-th" data-col={col.id}>
                                 {FILTERABLE.has(col.id) ? (
@@ -323,7 +368,7 @@ function TaskList() {
                                         className={`tsk-th__filter${active.length ? ' tsk-th__filter--active' : ''}`}
                                         aria-label={`Filter by ${headerText.toLowerCase()}`}
                                         aria-expanded={openFilter?.col === col.id}
-                                        onClick={(e) => openMenu(col.id as 'marker' | 'tags', e)}
+                                        onClick={(e) => openMenu(col.id as FilterCol, e)}
                                     >
                                         {col.id !== 'marker' && (
                                             <span className="tsk-th__label">{label}</span>
@@ -416,7 +461,7 @@ function TaskList() {
                     }}
                 >
                     <FilterMenu
-                        options={openFilter.col === 'marker' ? markerOptions : tagOptions}
+                        options={optionsFor(openFilter.col)}
                         selected={new Set(filterOf(openFilter.col))}
                         searchable={openFilter.col === 'tags'}
                         onToggle={(v) => toggleInColumn(openFilter.col, v)}

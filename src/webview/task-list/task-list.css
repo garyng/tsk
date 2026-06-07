@@ -9,8 +9,8 @@
     /* One column track shared by the header + every row so they align. Each
        virtual row is its own grid, so only fixed / fr tracks stay consistent
        across rows — no `auto`/`max-content` (those size per-row → drift).
-       status (icon-only) · content (2fr) · tags (1fr) · created. */
-    --tsk-cols: 2.2rem minmax(0, 2fr) minmax(0, 1fr) 5rem;
+       status (icon-only) · content (2fr) · priority · tags (1fr) · created. */
+    --tsk-cols: 2.2rem minmax(0, 2fr) 4.2rem minmax(0, 1fr) 5rem;
 }
 .tsk-tasks__empty {
     padding: 10px 14px;
@@ -160,6 +160,16 @@
     color: var(--vscode-textLink-foreground, #4daafc);
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 0.9em;
+}
+/* Priority badge — an outlined pill; its colour is set inline from the
+   PRIORITIES registry rgb (no theme var exists), so border + text track it. */
+.tsk-priority {
+    flex: 0 0 auto;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 0.78em;
+    font-weight: 600;
 }
 .tsk-row[data-marker="cancelled"] .tsk-cell[data-col="content"] {
     text-decoration: line-through;
