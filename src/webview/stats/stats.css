@@ -31,20 +31,18 @@
     background: var(--vscode-editorWidget-background, rgba(255, 255, 255, 0.04));
     border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
 }
-/* Glyph + count share a line; the count is tinted by the marker (the glyph
-   carries the same colour from the shared .tsk-marker). Base rules first, then
-   the per-marker overrides (ascending specificity — Biome's noDescendingSpecificity). */
-.tsk-tile__head {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-}
+/* Big count on top, the marker glyph + label beneath it (the glyph carries the
+   marker colour from the shared .tsk-marker; the count is tinted to match). Base
+   rules first, then the per-marker overrides (Biome's noDescendingSpecificity). */
 .tsk-tile__count {
     font-size: 1.5em;
     font-weight: 600;
     line-height: 1.1;
 }
 .tsk-tile__label {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
     font-size: 0.82em;
     color: var(--vscode-descriptionForeground, #8c8c8c);
 }
@@ -66,34 +64,12 @@
 .tsk-tile[data-marker="notes"] .tsk-tile__count {
     color: var(--tsk-marker-notes);
 }
-/* Segmented metric toggle — one bordered group, buttons divided by hairlines. */
-.tsk-seg {
-    display: inline-flex;
+/* Metric toggle — the same pill chips as the task-list filters (shared .tsk-chip). */
+.tsk-stats__toggle {
+    display: flex;
     flex-wrap: wrap;
+    gap: 4px;
     margin-bottom: 14px;
-    border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.12));
-    border-radius: 6px;
-    overflow: hidden;
-}
-.tsk-seg__btn {
-    padding: 3px 12px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.9em;
-    color: var(--vscode-foreground, #cccccc);
-    background: none;
-    border: none;
-    border-left: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.12));
-}
-.tsk-seg__btn:first-child {
-    border-left: none;
-}
-.tsk-seg__btn:hover {
-    background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
-}
-.tsk-seg__btn--active {
-    color: var(--vscode-button-foreground, #ffffff);
-    background: var(--vscode-button-background, #0e639c);
 }
 .tsk-stats__calendar {
     overflow-x: auto;

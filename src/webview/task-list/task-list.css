@@ -50,6 +50,11 @@
     align-items: center;
     gap: 8px;
     padding: 4px 12px;
+    /* Reserve the scrollbar gutter the body also reserves, so the header's fr
+       columns line up with the (narrower, scrolled) rows instead of drifting
+       right by a scrollbar width. */
+    overflow-y: auto;
+    scrollbar-gutter: stable;
     border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
     color: var(--vscode-descriptionForeground, #8c8c8c);
     font-size: 0.82em;
@@ -66,7 +71,9 @@
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    max-width: 100%;
+    /* Fill the header cell so the whole column header is a click target — the
+       Status header is otherwise just a lone caret, awkward to hit. */
+    width: 100%;
     padding: 0;
     background: none;
     border: none;
@@ -120,6 +127,7 @@
 .tsk-table__scroll {
     flex: 1;
     overflow-y: auto;
+    scrollbar-gutter: stable;
 }
 .tsk-table__body {
     position: relative;

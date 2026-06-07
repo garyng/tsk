@@ -107,8 +107,8 @@ test('mounts cleanly and renders a tile per status with its count', async ({ pag
 
 test('renders the metric toggle with All active by default', async ({ page }) => {
     await mount(page);
-    await expect(page.locator('.tsk-seg__btn')).toHaveCount(6);
-    await expect(page.locator('.tsk-seg__btn--active')).toHaveText('All');
+    await expect(page.locator('.tsk-chip')).toHaveCount(6);
+    await expect(page.locator('.tsk-chip--active')).toHaveText('All');
 });
 
 test('renders the activity calendar as an SVG of day blocks', async ({ page }) => {
@@ -128,10 +128,10 @@ test('sizes the calendar to fit the panel width (no horizontal overflow)', async
     expect(box?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(viewport?.width ?? 0);
 });
 
-test('switching metric updates the active segment', async ({ page }) => {
+test('switching metric updates the active chip', async ({ page }) => {
     await mount(page);
     await page.getByRole('button', { name: 'Completed' }).click();
-    await expect(page.locator('.tsk-seg__btn--active')).toHaveText('Completed');
+    await expect(page.locator('.tsk-chip--active')).toHaveText('Completed');
 });
 
 test('surfaces the best-effort caveat only for a metric with no events', async ({ page }) => {
@@ -140,3 +140,4 @@ test('surfaces the best-effort caveat only for a metric with no events', async (
     await page.getByRole('button', { name: 'Cancelled' }).click();
     await expect(page.locator('.tsk-stats__note')).toBeVisible();
 });
+

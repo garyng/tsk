@@ -5,6 +5,7 @@ import { MARKERS, type Marker } from '../../lib/markers';
 import { EVENT_METRICS, type Metric } from '../../lib/stats-aggregation';
 import { toCalendarData } from '../../lib/stats-calendar';
 import type { StatsHostToWebview, StatsView, StatsWebviewToHost } from '../../lib/stats-protocol';
+import chipStyles from '../shared/chip.css?raw';
 import { injectStyle } from '../shared/inject-style';
 import markerStyles from '../shared/marker.css?raw';
 import styles from './stats.css?raw';
@@ -142,7 +143,8 @@ function Stats() {
                 </div>
                 {view.tiles.map((tile) => (
                     <div className="tsk-tile" key={tile.marker} data-marker={tile.marker}>
-                        <span className="tsk-tile__head">
+                        <span className="tsk-tile__count">{tile.count}</span>
+                        <span className="tsk-tile__label">
                             <span
                                 className="tsk-marker"
                                 data-marker={tile.marker}
@@ -150,19 +152,18 @@ function Stats() {
                             >
                                 [{GLYPH[tile.marker as Marker]}]
                             </span>
-                            <span className="tsk-tile__count">{tile.count}</span>
+                            {tile.label}
                         </span>
-                        <span className="tsk-tile__label">{tile.label}</span>
                     </div>
                 ))}
             </header>
 
-            <nav className="tsk-seg" aria-label="Activity metric">
+            <nav className="tsk-stats__toggle" aria-label="Activity metric">
                 {METRICS.map((m) => (
                     <button
                         type="button"
                         key={m}
-                        className={`tsk-seg__btn${m === metric ? ' tsk-seg__btn--active' : ''}`}
+                        className={`tsk-chip${m === metric ? ' tsk-chip--active' : ''}`}
                         aria-pressed={m === metric}
                         onClick={() => setMetric(m)}
                     >
@@ -201,6 +202,7 @@ function Stats() {
 }
 
 injectStyle('tsk-marker-style', markerStyles);
+injectStyle('tsk-chip-style', chipStyles);
 injectStyle('tsk-stats-style', styles);
 
 const container = document.getElementById('root');
