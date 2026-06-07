@@ -1,4 +1,4 @@
-import type { CacheCounts, Db, TaskRecord } from './db';
+import type { CacheCounts, Db, MetadataRecord, TaskRecord } from './db';
 import type { TaskRelationshipInput } from './graph';
 import { parseDocument } from './parser';
 
@@ -190,6 +190,15 @@ export class CacheService {
     /** Enumerate every cached task across all files; used by the picker UX. */
     listAllTasks(): TaskRecord[] {
         return this.db.listAllTasks();
+    }
+
+    /**
+     * Every `(taskId, key, value)` metadata row across the workspace, in one
+     * query — the bulk counterpart to per-task metadata reads. Feeds the stats
+     * aggregation (`stats-aggregation.ts`); avoids an N+1 over `listAllTasks`.
+     */
+    listAllMetadata(): MetadataRecord[] {
+        return this.db.listAllMetadata();
     }
 
     /** mtime of a cached file, or `undefined` if not cached. Used to skip

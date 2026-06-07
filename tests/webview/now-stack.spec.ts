@@ -1,15 +1,18 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
+import type { Marker } from '../../src/lib/markers';
 
 /**
- * The built webview bundle, loaded as text and injected as a module script. It's
- * self-contained (React + grida are bundled in, no imports), so it runs
- * standalone in a blank page once `acquireVsCodeApi` is mocked. `npm run
- * test:webview` builds it first; reading it here keeps the test exercising the
- * real shipped artifact. The bundle injects its own `<style>` on load, so the
- * harness only supplies the editor-like backdrop.
+ * The now-stack webview is SERVED from a fake origin (via `page.route` in
+ * {@link mount}) rather than injected inline, so the entry's ESM imports — notably
+ * the shared React chunk Vite emits across the webview entries — resolve against
+ * the page origin. `npm run test:webview` builds `dist/webview` first; serving the
+ * real files keeps the test exercising the shipped artifact. The bundle injects
+ * its own `<style>` on load, so the harness only supplies the editor-like backdrop.
  */
-const bundle = readFileSync('dist/webview/now-stack.js', 'utf8');
+const WEBVIEW_DIR = 'dist/webview';
+const ORIGIN = 'http://tsk.test';
 
 const HARNESS = `<!DOCTYPE html>
 <html>
@@ -32,6 +35,7 @@ const HARNESS = `<!DOCTYPE html>
             setState: (s) => { __state = s; },
         });
     </script>
+    <script type="module" src="/now-stack.js"></script>
 </body>
 </html>`;
 
@@ -41,7 +45,19 @@ const HARNESS = `<!DOCTYPE html>
  * twisties (B, A are forks), a missing-task label, and the relative-time column.
  */
 const SAMPLE_ROWS = [
-    row('C', 'B', 0, 'trunk', false, true, true, 'Write the parser', '2 minutes ago', true),
+    row(
+        'C',
+        'B',
+        0,
+        'trunk',
+        false,
+        true,
+        true,
+        'Write the parser',
+        '2 minutes ago',
+        true,
+        'inprogress',
+    ),
     row(
         'B',
         'A',
@@ -53,9 +69,34 @@ const SAMPLE_ROWS = [
         'Refactor the cache layer',
         '10 minutes ago',
         true,
+        'completed',
     ),
-    row('D', 'B', 1, 'branch', false, false, false, 'Add unit tests', '8 minutes ago', true),
-    row('A', null, 0, 'trunk', true, true, false, 'Ship phase 7', 'about 1 hour ago', true),
+    row(
+        'D',
+        'B',
+        1,
+        'branch',
+        false,
+        false,
+        false,
+        'Add unit tests',
+        '8 minutes ago',
+        true,
+        'todo',
+    ),
+    row(
+        'A',
+        null,
+        0,
+        'trunk',
+        true,
+        true,
+        false,
+        'Ship phase 7',
+        'about 1 hour ago',
+        true,
+        'inprogress',
+    ),
     row(
         'E',
         'A',
@@ -81,6 +122,7 @@ function row(
     label: string,
     when: string,
     resolved: boolean,
+    marker?: Marker,
 ) {
     return {
         entryId,
@@ -94,20 +136,81 @@ function row(
         label,
         when,
         resolved,
+        marker,
     };
 }
 
 /** A flat linear chain (no branches): current at top, all depth 0, no twisties. */
 const LINEAR_ROWS = [
-    row('L3', 'L2', 0, 'trunk', false, true, true, 'Wire the keymap', 'just now', true),
-    row('L2', 'L1', 0, 'trunk', false, true, false, 'Refactor the panel', '5 minutes ago', true),
-    row('L1', null, 0, 'trunk', false, true, false, 'Open the now stack', 'an hour ago', true),
+    row(
+        'L3',
+        'L2',
+        0,
+        'trunk',
+        false,
+        true,
+        true,
+        'Wire the keymap',
+        'just now',
+        true,
+        'inprogress',
+    ),
+    row(
+        'L2',
+        'L1',
+        0,
+        'trunk',
+        false,
+        true,
+        false,
+        'Refactor the panel',
+        '5 minutes ago',
+        true,
+        'completed',
+    ),
+    row(
+        'L1',
+        null,
+        0,
+        'trunk',
+        false,
+        true,
+        false,
+        'Open the now stack',
+        'an hour ago',
+        true,
+        'completed',
+    ),
 ];
 
 /** A no-current forest (e.g. after removing the current root): two depth-0 roots, nothing marked. */
 const FOREST_ROWS = [
-    row('F1', null, 0, 'branch', false, false, false, 'Orphaned root one', '2 hours ago', true),
-    row('F2', null, 0, 'branch', false, false, false, 'Orphaned root two', '3 hours ago', true),
+    row(
+        'F1',
+        null,
+        0,
+        'branch',
+        false,
+        false,
+        false,
+        'Orphaned root one',
+        '2 hours ago',
+        true,
+        'completed',
+    ),
+    row(
+        'F2',
+        null,
+        0,
+        'branch',
+        false,
+        false,
+        false,
+        'Orphaned root two',
+        '3 hours ago',
+        true,
+        'cancelled',
+    ),
 ];
 
 /**
@@ -122,8 +225,21 @@ async function mount(page: Page): Promise<string[]> {
     page.on('console', (msg) => {
         if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`);
     });
-    await page.setContent(HARNESS);
-    await page.addScriptTag({ content: bundle, type: 'module' });
+    // Serve the harness + the built webview files from a fake origin so the
+    // entry's ESM imports (e.g. the shared React chunk) resolve — inline injection
+    // can't resolve `./chunk.mjs`, an intercepted origin can.
+    await page.route(`${ORIGIN}/**`, (route) => {
+        const { pathname } = new URL(route.request().url());
+        if (pathname === '/') return route.fulfill({ contentType: 'text/html', body: HARNESS });
+        try {
+            const body = readFileSync(join(WEBVIEW_DIR, pathname), 'utf8');
+            const contentType = pathname.endsWith('.map') ? 'application/json' : 'text/javascript';
+            return route.fulfill({ contentType, body });
+        } catch {
+            return route.fulfill({ status: 404, body: '' });
+        }
+    });
+    await page.goto(`${ORIGIN}/`);
     await page.locator('.now-stack').waitFor();
     return errors;
 }
@@ -293,6 +409,16 @@ test('exactly the current row shows the circle-filled marker', async ({ page }) 
     await render(page);
     await expect(page.locator('.now-row__icon .codicon-circle-filled')).toHaveCount(1);
     await expect(page.locator('[data-tree-row-id="C"] .codicon-circle-filled')).toBeVisible();
+});
+
+test('rich-renders each resolved row with its decorated marker glyph', async ({ page }) => {
+    await render(page);
+    // The four resolved rows carry a colored [glyph]; the unresolved E has none.
+    await expect(page.locator('.now-row__marker')).toHaveCount(4);
+    await expect(
+        page.locator('[data-tree-row-id="C"] .now-row__marker[data-marker="inprogress"]'),
+    ).toBeVisible();
+    await expect(page.locator('[data-tree-row-id="E"] .now-row__marker')).toHaveCount(0);
 });
 
 test('an unresolved task renders the italic missing-label style', async ({ page }) => {

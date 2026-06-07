@@ -156,6 +156,15 @@ The tree uses **linear-compaction**: the path from root to the current now rende
 
 **Limits (v1).** No in-panel search/filter; a now-task in a *closed* file shows no in-editor highlight (only the tree label); `@movedTo` isn't followed; multi-root workspaces aren't supported yet (same as the cache).
 
+## Stats & task list
+
+Two more React webview panels visualize every task in the workspace, opened from the Command Palette:
+
+- **Tsk: Open Stats** — a GitHub-style **activity calendar** of task events (created / started / completed / cancelled / moved) with a metric toggle, above a row of current-status **count tiles** (todo / in-progress / done / …). It reads the `@created` / `@started` / `@completed` timestamps tsk stamps on each status transition, scales its squares to fit the panel width (so a whole year stays visible in a narrow panel), and tracks your theme. Those stamps are written only when you toggle via the commands — and `@started` / `@completed` clear on toggle-back — so the calendar reflects tasks *currently* bearing each stamp: a best-effort history, not an append-only log.
+- **Tsk: Open Task List** — every task in a **searchable, sortable table**: a fuzzy content search, a relative `Created` column (newest first, hover for the exact time), coloured `P1/P2/P3` priority badges (`@priority:1–3`), and **Excel-style header filter dropdowns** on Status, Tags, and Priority — faceted, multi-select, with a search box for tags. The status chips (each showing its marker glyph + live count) are one-click quick-filters over the same Status filter; a row click reveals the task beside the panel. Virtualized for large workspaces. The persistent, browse-and-stay companion to *Tsk: Find All Tasks by Status* (which stays the fast keyboard path).
+
+Both refresh live as you edit and revive after a window reload. `docs/many-tasks.tsk` is a ready-made backlog for trying them out.
+
 ## Hover
 
 Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't decode the dimmed `<!-- … -->` comment by eye. It lists the `@id`, each timestamp rendered both absolutely and as friendly relative time (`… (3 days ago)`), the tags, and any relationship links — each link a clickable command URI that jumps to the referenced task. The task content itself is deliberately *not* repeated (it's already under your cursor). Document-local, so it works on untitled buffers too.
@@ -247,7 +256,7 @@ Requires **VS Code 1.112+** (the extension declares `engines.vscode = "^1.112.0"
 
 ```sh
 npm install            # one-time
-npm run build          # host (dist/host/extension.cjs) + webview (dist/webview/now-stack.js)
+npm run build          # host (dist/host/extension.cjs) + webview (dist/webview/{now-stack,stats,task-list}.js)
 npm run build:host     # just the extension host bundle (Vite library mode, CJS)
 npm run dev:host       # host bundle, watch mode (dev:webview watches the webview)
 ```
@@ -310,7 +319,7 @@ Workspace fixtures live in `tests/e2e/fixtures/workspace/` — the host opens th
 ```sh
 npm run lint           # biome check .
 npm run format         # biome format --write .
-npm run package        # builds, then @vscode/vsce → tsk-<version>.vsix
+npm run package        # @vscode/vsce packages dist/ → artifacts/tsk-<version>.vsix (build first)
 ```
 
 ### Architecture

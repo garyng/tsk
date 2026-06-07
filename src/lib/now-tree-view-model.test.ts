@@ -161,6 +161,19 @@ describe('buildNowTreeView — label + relative time', () => {
         expect(row.id).toBe('t-A');
     });
 
+    it('carries the resolved task marker (undefined when unresolved)', () => {
+        const s = markNow(emptyNowTree(), {
+            entryId: 'A',
+            id: 't-A',
+            markedAt: 'm',
+            content: 'snap',
+        });
+        const resolve: ResolveContent = (id) =>
+            id === 't-A' ? { content: 'live', marker: 'completed' } : undefined;
+        expect(only(buildNowTreeView(s, resolve, FIXED_NOW)).marker).toBe('completed');
+        expect(only(buildNowTreeView(s, noResolve, FIXED_NOW)).marker).toBeUndefined();
+    });
+
     it('falls back to the snapshot when the id is not live', () => {
         const s = markNow(emptyNowTree(), {
             entryId: 'A',

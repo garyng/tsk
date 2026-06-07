@@ -187,6 +187,8 @@ export const COMMANDS = {
     markNow: 'tsk.markNow',
     openNowStack: 'tsk.now.openStack',
     nowClear: 'tsk.now.clear',
+    openStats: 'tsk.openStats',
+    openTaskList: 'tsk.openTaskList',
 } as const satisfies Record<string, `tsk.${string}`>;
 
 /**

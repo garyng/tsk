@@ -1,9 +1,9 @@
 /**
  * Single source of truth for task priorities.
  *
- * Mirrors the {@link MARKERS} pattern (see `markers.ts`). Today only M4/B
- * (priority line decorations) will consume this; M5 (`toggleP1`/`P2`/`P3`)
- * will pick up the `keybinding` / `commandSuffix` fields when those land.
+ * Mirrors the {@link MARKERS} pattern (see `markers.ts`). Consumed by the
+ * priority line decorations, the `toggleP1`/`P2`/`P3` commands, and the task
+ * list's priority badges.
  */
 export interface PriorityDef {
     /** Priority level. Spec pins this to {1, 2, 3}. */

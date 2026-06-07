@@ -1,0 +1,294 @@
+.tsk-tasks {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    color: var(--vscode-foreground, #cccccc);
+    font:
+        var(--vscode-font-size, 13px) / 1.4
+        var(--vscode-font-family, system-ui, "Segoe UI", sans-serif);
+    /* One column track shared by the header + every row so they align. Each
+       virtual row is its own grid, so only fixed / fr tracks stay consistent
+       across rows — no `auto`/`max-content` (those size per-row → drift).
+       status (icon-only) · content (2fr) · priority · tags (1fr) · created. */
+    --tsk-cols: 2.2rem minmax(0, 2fr) 4.2rem minmax(0, 1fr) 5rem;
+}
+.tsk-tasks__empty {
+    padding: 10px 14px;
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+
+.tsk-table__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+.tsk-search {
+    flex: 1 1 12rem;
+    min-width: 8rem;
+    padding: 3px 8px;
+    color: var(--vscode-input-foreground, #cccccc);
+    background: var(--vscode-input-background, rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    font: inherit;
+}
+.tsk-search::placeholder {
+    color: var(--vscode-input-placeholderForeground, #8c8c8c);
+}
+.tsk-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.tsk-table__head {
+    display: grid;
+    grid-template-columns: var(--tsk-cols);
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    /* Reserve the scrollbar gutter the body also reserves, so the header's fr
+       columns line up with the (narrower, scrolled) rows instead of drifting
+       right by a scrollbar width. */
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+    font-size: 0.82em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.tsk-th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tsk-th__btn,
+.tsk-th__filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    /* Fill the header cell so the whole column header is a click target — the
+       Status header is otherwise just a lone caret, awkward to hit. */
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+}
+.tsk-th__btn:hover,
+.tsk-th__filter:hover,
+.tsk-th__filter--active {
+    color: var(--vscode-foreground, #cccccc);
+}
+.tsk-th__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tsk-th__sort,
+.tsk-th__caret {
+    flex: 0 0 auto;
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+.tsk-th__badge {
+    flex: 0 0 auto;
+    min-width: 1.1em;
+    padding: 0 4px;
+    border-radius: 999px;
+    font-size: 0.85em;
+    text-align: center;
+    color: var(--vscode-badge-foreground, #ffffff);
+    background: var(--vscode-badge-background, #4d4d4d);
+}
+.tsk-clear {
+    flex: 0 0 auto;
+    padding: 2px 9px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--vscode-foreground, #cccccc);
+    font: inherit;
+    font-size: 0.9em;
+    background: none;
+    border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.18));
+}
+.tsk-clear:hover {
+    background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.12));
+}
+
+.tsk-table__scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+.tsk-table__body {
+    position: relative;
+    width: 100%;
+}
+.tsk-row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: var(--tsk-cols);
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+}
+.tsk-row:hover {
+    background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.07));
+}
+.tsk-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.tsk-cell[data-col="created"] {
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+    font-size: 0.9em;
+}
+.tsk-cell[data-col="tags"] {
+    color: var(--vscode-textLink-foreground, #4daafc);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 0.9em;
+}
+/* Priority badge — an outlined pill; its colour is set inline from the
+   PRIORITIES registry rgb (no theme var exists), so border + text track it. */
+.tsk-priority {
+    flex: 0 0 auto;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 0.78em;
+    font-weight: 600;
+}
+.tsk-row[data-marker="cancelled"] .tsk-cell[data-col="content"] {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* Excel-style header filter dropdown — fixed-positioned (escapes the header's
+   overflow), anchored under the trigger by inline top/left. Width must match
+   POPOVER_WIDTH in main.tsx. */
+.tsk-filter {
+    position: fixed;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    max-height: 60vh;
+    padding: 4px;
+    border-radius: 6px;
+    color: var(--vscode-foreground, #cccccc);
+    background: var(--vscode-editorWidget-background, #252526);
+    border: 1px solid var(--vscode-editorWidget-border, rgba(255, 255, 255, 0.12));
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+.tsk-filter__search {
+    margin: 2px 2px 4px;
+    padding: 3px 6px;
+    color: var(--vscode-input-foreground, #cccccc);
+    background: var(--vscode-input-background, rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    font: inherit;
+}
+.tsk-filter__list {
+    overflow-y: auto;
+}
+.tsk-filter__empty {
+    margin: 4px 6px;
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+.tsk-filter__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.tsk-filter__item:hover {
+    background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.07));
+}
+.tsk-filter__label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tsk-filter__count {
+    flex: 0 0 auto;
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+    font-size: 0.9em;
+}
+.tsk-filter__foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+.tsk-filter__clear {
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--vscode-foreground, #cccccc);
+    font: inherit;
+    font-size: 0.9em;
+    background: none;
+    border: 1px solid transparent;
+}
+.tsk-filter__clear:hover:not(:disabled) {
+    background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.12));
+}
+.tsk-filter__clear:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Cross-surface "day filter" banner (set by a stats calendar-day click). */
+.tsk-daybanner {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px 2px 10px;
+    border-radius: 999px;
+    font-size: 0.9em;
+    color: var(--vscode-button-foreground, #ffffff);
+    background: var(--vscode-button-background, #0e639c);
+}
+.tsk-daybanner__clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    background: rgba(255, 255, 255, 0.2);
+}
+.tsk-daybanner__clear:hover {
+    background: rgba(255, 255, 255, 0.35);
+}

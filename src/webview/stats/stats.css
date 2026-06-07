@@ -1,0 +1,91 @@
+.tsk-stats {
+    padding: 14px 18px;
+    color: var(--vscode-foreground, #cccccc);
+    font:
+        var(--vscode-font-size, 13px) / 1.5
+        var(--vscode-font-family, system-ui, "Segoe UI", sans-serif);
+}
+.tsk-stats__empty,
+.tsk-stats__note {
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+.tsk-stats__note {
+    margin: 10px 0 0;
+    font-size: 0.9em;
+    max-width: 56ch;
+    line-height: 1.5;
+}
+.tsk-stats__tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.tsk-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 68px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: var(--vscode-editorWidget-background, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+}
+/* Big count on top, the marker glyph + label beneath it (the glyph carries the
+   marker colour from the shared .tsk-marker; the count is tinted to match). Base
+   rules first, then the per-marker overrides (Biome's noDescendingSpecificity). */
+.tsk-tile__count {
+    font-size: 1.5em;
+    font-weight: 600;
+    line-height: 1.1;
+}
+.tsk-tile__label {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 0.82em;
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+.tsk-tile[data-marker="todo"] .tsk-tile__count {
+    color: var(--tsk-marker-todo);
+}
+.tsk-tile[data-marker="inprogress"] .tsk-tile__count {
+    color: var(--tsk-marker-inprogress);
+}
+.tsk-tile[data-marker="completed"] .tsk-tile__count {
+    color: var(--tsk-marker-completed);
+}
+.tsk-tile[data-marker="moved"] .tsk-tile__count {
+    color: var(--tsk-marker-moved);
+}
+.tsk-tile[data-marker="cancelled"] .tsk-tile__count {
+    color: var(--tsk-marker-cancelled);
+}
+.tsk-tile[data-marker="notes"] .tsk-tile__count {
+    color: var(--tsk-marker-notes);
+}
+/* Metric toggle — the same pill chips as the task-list filters (shared .tsk-chip). */
+.tsk-stats__toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+.tsk-stats__calendar {
+    overflow-x: auto;
+}
+/* react-activity-calendar ships NO styling for its tooltip and portals it to
+   <body>, so style it globally: a readable VS Code hover-widget surface, with
+   `pre-line` to honor the per-type line breaks from `dayTooltip`. */
+.react-activity-calendar__tooltip {
+    white-space: pre-line;
+    background: var(--vscode-editorHoverWidget-background, #252526);
+    color: var(--vscode-editorHoverWidget-foreground, #cccccc);
+    border: 1px solid var(--vscode-editorHoverWidget-border, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    padding: 6px 9px;
+    font-size: 0.85em;
+    line-height: 1.45;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    z-index: 10;
+}

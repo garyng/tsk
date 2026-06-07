@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -19,7 +19,9 @@
     "activationEvents": [
         "onLanguage:tsk",
         "workspaceContains:**/*.tsk",
-        "onWebviewPanel:tsk.nowStack"
+        "onWebviewPanel:tsk.nowStack",
+        "onWebviewPanel:tsk.stats",
+        "onWebviewPanel:tsk.taskList"
     ],
     "contributes": {
         "languages": [
@@ -224,6 +226,16 @@
             {
                 "command": "tsk.now.clear",
                 "title": "Clear Now History",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.openStats",
+                "title": "Open Stats",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.openTaskList",
+                "title": "Open Task List",
                 "category": "Tsk"
             }
         ],
@@ -555,9 +567,13 @@
         "vscode-textmate": "^9.3.2"
     },
     "dependencies": {
+        "@tanstack/match-sorter-utils": "^8.19.4",
+        "@tanstack/react-table": "^8.21.3",
+        "@tanstack/react-virtual": "^3.14.2",
         "date-fns": "^4.3.0",
         "nanoid": "^5.1.11",
         "pathe": "^2.0.3",
+        "react-activity-calendar": "^3.2.0",
         "yaml": "^2.9.0"
     }
 }

@@ -17,9 +17,9 @@ export interface RangeLike {
 }
 
 /**
- * Marker → `contributes.colors` id, derived from the registry. `todo` resolves
- * to `undefined` (no color override → editor default foreground wins); the
- * other five resolve to their declared `contributes.colors` id.
+ * Marker → `contributes.colors` id, derived from the registry. Every marker
+ * declares a color, so each resolves to its `tsk.marker.<name>` id. (The
+ * `| undefined` is defensive: `MarkerDef.color` is optional in the type.)
  */
 export const MARKER_THEME_COLOR_IDS: Record<Marker, string | undefined> = Object.fromEntries(
     MARKERS.map((m) => [m.name, m.color?.id]),
