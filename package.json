@@ -19,7 +19,8 @@
     "activationEvents": [
         "onLanguage:tsk",
         "workspaceContains:**/*.tsk",
-        "onWebviewPanel:tsk.nowStack"
+        "onWebviewPanel:tsk.nowStack",
+        "onWebviewPanel:tsk.stats"
     ],
     "contributes": {
         "languages": [
@@ -224,6 +225,11 @@
             {
                 "command": "tsk.now.clear",
                 "title": "Clear Now History",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.openStats",
+                "title": "Open Stats",
                 "category": "Tsk"
             }
         ],
@@ -558,6 +564,7 @@
         "date-fns": "^4.3.0",
         "nanoid": "^5.1.11",
         "pathe": "^2.0.3",
+        "react-activity-calendar": "^3.2.0",
         "yaml": "^2.9.0"
     }
 }
