@@ -4,7 +4,7 @@ import { parseDocument } from './parser';
 
 /**
  * Quantifies the per-focus work the M40 version cache eliminates: a full
- * `parseDocument` + the three `compute*Ranges` passes over a whole document.
+ * `parseDocument` + the `compute*Ranges` passes over a whole document.
  * `DecorationsController.applyToEditor` ran this on *every* editor focus before
  * M40; the cache now reuses the result whenever `document.version` is unchanged.
  *

@@ -19,7 +19,7 @@ Open any `.tsk` file — or the bundled `docs/demo.tsk`, a hands-on tour where e
 
 ## Status markers & toggles
 
-Thirteen commands operate on the cursor line (or every unique cursor line in a multi-cursor selection). Each command builds a single edit, so one `Ctrl+Z` reverts the whole operation.
+The commands below operate on the cursor line (or every unique cursor line in a multi-cursor selection). Each builds a single edit, so one `Ctrl+Z` reverts the whole operation.
 
 | Keybinding   | Command                                       | Behavior |
 |--------------|-----------------------------------------------|----------|
@@ -33,7 +33,7 @@ Thirteen commands operate on the cursor line (or every unique cursor line in a m
 | `Alt+1 / 2 / 3` | `tsk.toggleP1` / `P2` / `P3`                | Toggle `@priority:N`; switching levels overwrites in one step. |
 | `` Alt+` ``  | `tsk.copyTaskId`                             | Copy the current task's `@id` to the system clipboard. |
 
-The four picker-driven commands (move + the three relationships) open an input box prefilled with the sanitized first token of clipboard text. Click the **Browse tasks…** button (search icon) to switch to a list of every cached task across the workspace.
+The picker-driven commands (move + the relationships) open an input box prefilled with the sanitized first token of clipboard text. Click the **Browse tasks…** button (search icon) to switch to a list of every cached task across the workspace.
 
 **Keybinding caveats:**
 - `Alt+1` / `Alt+2` / `Alt+3` are globally bound to "Focus N-th Editor Group" in VS Code defaults. The `when: editorLangId == 'tsk'` clause makes the toggle win inside `.tsk` files; the editor-group focus still works elsewhere.
@@ -42,11 +42,11 @@ The four picker-driven commands (move + the three relationships) open an input b
 
 ## Marker, priority & metadata coloring
 
-Three visual layers on `.tsk` documents. Two run through VS Code's **semantic tokens** — the same pipeline as syntax highlighting, so they recolor *instantly* with the text — and one stays a decoration:
+Visual layers on `.tsk` documents — most run through VS Code's **semantic tokens** (the same pipeline as syntax highlighting, so they recolor *instantly* with the text), while the priority background stays a decoration:
 
 - **Marker color (semantic token).** Each `[X]` triplet is colored per status — `[ ]` yellow, `[/]` blue, `[x]` green, `[>]` orange, `[!]` gray (struck through), `[n]` purple. Colors ship as defaults under token type `taskMarker` (one modifier per status); recolor any via `editor.semanticTokenColorCustomizations`, e.g. `"taskMarker.completed": "#9ece6a"`. Toggling a status recolors with no delay.
 - **Inline metadata dim (semantic token).** Every `<!-- @key:value -->` block is dimmed (token type `taskMetadata`) so the comments recede; the hover popup surfaces the parsed values when you need them. Recolor via `"taskMetadata"` in the same setting.
-- **Priority line background (decoration).** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); applies live. This stays a decoration — nothing else paints a whole-line background — so it refreshes on editor focus, after save, and on a short post-change debounce rather than instantly.
+- **Priority line background (decoration).** `@priority:1` paints the line red, `:2` yellow, `:3` blue. Opacity is settable via `tsk.decorations.priority.opacity` (default `0.15`, range 0–1); applies live. This stays a decoration — only `setDecorations` can paint a whole-line background (a semantic token can't) — so it refreshes on editor focus, after save, and on a short post-change debounce rather than instantly.
 
 On top of these, a task's *text* is ordinary Markdown: `.tsk` extends the Markdown grammar, so inline `code`, **bold**, *italic*, and `[links](…)` render inside task lines exactly as they do elsewhere in the document — while the marker triplet and `<!-- … -->` metadata keep their own coloring. (The grammar wraps each task line so the embedded Markdown engages mid-line, which a flat checkbox match wouldn't.)
 
@@ -77,6 +77,7 @@ Tags use `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files. Two surfaces sit
 
 - **`#`-triggered completion.** Type `#` (or `#partial`) in any `.tsk` editor and a completion list surfaces every known tag. Items merge two sources: tags declared in the workspace `tags.yml` (with descriptions, shown as the item detail) and tags discovered in `.tsk` files via the cache — plus implicit `/`-separated parents, so `#project/tsk` automatically contributes `#project`.
 - **`Alt+T` find-all-tasks-by-tag.** Opens a list of every known tag — each row showing a hierarchical task count (`5 tasks · <description>`), searchable by name, count, *and* description — then opens VS Code's **Search Editor** with `#<tag>` pre-queried, scoped to `*.tsk`. You get Ctrl+Click navigation, regex/case toggles, and result folding for free, and the search opens with **0 context lines** so only the matching task rows show. The Search Editor's own grammar can't highlight tsk rows, so the extension paints tsk **decorations** (marker colors, priority backgrounds, dimmed metadata) onto the match rows itself. The per-tag count is prefix-inclusive (a `#project` row counts its `#project/tsk` tasks too), matching what the substring search returns.
+- **Find all tasks by status** (Command Palette → *Tsk: Find All Tasks by Status*; palette-only, since `Alt+T` is the tag search). Pick a status marker — each row shows its `[glyph]` and a task count — and it opens the same Search Editor with a line-anchored **regex** (`^\s*[-*+] \[<glyph>\]`) scoped to `*.tsk`, listing every task carrying that marker. The anchor keeps `[ ]` (todo) from matching stray empty brackets in prose; the result rows get the same tsk decorations as the tag search.
 
 **`tags.yml` location.** Default `${workspaceFolder}/.vscode/tsk/tags.yml` (configurable via `tsk.tags.path`). Both schema forms are accepted:
 
@@ -91,9 +92,26 @@ Empty / missing / malformed `tags.yml` is tolerated — the loader returns an em
 
 **Search semantics.** The `#tag` query is a literal substring, so `#project` also matches lines containing `#project/tsk` — read this as a feature: parent-tag searches naturally include their children. For exact matches, toggle regex in the Search Editor's toolbar (e.g. `(?<![\w/-])#project(?![\w/-])`).
 
+## Autolinks
+
+Turn text matching a regular expression into a clickable link in `.tsk` editors — `Ctrl`/`Cmd`+Click to open. Rules live in `tsk.autolinks` (an array, empty by default — opt-in):
+
+```jsonc
+"tsk.autolinks": [
+  { "pattern": "([A-Z]+)-([0-9]+)", "target": "https://jira.example.com/browse/$1-$2" }
+]
+```
+
+Every line is scanned (not only task lines), so a tagged `#JIRAID-123` and a bare `JIRAID-123` both link. Per rule:
+
+- **`pattern`** — a JavaScript regex; the `g` flag is always applied. Capture groups (including named `(?<name>…)`) feed the template. Optional **`flags`** may add any of `i` `m` `s` `u`.
+- **`target`** — a URL template with `String.replace` substitution: `$1`/`$2` (numbered groups), `$<name>` (named), `$&` (whole match), `$$` (a literal `$`).
+
+Earlier rules win where matches overlap. Substitution is **raw** — the captured text drops into the URL as-is, so anchor your pattern to capture exactly what the URL needs. A pattern relying on **look-behind/look-ahead** positions the link correctly but won't substitute (the URL falls back to the raw match, and is skipped when that isn't a valid URI).
+
 ## Relationships, code lenses & navigation
 
-Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N`). A moved task (`[>]`) carrying an `@movedTo` target also shows a `movedTo: <id>` lens pointing at where the work went. Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
+Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>` / `movedTo: <id>`) and inverse edges (`children: N` / `dependents: N` / `related: N` / `movedHereFrom: N`). `@movedTo` (a `[>]` task's "moved to" pointer) is a first-class graph edge: it shows the forward `movedTo: <id>` lens, the move target gains an inverse `movedHereFrom: N` lens, and a dangling `@movedTo` squiggles like any other broken reference. Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
 
 | Lens                       | Command                  | Behavior |
 |----------------------------|--------------------------|----------|
@@ -104,6 +122,7 @@ Every task with relationship metadata grows code lenses showing forward edges (`
 | `relatedTo: <id>`          | `tsk.goToRelated`        | Open the related task's location. |
 | `related: N`               | `tsk.findAllRelated`     | Peek view of every task `@relatedTo`-pointing here. |
 | `movedTo: <id>`            | `tsk.goToMovedTo`        | Open the move target's location (a `[>]` task's `@movedTo`). |
+| `movedHereFrom: N`         | `tsk.findAllMovedHereFrom` | Peek view of every task that `@movedTo`-points here. |
 | `<key>: <id> (missing)`    | `tsk.codelens.missing`   | Info toast — the referenced `@id` isn't in the workspace. |
 
 These commands are invoked exclusively by lens clicks — no palette entries, no keybindings; the lens *is* the invocation.
@@ -111,6 +130,31 @@ These commands are invoked exclusively by lens clicks — no palette entries, no
 **Canonical-occurrence gating.** Lenses render only on the canonical occurrence of an `@id` (the lex-lowest `(file, line)` in the workspace). Duplicate-`@id` losers get a diagnostic squiggle pointing at the canonical winner instead of a potentially misleading lens.
 
 **Navigation highlight.** Clicking a forward-edge lens (parent / dependsOn / relatedTo / movedTo) lands on the target line and leaves a soft whole-line tint there until your next interaction. It's persistent, not a flash — it clears on the next navigate, a user-initiated cursor move in that editor, or the active editor moving off it. Theme it via `workbench.colorCustomizations` and the `tsk.navigation.highlight` color id (default: soft yellow with alpha, readable on light and dark themes).
+
+## Now task & tree
+
+`Alt+W` (**Tsk: Mark Now**) marks the task under the cursor as your current "now". In a single undo step it stamps a missing `@id` (+ `@created`) and — unless you turn off `tsk.now.autoInProgress` — flips the marker to `[/]` and stamps `@started`, the same transition the `Alt+S` in-progress toggle applies. The current now-task carries a persistent border around its line (the `tsk.now.highlight` color), a box kept visually distinct from the priority line-background tint.
+
+Marks accumulate into an **undo-tree**, not a stack: each new mark becomes a child of the current one, and switching to an earlier node and marking again *branches* rather than overwriting — history is never pruned implicitly. Open the tree from the `target` button in a `.tsk` editor's title bar, or **Tsk: Open Now Stack**. It's a React webview that docks **beside** the file like a Markdown preview (and pops out via *Move / Copy into a New Window*), rendered with [`@grida/tree-view`](https://grida.co/packages/@grida/tree-view) for a native tree feel — keyboard nav (`↑`/`↓` move, `←`/`→` collapse/expand, `Enter` jumps), twisties, collapse-state that persists.
+
+The tree uses **linear-compaction**: the path from root to the current now renders as a flat trunk (current at the top), and only real branches indent — so a mostly-linear history stays flat instead of deeply nested.
+
+| Action | What it does |
+|--------|--------------|
+| **Click a node** | Jump to that task. Reuses the editor beside the panel (a task in another file opens in that group — never a stray tab over the panel). Read-only; never edits. |
+| **Set as current** | Switch the now-pointer to that node. Undo / redo is a pointer move — nothing is deleted. |
+| **Back** (toolbar) | Switch to the current node's parent (undo one step). |
+| **Remove** | Drop one node, re-parenting its children onto its parent. |
+| **Delete branch** | Drop a node and its whole subtree. |
+| **Remove children** | Drop a node's descendants, keeping the node itself. |
+| **Prune off-path** (toolbar) | Drop every branch not on the path to the current now (linearize). |
+| **Clear** (toolbar, or **Tsk: Clear Now History**) | Wipe the whole tree — confirm via a notification toast (not a blocking modal); your tasks are untouched. |
+
+**Persistence.** The now-tree lives in its own SQLite `state.db` (default `${workspaceFolder}/.vscode/tsk/state.db`, set via `tsk.state.path`) — **separate from `cache.db`**, so **Tsk: Rebuild Cache** leaves it intact. With no workspace folder it's session-only (in-memory). Like the cache, it's single-root today.
+
+**Recurrence.** The same task can appear at several nodes (mark it, move on, come back later) — a node's identity is its position in the tree, not the `@id`, so one task can sit at multiple points in your history.
+
+**Limits (v1).** No in-panel search/filter; a now-task in a *closed* file shows no in-editor highlight (only the tree label); `@movedTo` isn't followed; multi-root workspaces aren't supported yet (same as the cache).
 
 ## Hover
 
@@ -121,7 +165,7 @@ Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't
 Two `Ctrl+.` helpers:
 
 - **Add missing id.** A markered task with no `@id` (any marker, not only `[ ]`) offers *"Tsk: Add missing id + created"* (or *"…Add missing id"* when `@created` is already present), writing the same metadata `Alt+A` would. Unlike the `Alt+A` toggle — which fires only on its own target marker — the quick-fix is marker-agnostic, so you can promote a hand-typed `- [x] done` imported from elsewhere.
-- **Broken references.** When a task's `@parent` / `@dependsOn` / `@relatedTo` points at an `@id` with no canonical occurrence in the workspace, the line gets a `Warning` squiggle. The lightbulb offers *"Tsk: Remove broken @parent"* to drop it, or *"Tsk: Replace @parent via picker…"* to pick a real task.
+- **Broken references.** When a task's `@parent` / `@dependsOn` / `@relatedTo` / `@movedTo` points at an `@id` with no canonical occurrence in the workspace, the line gets a `Warning` squiggle. The lightbulb offers *"Tsk: Remove broken @parent"* (or `@movedTo`, etc.) to drop it, or *"Tsk: Replace @parent via picker…"* to pick a real task.
 
 Warnings surface in both the `tsk` Output channel and the Problems panel: today's categories are duplicate `@id` and task-without-`@id`.
 
@@ -170,8 +214,11 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.clipboard.bridgeEnabled` | `false` | Master switch for the clipboard bridge (watch a file → host clipboard). |
 | `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched bridge file; only used when the bridge is enabled. |
 | `tsk.pasteImage.baseDirectory` | `./images` | Base directory (under the document) for pasted images. Blank ⇒ beside the document. |
+| `tsk.state.path` | `${workspaceFolder}/.vscode/tsk/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
+| `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]` and stamp `@started` (like `Alt+S`). Turn off to leave the marker unchanged. |
+| `tsk.autolinks` | `[]` | Regex→URL rules; text matching a rule becomes a `Ctrl`/`Cmd`+clickable link in `.tsk` editors. See *Autolinks*. |
 
-Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`. These drive the Search Editor result rows; in `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
+Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. The marker and metadata colors drive the **Search Editor result rows** (which can't carry semantic tokens); `tsk.navigation.highlight` and `tsk.now.highlight` are in-editor line decorations (the navigate-flash and the now-task border). In `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 
 ## Limitations
 
@@ -200,8 +247,9 @@ Requires **VS Code 1.112+** (the extension declares `engines.vscode = "^1.112.0"
 
 ```sh
 npm install            # one-time
-npm run build:host     # produces dist/extension.cjs via Vite (library mode, CJS)
-npm run dev:host       # same, in watch mode
+npm run build          # host (dist/host/extension.cjs) + webview (dist/webview/now-stack.js)
+npm run build:host     # just the extension host bundle (Vite library mode, CJS)
+npm run dev:host       # host bundle, watch mode (dev:webview watches the webview)
 ```
 
 Open the repo in VS Code and pick **Run and Debug → Run Extension** to launch a development host with the extension loaded. After a fresh `npm run build:host`, the running dev host still has the *previous* bundle — run **Developer: Restart Extension Host** in the dev host window to pick up the new build.

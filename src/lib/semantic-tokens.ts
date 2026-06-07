@@ -14,6 +14,12 @@ export type TskTokenType = 'taskMarker' | 'taskMetadata';
  * activation-layer provider maps these onto a `vscode.SemanticTokensBuilder`.
  * Reuses the decoration range computers so positions stay single-sourced with
  * the search-result decoration path.
+ *
+ * The COLORS, however, are NOT single-sourced (they can't be): `taskMetadata`'s
+ * default (`#808080`, package.json `configurationDefaults`) mirrors the
+ * `tsk.metadata.foreground` decoration that dims the same metadata on
+ * Search-Editor result rows — see `constants.ts::METADATA_FOREGROUND_COLOR_ID`.
+ * Keep the two in sync by hand.
  */
 export interface SemanticToken {
     line: number;

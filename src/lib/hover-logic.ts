@@ -61,7 +61,7 @@ const MARKER_LABEL: Record<Marker, string> = {
  * "Tags: " line, no zero-row table).
  *
  * **Forward refs** to ids the workspace doesn't know are rendered as
- * `*(missing in workspace)*` — redundant with the M20/B diagnostic
+ * `*— missing in workspace*` — redundant with the M20/B diagnostic
  * squiggle, but the hover is what users read at the point of curiosity.
  *
  * **Inverse-ref navigation** uses `tsk.goToParent` regardless of
@@ -174,18 +174,26 @@ function commandLink(command: string, args: unknown[], label: string): string {
 }
 
 /**
- * Render an ISO-8601 timestamp with a parenthesised human-friendly
- * relative distance, e.g. `2026-05-27T10:00:00+08:00 (2 hours ago)`.
- * Falls back to the raw value when the string doesn't parse as a date —
- * we never want a broken timestamp to crash the hover.
- *
- * `date-fns/formatDistance(d, now, { addSuffix: true })` does all the
- * pluralisation + "X ago" / "in X" logic; we don't reimplement.
+ * Relative-time phrase like "3 minutes ago" (date-fns `formatDistance`, with
+ * suffix). Returns the raw value unchanged if it isn't a parseable date —
+ * shared by the hover timestamp and the now-stack `when` column.
+ */
+export function formatRelativeTime(value: string, now: Date): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return formatDistance(date, now, { addSuffix: true });
+}
+
+/**
+ * Render an ISO-8601 timestamp with a parenthesised human-friendly relative
+ * distance, e.g. `2026-05-27T10:00:00+08:00 (2 hours ago)`. Falls back to the
+ * raw value when the string doesn't parse — we never want a broken timestamp to
+ * crash the hover.
  */
 function formatTimestamp(value: string, now: Date): string {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return `${value} (${formatDistance(date, now, { addSuffix: true })})`;
+    return `${value} (${formatRelativeTime(value, now)})`;
 }
 
 /**

@@ -1,3 +1,4 @@
 {
-    "tsk.cache.path": ""
+    "tsk.cache.path": "",
+    "tsk.state.path": ""
 }

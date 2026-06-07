@@ -106,7 +106,7 @@ export class GraphService {
     getBrokenForwardEdges(): readonly BrokenEdgeReport[] {
         const reports: BrokenEdgeReport[] = [];
         for (const node of this.snapshot.graph.values()) {
-            for (const key of ['parent', 'dependsOn', 'relatedTo'] as const) {
+            for (const key of ['parent', 'dependsOn', 'relatedTo', 'movedTo'] as const) {
                 const targetId = node.forward[key];
                 if (!targetId) continue;
                 if (this.snapshot.graph.has(targetId)) continue;

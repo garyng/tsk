@@ -10,7 +10,7 @@ import type { TagsLoader } from './tags-loader';
  * Register a hover provider for `.tsk` documents. For each hovered line
  * that parses as a task, build a markdown popup showing:
  *
- *   - marker glyph + content (header)
+ *   - status label (header)
  *   - @id / priority / timestamps (table)
  *   - tags with yaml descriptions (when present)
  *   - parent / depends on / related to with clickable jump-to-target links

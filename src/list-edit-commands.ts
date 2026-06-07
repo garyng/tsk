@@ -13,13 +13,13 @@ import type { Logger } from './lib/logger';
 import { defaultToggleDeps, type ToggleDeps } from './lib/toggle-mutators';
 
 /**
- * Register the three M7 list-edit commands (`tsk.handleEnter` /
- * `tsk.handleTab` / `tsk.handleShiftTab`). Each intercepts the
+ * Register the M7 list-edit commands (`tsk.handleEnter` /
+ * `tsk.handleTab` / `tsk.handleShiftTab` / `tsk.handleBackspace`). Each intercepts the
  * corresponding keypress in `.tsk` files via a keybinding gated by
  * `editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible &&
  * !inSnippetMode`. The pure helpers in `lib/list-edit.ts` decide the
  * edit; this layer translates the result into a `WorkspaceEdit` (single
- * Ctrl+Z reverts) and repositions the cursor. On a `noop` result, we
+ * undo reverts) and repositions the cursor. On a `noop` result, we
  * fall through to the editor's default key behavior.
  *
  * `deps` exists for tests (M7/C drives the suite); defaults to

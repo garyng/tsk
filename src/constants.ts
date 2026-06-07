@@ -41,7 +41,7 @@
  * **TODO — configurability**
  *
  * Entries marked `// TODO: configurable` are candidates to be exposed as
- * user settings in a future plan (`2026-XX-XX_tsk-configurable-constants.md`).
+ * user settings in a future iteration.
  * They are values where a power-user might reasonably want a different
  * trade-off (e.g. debounce latency vs. responsiveness) but where we haven't
  * yet seen the demand. When such a setting lands, the constant here becomes
@@ -99,6 +99,15 @@ export const PASTE_IMAGE_BASE_DIRECTORY_KEY = 'pasteImage.baseDirectory';
 export const EDITOR_CHANGE_DEBOUNCE_SETTING = 'tsk.editor.changeDebounceMs';
 export const EDITOR_CHANGE_DEBOUNCE_KEY = 'editor.changeDebounceMs';
 
+export const STATE_PATH_SETTING = 'tsk.state.path';
+export const STATE_PATH_KEY = 'state.path';
+
+export const NOW_AUTO_IN_PROGRESS_SETTING = 'tsk.now.autoInProgress';
+export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
+
+export const AUTOLINKS_SETTING = 'tsk.autolinks';
+export const AUTOLINKS_KEY = 'autolinks';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every
@@ -112,8 +121,18 @@ export const EDITOR_CHANGE_DEBOUNCE_KEY = 'editor.changeDebounceMs';
 
 // ── Theme color ids ─────────────────────────────────────────────────────────
 
+// Metadata-dim is colored TWO ways that must be kept visually in sync — they
+// can't share a runtime source: a semantic-token color is hex-only and can't
+// reference a workbench ThemeColor id, and this decoration's theme-aware alpha
+// dimming is deliberately richer than a flat token value.
+//   • `.tsk` editors → the `taskMetadata` semantic token (default `#808080` in
+//     package.json `configurationDefaults.editor.semanticTokenColorCustomizations`).
+//   • Search-Editor result rows → this `tsk.metadata.foreground` decoration
+//     (theme-aware + user-overridable; semantic tokens don't apply to the
+//     `search-result` language). Mirror of the token above — edit both together.
 export const METADATA_FOREGROUND_COLOR_ID = 'tsk.metadata.foreground';
 export const NAVIGATION_HIGHLIGHT_COLOR_ID = 'tsk.navigation.highlight';
+export const NOW_HIGHLIGHT_COLOR_ID = 'tsk.now.highlight';
 
 // ── Timing ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +163,7 @@ export const CLIPBOARD_BRIDGE_POLL_INTERVAL_MS = 300;
 export const COMMANDS = {
     rebuildCache: 'tsk.rebuildCache',
     findAllTasksByTag: 'tsk.findAllTasksByTag',
+    findAllTasksByStatus: 'tsk.findAllTasksByStatus',
     toggleTodo: 'tsk.toggleTodo',
     toggleInprogress: 'tsk.toggleInprogress',
     toggleCompleted: 'tsk.toggleCompleted',
@@ -164,14 +184,18 @@ export const COMMANDS = {
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
+    markNow: 'tsk.markNow',
+    openNowStack: 'tsk.now.openStack',
+    nowClear: 'tsk.now.clear',
 } as const satisfies Record<string, `tsk.${string}`>;
 
 /**
  * Commands registered programmatically and invoked only via CodeLens
- * descriptors (see `lib/codelens-logic.ts`). Deliberately NOT in
- * `package.json#contributes.commands` — they require arguments only the
- * lens layer can supply, so surfacing them in the Command Palette would
- * just produce broken invocations.
+ * descriptors (see `lib/codelens-logic.ts`) or the now-stack webview bridge
+ * (see `now-tree-commands.ts`). Deliberately NOT in
+ * `package.json#contributes.commands` — they require arguments (a task `@id`,
+ * a tree `entryId`) only those layers can supply, so surfacing them in the
+ * Command Palette would just produce broken invocations.
  *
  * Kept separate from `COMMANDS` so the package.json cross-check stays
  * sharp ("every contributed command is in `COMMANDS`" — without false
@@ -185,10 +209,21 @@ export const INTERNAL_COMMANDS = {
     findAllChildren: 'tsk.findAllChildren',
     findAllDependents: 'tsk.findAllDependents',
     findAllRelated: 'tsk.findAllRelated',
+    findAllMovedHereFrom: 'tsk.findAllMovedHereFrom',
     codelensMissing: 'tsk.codelens.missing',
+    // Now-stack actions — the webview posts an action message, the panel routes
+    // it to one of these (jump takes a task `@id`; the rest a tree `entryId`,
+    // except back/pruneOffPath which act on the current).
+    nowJump: 'tsk.now.jump',
+    nowSwitchTo: 'tsk.now.switchTo',
+    nowBack: 'tsk.now.back',
+    nowRemove: 'tsk.now.remove',
+    nowPruneSubtree: 'tsk.now.pruneSubtree',
+    nowPruneChildren: 'tsk.now.pruneChildren',
+    nowPruneOffPath: 'tsk.now.pruneOffPath',
     /**
      * Quick-fix backing for broken-ref diagnostics (M20/C). Takes
-     * `(uri: vscode.Uri, line: number, key: 'parent' | 'dependsOn' | 'relatedTo')`,
+     * `(uri: vscode.Uri, line: number, key: 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo')`,
      * opens the task picker, and rewrites `@<key>:<picked-id>` on the
      * given line. Hidden from the palette because the args make no
      * sense outside a code-action invocation.

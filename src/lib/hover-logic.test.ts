@@ -131,7 +131,7 @@ describe('buildTaskHoverMarkdown', () => {
             fileUri: 'file:///work/notes.tsk',
             line: 0,
             forward: {},
-            inverse: { children: ['c1', 'c2'], dependents: [], related: [] },
+            inverse: { children: ['c1', 'c2'], dependents: [], related: [], movedHereFrom: [] },
         };
         const md = buildTaskHoverMarkdown(makeTask({ metadata: new Map([['id', 'parent-1']]) }), {
             ...emptyDeps,
@@ -149,7 +149,7 @@ describe('buildTaskHoverMarkdown', () => {
             fileUri: 'file:///work/notes.tsk',
             line: 0,
             forward: {},
-            inverse: { children: [], dependents: [], related: [] },
+            inverse: { children: [], dependents: [], related: [], movedHereFrom: [] },
         };
         const md = buildTaskHoverMarkdown(makeTask({ metadata: new Map([['id', 'lonely']]) }), {
             ...emptyDeps,

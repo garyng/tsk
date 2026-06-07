@@ -165,4 +165,120 @@ suite('code actions — Add missing id + created', () => {
         // Undo so the file fixture isn't dirtied for the next test run.
         await vscode.commands.executeCommand('undo');
     });
+
+    test('offers Remove/Replace quick-fixes on a dangling @movedTo (M8 parity)', async () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder);
+        const movedUri = vscode.Uri.joinPath(folder.uri, 'moved.tsk');
+        const doc = await vscode.workspace.openTextDocument(movedUri);
+        await vscode.window.showTextDocument(doc);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const movedDiag = vscode.languages
+            .getDiagnostics(movedUri)
+            .find((d) => d.code === 'broken-ref:movedTo');
+        assert.ok(movedDiag, 'expected the dangling @movedTo diagnostic');
+
+        const line = movedDiag.range.start.line;
+        const range = new vscode.Range(line, 0, line, 0);
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            movedUri,
+            range,
+            vscode.CodeActionKind.QuickFix.value,
+        );
+        const titles = (actions ?? []).map((a) => a.title);
+        assert.ok(titles.includes('Tsk: Remove broken @movedTo'), `got: ${titles.join(', ')}`);
+        assert.ok(
+            titles.includes('Tsk: Replace @movedTo via picker…'),
+            `got: ${titles.join(', ')}`,
+        );
+        const replace = (actions ?? []).find(
+            (a) => a.title === 'Tsk: Replace @movedTo via picker…',
+        );
+        assert.deepStrictEqual(replace?.command?.arguments?.[2], 'movedTo');
+    });
+});
+
+/**
+ * Regenerate-duplicate-@id quick fix (M7). Leans on the `dup.tsk` fixture —
+ * occurrence A (line index 7) is the canonical winner, occurrence B (index 8)
+ * is the non-canonical duplicate whose diagnostic carries the
+ * `duplicate-id:e2e-dup` code the action matches on. Don't edit the fixture's id
+ * or line order — pinned here and by `graph.test.ts`.
+ */
+suite('code actions — Regenerate duplicate @id (M7)', () => {
+    const REGEN = 'Tsk: Regenerate @id (resolve duplicate)';
+    let dupUri: vscode.Uri;
+
+    suiteSetup(async () => {
+        const ext = vscode.extensions.getExtension(EXTENSION_ID);
+        assert.ok(ext, `extension ${EXTENSION_ID} should be discoverable`);
+        await ext.activate();
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder, 'expected a workspace folder');
+        dupUri = vscode.Uri.joinPath(folder.uri, 'dup.tsk');
+    });
+
+    async function dupDiagnostics(): Promise<vscode.Diagnostic[]> {
+        const doc = await vscode.workspace.openTextDocument(dupUri);
+        await vscode.window.showTextDocument(doc);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return vscode.languages
+            .getDiagnostics(dupUri)
+            .filter((d) => /Duplicate @id "e2e-dup"/.test(d.message));
+    }
+
+    async function actionsAtLine(line: number): Promise<vscode.CodeAction[]> {
+        const range = new vscode.Range(line, 0, line, 0);
+        const result = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            dupUri,
+            range,
+            vscode.CodeActionKind.QuickFix.value,
+        );
+        return result ?? [];
+    }
+
+    test('offers "Regenerate @id" on the non-canonical occurrence with a precomputed edit', async () => {
+        const coded = (await dupDiagnostics()).find((d) => d.code === 'duplicate-id:e2e-dup');
+        assert.ok(coded, 'the non-canonical occurrence should carry the duplicate-id code');
+        const actions = await actionsAtLine(coded.range.start.line);
+        const regen = actions.find((a) => a.title === REGEN);
+        assert.ok(
+            regen,
+            `expected the regenerate action; got: ${actions.map((a) => a.title).join(', ')}`,
+        );
+        assert.ok(regen.edit, 'regenerate action should carry a precomputed WorkspaceEdit');
+        assert.strictEqual(regen.kind?.value, vscode.CodeActionKind.QuickFix.value);
+    });
+
+    test('does NOT offer it on the canonical (first) occurrence', async () => {
+        const canonical = (await dupDiagnostics()).find((d) =>
+            /canonical occurrence/.test(d.message),
+        );
+        assert.ok(canonical, 'expected the canonical-occurrence diagnostic');
+        assert.strictEqual(canonical.code, undefined, 'canonical diagnostic must NOT carry a code');
+        const actions = await actionsAtLine(canonical.range.start.line);
+        assert.strictEqual(
+            actions.find((a) => a.title === REGEN),
+            undefined,
+            'the canonical occurrence keeps its id — no regenerate action there',
+        );
+    });
+
+    test('applying it stamps a fresh @id (≠ the duplicate), content untouched', async () => {
+        const coded = (await dupDiagnostics()).find((d) => d.code === 'duplicate-id:e2e-dup');
+        assert.ok(coded);
+        const line = coded.range.start.line;
+        const doc = await vscode.workspace.openTextDocument(dupUri);
+        const regen = (await actionsAtLine(line)).find((a) => a.title === REGEN);
+        assert.ok(regen?.edit);
+        await vscode.workspace.applyEdit(regen.edit);
+        const after = doc.lineAt(line).text;
+        assert.match(after, /^- \[x\] dup occurrence B <!-- @id:[a-z0-9]+ -->$/, `got: ${after}`);
+        assert.ok(!/@id:e2e-dup\b/.test(after), `id should have changed; line: ${after}`);
+        // Undo so the fixture stays pristine for other suites.
+        await vscode.commands.executeCommand('undo');
+    });
 });

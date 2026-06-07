@@ -1,5 +1,6 @@
-import { DatabaseSync, type StatementSync } from 'node:sqlite';
+import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import type { Marker } from './parser';
+import { openDatabase, transaction as runTransaction } from './sqlite';
 
 /**
  * Thin wrapper over `node:sqlite`. Owns the connection, applies the schema
@@ -125,13 +126,11 @@ export class Db {
     private readonly stmts: PreparedStatements;
 
     constructor(path: string) {
-        this.db = new DatabaseSync(path);
-        // WAL only meaningful for on-disk databases; sqlite returns "memory"
-        // for `:memory:` regardless, so skip the pragma to avoid noise.
-        if (path !== ':memory:') {
-            this.db.exec('PRAGMA journal_mode = WAL');
-        }
-        this.db.exec('PRAGMA synchronous = NORMAL');
+        // WAL + synchronous hardening is shared via `openDatabase`. cache.db
+        // relies on FK cascades (deleting a `files` row wipes its
+        // tasks/metadata/tags), so assert foreign_keys ON explicitly (node:sqlite
+        // defaults it on, but the cascades are load-bearing — be explicit).
+        this.db = openDatabase(path);
         this.db.exec('PRAGMA foreign_keys = ON');
         this.db.exec(SCHEMA);
         this.stmts = this.prepareStatements();
@@ -287,15 +286,7 @@ export class Db {
 
     // ── Transactions / maintenance ──────────────────────────────────────────
     transaction<T>(fn: () => T): T {
-        this.db.exec('BEGIN');
-        try {
-            const result = fn();
-            this.db.exec('COMMIT');
-            return result;
-        } catch (err) {
-            this.db.exec('ROLLBACK');
-            throw err;
-        }
+        return runTransaction(this.db, fn);
     }
 
     /** Drop all data. Schema and prepared statements remain valid. */

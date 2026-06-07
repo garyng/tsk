@@ -1,6 +1,6 @@
 # e2e fixture for the movedTo code lens
 
-Pins `tests/e2e/codelens.test.ts`'s movedTo cases. One moved task points at a real target in this file (the `$(forward) movedTo:` lens); another points at a dangling id (the `(missing)` variant). `@movedTo` is a lifecycle pointer, not a relationship edge, so the dangling case yields a missing *lens* but no broken-ref diagnostic. Don't edit the ids — the suite pins them.
+Pins the movedTo cases for `tests/e2e/codelens.test.ts`, `graph.test.ts`, `missing-ref-diagnostic.test.ts`, and `code-actions.test.ts`. One moved task points at a real target in this file (the `$(forward) movedTo:` lens, plus a `$(reply) movedHereFrom:` inverse lens on the target); another points at a dangling id. As of M8, `@movedTo` is a real graph forward edge, so the dangling case yields the `(missing)` lens AND a `broken-ref:movedTo` diagnostic with Remove/Replace quick-fixes (parity with `@parent` etc.). Don't edit the ids — the suites pin them.
 
 - [ ] move target <!-- @id:e2e-moved-target -->
 - [>] relocated to a real task <!-- @id:e2e-moved-src @movedTo:e2e-moved-target -->

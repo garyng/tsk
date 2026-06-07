@@ -45,10 +45,12 @@ Colors the whole line; the same number clears it.
 - [ ] sketch the architecture #
 - [ ] order the parts #
 
-`Alt+T` → searchable tag list with counts → opens a search of matching tasks.
+`Alt+T` → searchable tag list with counts → opens a search of matching tasks. Its sibling **Tsk: Find All Tasks by Status** (Command Palette) does the same by status marker — pick `[/]` to find every in-progress task, `[x]` every done one, and so on.
 
 - [ ] chase the ticket #JIRAID-123 <!-- @id:tag-a -->
 - [ ] mount the NAS #inventory/homelab/nas1 <!-- @id:tag-b -->
+
+`JIRAID-123` above is also a **link** — this folder's `.vscode/settings.json` has an autolink rule (regex → URL), so Ctrl/Cmd+Click opens the ticket.
 
 ## 4. Links
 
@@ -103,7 +105,7 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 
 ## 8. Move
 
-`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`. Pick a target and the task gains an `@movedTo` plus a `movedTo: <id>` lens (the `forward` codicon) — click it to jump to where the work went.
+`Alt+M` → picker (or submit empty for "moved, no target") → marks `[>]`. Pick a target and the task gains an `@movedTo` plus a `movedTo: <id>` lens (the `forward` codicon) — click it to jump to where the work went. `@movedTo` is a real graph edge: the target shows a `movedHereFrom: N` lens back, and a `@movedTo` pointing at an unknown id squiggles like any broken reference.
 
 - [ ] belongs in another project <!-- @id:move-demo -->
 
@@ -119,7 +121,21 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 
 <!-- paste an image on the line below -->
 
-## 11. Putting it together
+## 11. Now
+
+| Key | Effect |
+|-----|--------|
+| `Alt+W` | mark the task as your current "now" |
+
+`Alt+W` stamps a missing `@id`, flips the task to `[/]` (stamping `@started`, just like `Alt+S`), and pushes it onto a persistent undo-**tree** of "what am I working on now" — the marked line gets a border around it. Open the tree from the `target` button in this editor's title bar (or **Tsk: Open Now Stack**); it docks beside the file like a Markdown preview — click a node to jump straight back to it.
+
+Mark the first line, then the second (it becomes a *child*). Open the stack, click the first to switch back, then mark the third — the tree keeps **both** branches, so your history is never lost:
+
+- [ ] draft the launch plan <!-- @id:now-draft -->
+- [ ] handle the review notes <!-- @id:now-review -->
+- [ ] cut the release <!-- @id:now-release -->
+
+## 12. Putting it together
 
 A real slice of a plan — every status, priority, tag, and link at once. The priorities tint their rows, the cancelled line is struck through, the metadata stays dimmed. Hover any task, click a `children:` / `parent:` / `dependsOn:` / `movedTo:` lens to jump, or `Alt+T` a tag to find more like it. The task text itself is plain Markdown — inline `code`, **bold**, and *italic* all render in place.
 

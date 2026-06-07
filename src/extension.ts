@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { registerAutoLinksProvider } from './autolinks-provider';
 import { registerClipboardBridge } from './clipboard-bridge';
 import { registerCodeActionsProvider } from './code-actions';
 import { registerCodelens } from './codelens';
@@ -12,11 +13,13 @@ import {
     OUTPUT_CHANNEL_NAME,
     PRIORITY_OPACITY_KEY,
     PRIORITY_OPACITY_SETTING,
+    STATE_PATH_KEY,
 } from './constants';
 import { type DecorationSnapshot, DecorationsController } from './decorations-controller';
 import { DiagnosticsManager } from './diagnostics-manager';
 import { registerDuplicateCommands } from './duplicate-commands';
 import { isPersistableDocument, isTskDocument } from './editor-guards';
+import { registerFindAllTasksByStatusCommand } from './find-tasks-by-marker';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerHoverProvider } from './hover';
 import { registerInstallClipboardBridgeSkillCommand } from './install-clipboard-bridge-skill';
@@ -26,10 +29,16 @@ import { type CacheCounts, Db, type TaskRecord } from './lib/db';
 import type { GraphNode } from './lib/graph';
 import { GraphService } from './lib/graph-service';
 import { Logger, type LogLevel } from './lib/logger';
+import { NowStore } from './lib/now-store';
+import type { NowTreeState } from './lib/now-tree';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { NavigationHighlight } from './navigation-highlight';
+import { registerNowCommands } from './now-commands';
+import { NowDecoration } from './now-decoration';
+import { registerNowPanel } from './now-panel';
+import { registerNowTreeCommands } from './now-tree-commands';
 import { registerPasteImageProvider } from './paste-image';
 import { ScanController } from './scan-controller';
 import { registerSemanticTokens } from './semantic-tokens';
@@ -83,6 +92,20 @@ export interface TskExtensionApi {
      * since VSCode doesn't expose decoration state directly.
      */
     getNavigationHighlight(): { uri: string; line: number } | undefined;
+    /**
+     * The current now-tree snapshot, and the current "now" task `@id` (M44/M45).
+     * Exposed for e2e introspection of the undo-tree without driving the panel.
+     */
+    getNowTree(): NowTreeState;
+    getNowTaskId(): string | undefined;
+    /** The currently-painted now-decoration location, or `undefined` when nothing is highlighted (M45). */
+    getNowDecoration(): { uri: string; line: number } | undefined;
+    /**
+     * Force a re-read of `tsk.autolinks` + provider re-registration (Feature A).
+     * Exposed so e2e tests can deterministically refresh after a config update
+     * without waiting on the `onDidChangeConfiguration` round-trip.
+     */
+    refreshAutolinks(): void;
 }
 
 /**
@@ -114,6 +137,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     logger.info('tsk extension activating.');
 
     const { cache } = openCache(context, logger);
+    const nowStore = openNowStore(context, logger);
     const decorations = new DecorationsController(context, readPriorityOpacity());
 
     const diagnostics = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
@@ -123,8 +147,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     const diagnosticsManager = new DiagnosticsManager(diagnostics);
     const navigationHighlight = new NavigationHighlight();
     context.subscriptions.push(navigationHighlight);
+    const nowDecoration = new NowDecoration(cache, nowStore);
+    context.subscriptions.push(nowDecoration);
+    // Created before the scan controller so its `refresh()` can ride the
+    // rescan-tail (a cache rebuild changes labels without touching the tree).
+    const nowPanel = registerNowPanel(context, nowStore, cache, logger);
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
-    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger);
+    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger, () => {
+        nowDecoration.reapply();
+        nowPanel.refresh();
+    });
 
     state = {
         logger,
@@ -141,17 +173,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     for (const editor of vscode.window.visibleTextEditors) {
         decorations.applyToEditor(editor);
     }
+    nowDecoration.reapply();
 
     attachFileSystemWatcher(context);
     attachDocumentListeners(context);
 
     const tagsLoader = await createTagsLoader(context, logger);
-    registerAllCommands(context, cache, graph, tagsLoader, logger);
+    registerAllCommands(context, cache, graph, tagsLoader, logger, nowStore, navigationHighlight);
 
     registerClipboardBridge(context, logger);
     registerInstallClipboardBridgeSkillCommand(context, logger);
     registerPasteImageProvider(context, logger);
     registerSemanticTokens(context);
+    const autolinks = registerAutoLinksProvider(context, logger);
 
     logger.info('tsk extension activated.');
 
@@ -164,6 +198,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         reloadTags: () => tagsLoader.reload(),
         lookupGraph: (id) => graph.getNode(id),
         getNavigationHighlight: () => navigationHighlight.getCurrent(),
+        getNowTree: () => nowStore.getState(),
+        getNowTaskId: () => nowStore.getCurrentNowId() ?? undefined,
+        getNowDecoration: () => nowDecoration.getCurrent(),
+        refreshAutolinks: () => autolinks.refresh(),
     };
 }
 
@@ -203,6 +241,30 @@ function openCache(
     }
 
     return { db, cache };
+}
+
+/**
+ * Resolve `tsk.state.path`, open the now-tree's `state.db`, and register its
+ * close hook on `context.subscriptions`. Mirrors {@link openCache} — a separate
+ * file + connection, so `Tsk: Rebuild Cache` (which only touches the cache DB)
+ * structurally can't reach it.
+ */
+function openNowStore(context: vscode.ExtensionContext, logger: Logger): NowStore {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const rawSetting = vscode.workspace.getConfiguration('tsk').get<string>(STATE_PATH_KEY, '');
+    const statePath = resolveCachePath(rawSetting, workspaceFolder);
+    ensureCacheParentDir(statePath);
+
+    const store = new NowStore(statePath, { warn: (message) => logger.warn(message) });
+    context.subscriptions.push(store);
+
+    if (statePath === IN_MEMORY) {
+        logger.info('now-tree state opened in-memory (no workspace folder).');
+    } else {
+        logger.info(`now-tree state opened at ${statePath}.`);
+    }
+
+    return store;
 }
 
 /**
@@ -294,11 +356,12 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Register every contributed command: the toggle set, the copy-id
- * command, the relationship picker commands, the list-edit handlers,
- * the tags completion provider, the find-by-tag command, and the
- * `tsk.rebuildCache` palette entry. Commands registered via the
- * codelens provider are attached separately during initial setup.
+ * Register the contributed command + provider families: the toggle set,
+ * copy-id, the relationship pickers, list-edit, duplicate-line, the tags
+ * completion provider, find-by-tag, find-by-status, code actions, hover,
+ * and the now + now-tree commands, plus the `tsk.rebuildCache` palette
+ * entry. (Codelens, semantic-token, autolinks, clipboard-bridge and
+ * paste-image providers are registered separately in `activate()`.)
  */
 function registerAllCommands(
     context: vscode.ExtensionContext,
@@ -306,6 +369,8 @@ function registerAllCommands(
     graph: GraphService,
     tagsLoader: TagsLoader,
     logger: Logger,
+    nowStore: NowStore,
+    navigationHighlight: NavigationHighlight,
 ): void {
     registerToggleCommands(context, logger);
     registerCopyTaskIdCommand(context, logger);
@@ -314,8 +379,11 @@ function registerAllCommands(
     registerDuplicateCommands(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
+    registerFindAllTasksByStatusCommand(context, cache, logger);
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
+    registerNowCommands(context, nowStore, cache, logger);
+    registerNowTreeCommands(context, nowStore, cache, navigationHighlight, logger);
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.rebuildCache, async () => {

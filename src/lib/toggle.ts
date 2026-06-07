@@ -43,7 +43,7 @@ export interface WrapOpts {
  *
  * **Marker-agnostic.** Promotes whatever marker the task carries
  * (`- [ ]`, `- [/]`, `- [x]`, `- [n]`, etc.) without rewriting it. The
- * Alt+A toggle mutator gates this on a specific target marker; the
+ * `toggleTodo` mutator gates this on a specific target marker; the
  * code-action provider gates on "any markered task" so a user can
  * promote a hand-typed `- [x] done` in place too.
  *

@@ -132,13 +132,16 @@ export class DiagnosticsManager {
                 const message = isCanonical
                     ? `Duplicate @id "${dup.id}" — this is the canonical occurrence (${dup.occurrences.length} total).`
                     : `Duplicate @id "${dup.id}" — first occurrence at ${canonical.fileUri}:${canonical.line + 1} takes precedence.`;
-                diagnostics.push(
-                    new vscode.Diagnostic(
-                        new vscode.Range(occ.line, 0, occ.line, ROW_END),
-                        message,
-                        vscode.DiagnosticSeverity.Warning,
-                    ),
+                const diagnostic = new vscode.Diagnostic(
+                    new vscode.Range(occ.line, 0, occ.line, ROW_END),
+                    message,
+                    vscode.DiagnosticSeverity.Warning,
                 );
+                // Tag the non-canonical occurrences so the M7 regenerate-@id quick
+                // fix can offer to deduplicate them; the canonical occurrence keeps
+                // the id (regenerating it would just move the collision).
+                if (!isCanonical) diagnostic.code = `duplicate-id:${dup.id}`;
+                diagnostics.push(diagnostic);
             }
         }
 

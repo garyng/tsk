@@ -1,0 +1,9 @@
+{
+    "tsk.clipboard.bridgeEnabled": true,
+    "tsk.autolinks": [
+        {
+            "pattern": "([A-Z]+)-([0-9]+)",
+            "target": "https://example.atlassian.net/browse/$1-$2"
+        }
+    ]
+}

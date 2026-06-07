@@ -5,7 +5,9 @@ function task(
     id: string,
     fileUri: string,
     line: number,
-    forward: Partial<Pick<TaskRelationshipInput, 'parent' | 'dependsOn' | 'relatedTo'>> = {},
+    forward: Partial<
+        Pick<TaskRelationshipInput, 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo'>
+    > = {},
 ): TaskRelationshipInput {
     return { id, fileUri, line, ...forward };
 }
@@ -22,7 +24,12 @@ describe('buildGraph — basics', () => {
         const node = graph.get('a');
         expect(node).toBeDefined();
         expect(node?.forward).toEqual({});
-        expect(node?.inverse).toEqual({ children: [], dependents: [], related: [] });
+        expect(node?.inverse).toEqual({
+            children: [],
+            dependents: [],
+            related: [],
+            movedHereFrom: [],
+        });
         expect(node?.fileUri).toBe('file:///x.tsk');
         expect(node?.line).toBe(1);
     });
@@ -35,10 +42,15 @@ describe('buildGraph — basics', () => {
 
     it('records every forward edge on the source node', () => {
         const { graph } = buildGraph([
-            task('a', 'f.tsk', 1, { parent: 'p', dependsOn: 'd', relatedTo: 'r' }),
+            task('a', 'f.tsk', 1, { parent: 'p', dependsOn: 'd', relatedTo: 'r', movedTo: 'm' }),
         ]);
         const node = graph.get('a');
-        expect(node?.forward).toEqual({ parent: 'p', dependsOn: 'd', relatedTo: 'r' });
+        expect(node?.forward).toEqual({
+            parent: 'p',
+            dependsOn: 'd',
+            relatedTo: 'r',
+            movedTo: 'm',
+        });
     });
 });
 
@@ -82,6 +94,18 @@ describe('buildGraph — inverse edges', () => {
         expect(target?.inverse.dependents).toEqual(['a', 'b']);
         expect(target?.inverse.related).toEqual(['c']);
         expect(target?.inverse.children).toEqual([]);
+    });
+
+    it('populates `movedHereFrom` for the movedTo target, sorted + independent', () => {
+        const { graph } = buildGraph([
+            task('zoo', 'f.tsk', 1, { movedTo: 'dest' }),
+            task('alpha', 'f.tsk', 2, { movedTo: 'dest' }),
+            task('dest', 'f.tsk', 3),
+        ]);
+        const dest = graph.get('dest');
+        expect(dest?.inverse.movedHereFrom).toEqual(['alpha', 'zoo']);
+        expect(dest?.inverse.children).toEqual([]);
+        expect(graph.get('zoo')?.forward).toEqual({ movedTo: 'dest' });
     });
 });
 

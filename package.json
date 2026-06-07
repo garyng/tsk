@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -15,10 +15,11 @@
     "engines": {
         "vscode": "^1.112.0"
     },
-    "main": "./dist/extension.cjs",
+    "main": "./dist/host/extension.cjs",
     "activationEvents": [
         "onLanguage:tsk",
-        "workspaceContains:**/*.tsk"
+        "workspaceContains:**/*.tsk",
+        "onWebviewPanel:tsk.nowStack"
     ],
     "contributes": {
         "languages": [
@@ -102,6 +103,11 @@
             {
                 "command": "tsk.findAllTasksByTag",
                 "title": "Find All Tasks by Tag",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.findAllTasksByStatus",
+                "title": "Find All Tasks by Status",
                 "category": "Tsk"
             },
             {
@@ -203,8 +209,33 @@
                 "command": "tsk.installClipboardBridgeSkill",
                 "title": "Install Clipboard Bridge Skill",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.markNow",
+                "title": "Mark Now",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.now.openStack",
+                "title": "Open Now Stack",
+                "category": "Tsk",
+                "icon": "$(target)"
+            },
+            {
+                "command": "tsk.now.clear",
+                "title": "Clear Now History",
+                "category": "Tsk"
             }
         ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "tsk.now.openStack",
+                    "when": "editorLangId == tsk",
+                    "group": "navigation"
+                }
+            ]
+        },
         "keybindings": [
             {
                 "command": "tsk.findAllTasksByTag",
@@ -305,6 +336,11 @@
                 "command": "tsk.duplicateLineUp",
                 "key": "shift+alt+up",
                 "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
+            {
+                "command": "tsk.markNow",
+                "key": "alt+w",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
             }
         ],
         "colors": [
@@ -371,6 +407,14 @@
                     "light": "#fff59d50",
                     "dark": "#ffe57f30"
                 }
+            },
+            {
+                "id": "tsk.now.highlight",
+                "description": "Border color of the current \"now\" task line (marked via Tsk: Mark Now). Persistent — distinct from the transient tsk.navigation.highlight jump flash and from the priority line-background fill. Defaults to the in-progress blue so \"now\" reads as a box around the line on light and dark themes; override via workbench.colorCustomizations.",
+                "defaults": {
+                    "light": "#3794ffcc",
+                    "dark": "#3794ffcc"
+                }
             }
         ],
         "configuration": {
@@ -425,34 +469,85 @@
                     "type": "string",
                     "default": "./images",
                     "description": "Base directory for images saved when pasting an image into a .tsk, Markdown, or Jupyter markdown-cell document. The saved path is <document directory>/<base directory>/<selection>.<ext>; a selection may itself contain path separators (subdirectories), and any intermediate directories are created. Relative base directories resolve against the document's parent directory (for notebook cells, the notebook's directory); an absolute base directory is used as-is. Leave blank to save directly beside the document."
+                },
+                "tsk.state.path": {
+                    "type": "string",
+                    "default": "${workspaceFolder}/.vscode/tsk/state.db",
+                    "description": "Path to the on-disk SQLite state database holding the \"now\" undo-tree. Kept separate from the rebuildable cache, so Tsk: Rebuild Cache never touches it. Supports ${workspaceFolder} substitution. When no workspace folder is open, the now-tree is in-memory and lost when the window closes."
+                },
+                "tsk.now.autoInProgress": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When marking a task as \"now\" (via Tsk: Mark Now), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
+                },
+                "tsk.autolinks": {
+                    "type": "array",
+                    "default": [],
+                    "markdownDescription": "Turn text matching a regular expression into a clickable link in `.tsk` editors. Each rule's `pattern` is tested against every line (the `g` flag is always applied); each match becomes a link whose URL is `target` with capture groups substituted via JavaScript `String.replace` semantics — `$1`/`$2` (numbered), `$<name>` (named `(?<name>…)`), `$&` (whole match), `$$` (literal `$`). Example: `{ \"pattern\": \"([A-Z]+)-([0-9]+)\", \"target\": \"https://jira.example.com/$1-$2\" }` links `JIRAID-123`. Earlier rules win where matches overlap. A pattern using look-behind/look-ahead positions the link correctly but won't substitute (the URL falls back to the raw match).",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "pattern",
+                            "target"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "pattern": {
+                                "type": "string",
+                                "markdownDescription": "JavaScript regular-expression source, matched against every line. Use capture groups — including named `(?<name>…)` — to feed `target`."
+                            },
+                            "target": {
+                                "type": "string",
+                                "markdownDescription": "URL template. Substitutes `$1`/`$2` (numbered), `$<name>` (named), `$&` (whole match), `$$` (literal `$`)."
+                            },
+                            "flags": {
+                                "type": "string",
+                                "pattern": "^[imsu]*$",
+                                "markdownDescription": "Optional extra regex flags — any of `i` `m` `s` `u`. The `g` flag is always applied automatically."
+                            }
+                        }
+                    }
                 }
             }
         }
     },
     "scripts": {
         "build:host": "vite build -c vite.config.host.ts",
-        "build": "npm run build:host",
+        "build:webview": "vite build -c vite.config.webview.ts",
+        "build": "npm run build:host && npm run build:webview",
         "dev:host": "vite build -c vite.config.host.ts --watch --mode development",
-        "typecheck": "tsc",
+        "dev:webview": "vite build -c vite.config.webview.ts --watch --mode development",
+        "dev:all": "concurrently -n host,webview -c blue,magenta npm:dev:host npm:dev:webview",
+        "typecheck": "tsc && tsc -p tsconfig.webview.json",
         "compile:tests": "tsc -p tests/tsconfig.json",
         "test": "vitest run",
-        "prepare:e2e": "npm run compile:tests && npm run build:host",
+        "prepare:e2e": "npm run compile:tests && npm run build",
         "test:e2e": "npm run prepare:e2e && bash scripts/run-e2e.sh --label stable",
         "test:e2e:floor": "npm run prepare:e2e && bash scripts/run-e2e.sh --label floor",
         "test:e2e:all": "npm run prepare:e2e && bash scripts/run-e2e.sh",
+        "test:webview": "npm run build:webview && playwright test",
+        "test:webview:update": "npm run build:webview && playwright test --update-snapshots",
         "lint": "biome check .",
         "format": "biome format --write .",
         "package": "vsce package --out artifacts/"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.15",
+        "@grida/tree-view": "0.1.0",
+        "@playwright/test": "^1.60.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.19.19",
+        "@types/react": "^18.3.30",
+        "@types/react-dom": "^18.3.7",
         "@types/vscode": "~1.110.0",
         "@vitest/coverage-v8": "^4.1.7",
+        "@vscode/codicons": "0.0.45",
         "@vscode/test-cli": "^0.0.12",
         "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.9.1",
+        "concurrently": "^10.0.3",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
         "typescript": "^6.0.3",
         "vite": "^8.0.14",
         "vitest": "^4.1.7",

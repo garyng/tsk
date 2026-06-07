@@ -26,6 +26,7 @@ function node(
             children: overrides.inverse?.children ?? [],
             dependents: overrides.inverse?.dependents ?? [],
             related: overrides.inverse?.related ?? [],
+            movedHereFrom: overrides.inverse?.movedHereFrom ?? [],
         },
     };
 }
@@ -117,10 +118,13 @@ describe('computeLensesForTask — forward edges', () => {
     });
 });
 
-describe('computeLensesForTask — movedTo (lifecycle pointer)', () => {
-    it('renders a movedTo lens from metadata, routed to goToMovedTo', () => {
-        const lookup = lookupFrom([node('gone', 'a.tsk', 0), node('dest', 'a.tsk', 5)]);
-        const lenses = computeLensesForTask(task('gone', 0, { movedTo: 'dest' }), 'a.tsk', lookup);
+describe('computeLensesForTask — movedTo (forward graph edge)', () => {
+    it('renders a movedTo lens from the graph, routed to goToMovedTo', () => {
+        const lookup = lookupFrom([
+            node('gone', 'a.tsk', 0, { forward: { movedTo: 'dest' } }),
+            node('dest', 'a.tsk', 5),
+        ]);
+        const lenses = computeLensesForTask(task('gone', 0), 'a.tsk', lookup);
         expect(lenses).toEqual([
             {
                 line: 0,
@@ -136,12 +140,8 @@ describe('computeLensesForTask — movedTo (lifecycle pointer)', () => {
     });
 
     it('marks a dangling movedTo target with `(missing)`', () => {
-        const lookup = lookupFrom([node('gone', 'a.tsk', 0)]);
-        const lenses = computeLensesForTask(
-            task('gone', 0, { movedTo: 'nowhere' }),
-            'a.tsk',
-            lookup,
-        );
+        const lookup = lookupFrom([node('gone', 'a.tsk', 0, { forward: { movedTo: 'nowhere' } })]);
+        const lenses = computeLensesForTask(task('gone', 0), 'a.tsk', lookup);
         expect(lenses).toEqual([
             {
                 line: 0,
@@ -155,7 +155,7 @@ describe('computeLensesForTask — movedTo (lifecycle pointer)', () => {
     it('renders movedTo last in the forward group, before inverse edges', () => {
         const lookup = lookupFrom([
             node('source', 'a.tsk', 0, {
-                forward: { parent: 'p', dependsOn: 'd', relatedTo: 'r' },
+                forward: { parent: 'p', dependsOn: 'd', relatedTo: 'r', movedTo: 'dest' },
                 inverse: { children: ['c'] },
             }),
             node('p', 'a.tsk', 1),
@@ -164,11 +164,7 @@ describe('computeLensesForTask — movedTo (lifecycle pointer)', () => {
             node('c', 'a.tsk', 4),
             node('dest', 'a.tsk', 5),
         ]);
-        const lenses = computeLensesForTask(
-            task('source', 0, { movedTo: 'dest' }),
-            'a.tsk',
-            lookup,
-        );
+        const lenses = computeLensesForTask(task('source', 0), 'a.tsk', lookup);
         expect(lenses.map((l) => l.title)).toEqual([
             `$(${CODICONS.parent}) parent: p`,
             `$(${CODICONS.dependsOn}) dependsOn: d`,
@@ -178,9 +174,24 @@ describe('computeLensesForTask — movedTo (lifecycle pointer)', () => {
         ]);
     });
 
-    it('omits the movedTo lens when the metadata value is empty', () => {
-        const lookup = lookupFrom([node('gone', 'a.tsk', 0)]);
-        expect(computeLensesForTask(task('gone', 0, { movedTo: '' }), 'a.tsk', lookup)).toEqual([]);
+    it('omits the movedTo lens when the graph value is empty (a bare @movedTo flag)', () => {
+        const lookup = lookupFrom([node('gone', 'a.tsk', 0, { forward: { movedTo: '' } })]);
+        expect(computeLensesForTask(task('gone', 0), 'a.tsk', lookup)).toEqual([]);
+    });
+
+    it('renders a movedHereFrom inverse lens routed to findAllMovedHereFrom', () => {
+        const lookup = lookupFrom([
+            node('dest', 'a.tsk', 0, { inverse: { movedHereFrom: ['s1', 's2'] } }),
+        ]);
+        const lenses = computeLensesForTask(task('dest', 0), 'a.tsk', lookup);
+        expect(lenses).toEqual([
+            {
+                line: 0,
+                title: `$(${CODICONS.movedHereFrom}) movedHereFrom: 2`,
+                command: INTERNAL_COMMANDS.findAllMovedHereFrom,
+                args: ['a.tsk', 0, ['s1', 's2']],
+            },
+        ]);
     });
 });
 

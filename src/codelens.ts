@@ -4,6 +4,7 @@ import { computeLensesForTask } from './lib/codelens-logic';
 import type { GraphService } from './lib/graph-service';
 import type { Logger } from './lib/logger';
 import { parseDocument } from './lib/parser';
+import { type NavTarget, navigateTo, peekTargets, targetNotFoundMessage } from './navigation';
 import type { NavigationHighlight } from './navigation-highlight';
 import { pointRange } from './range-helpers';
 
@@ -61,7 +62,7 @@ export interface CodelensHandle {
 }
 
 /**
- * Register the `.tsk` CodeLensProvider plus the seven navigation /
+ * Register the `.tsk` CodeLensProvider plus the navigation /
  * peek commands it dispatches to, plus the dangling-edge "(missing)"
  * handler that pops an info toast.
  *
@@ -87,18 +88,13 @@ export function registerCodelens(
         const node = graph.getNode(targetId);
         if (!node) {
             logger.warn(`navigate: task @id "${targetId}" not found.`);
-            void vscode.window.showInformationMessage(
-                `Tsk: task @id "${targetId}" not found in the workspace.`,
-            );
+            void vscode.window.showInformationMessage(targetNotFoundMessage(targetId));
             return;
         }
-        const uri = vscode.Uri.parse(node.fileUri);
-        const doc = await vscode.workspace.openTextDocument(uri);
-        const editor = await vscode.window.showTextDocument(doc);
-        const targetRange = pointRange(node.line);
-        editor.selection = new vscode.Selection(targetRange.start, targetRange.end);
-        editor.revealRange(targetRange, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-        navigationHighlight.set(editor, node.line);
+        await navigateTo(
+            { uri: vscode.Uri.parse(node.fileUri), line: node.line },
+            { highlight: navigationHighlight },
+        );
     }
 
     async function peek(
@@ -106,29 +102,16 @@ export function registerCodelens(
         sourceLine: number,
         ids: readonly string[],
     ): Promise<void> {
-        const locations: vscode.Location[] = [];
+        const targets: NavTarget[] = [];
         for (const id of ids) {
-            const target = graph.getNode(id);
-            if (!target) continue;
-            locations.push(
-                new vscode.Location(
-                    vscode.Uri.parse(target.fileUri),
-                    new vscode.Position(target.line, 0),
-                ),
-            );
+            const node = graph.getNode(id);
+            if (node) targets.push({ uri: vscode.Uri.parse(node.fileUri), line: node.line });
         }
-        if (locations.length === 0) {
+        const opened = await peekTargets(vscode.Uri.parse(sourceUri), sourceLine, targets);
+        if (!opened) {
             logger.warn(`peek: no resolvable targets among [${ids.join(', ')}].`);
             void vscode.window.showInformationMessage('Tsk: no target tasks found.');
-            return;
         }
-        await vscode.commands.executeCommand(
-            'editor.action.peekLocations',
-            vscode.Uri.parse(sourceUri),
-            new vscode.Position(sourceLine, 0),
-            locations,
-            'peek',
-        );
     }
 
     function missingTarget(targetId: string, label: string): void {
@@ -160,6 +143,11 @@ export function registerCodelens(
         ),
         vscode.commands.registerCommand(
             INTERNAL_COMMANDS.findAllRelated,
+            (sourceUri: string, sourceLine: number, ids: string[]) =>
+                peek(sourceUri, sourceLine, ids),
+        ),
+        vscode.commands.registerCommand(
+            INTERNAL_COMMANDS.findAllMovedHereFrom,
             (sourceUri: string, sourceLine: number, ids: string[]) =>
                 peek(sourceUri, sourceLine, ids),
         ),

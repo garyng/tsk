@@ -36,7 +36,7 @@ suite('codelens', () => {
         void api;
     });
 
-    test('all seven navigate/peek commands + the missing handler are registered', async () => {
+    test('all eight navigate/peek commands + the missing handler are registered', async () => {
         const registered = await vscode.commands.getCommands(true);
         for (const command of [
             'tsk.goToParent',
@@ -46,6 +46,7 @@ suite('codelens', () => {
             'tsk.findAllChildren',
             'tsk.findAllDependents',
             'tsk.findAllRelated',
+            'tsk.findAllMovedHereFrom',
             'tsk.codelens.missing',
         ]) {
             assert.ok(registered.includes(command), `${command} should be registered`);
@@ -130,6 +131,12 @@ suite('codelens', () => {
         assert.ok(missingLens, 'dangling movedTo should render the (missing) lens');
         assert.strictEqual(missingLens.command?.command, 'tsk.codelens.missing');
         assert.deepStrictEqual(missingLens.command?.arguments, ['e2e-moved-gone', 'movedTo']);
+
+        // M8 — the move target now carries the inverse "moved here from" lens.
+        const movedHereLens = byTitle.get(`$(${CODICONS.movedHereFrom}) movedHereFrom: 1`);
+        assert.ok(movedHereLens, 'move target should expose the `movedHereFrom: 1` inverse lens');
+        assert.strictEqual(movedHereLens.command?.command, 'tsk.findAllMovedHereFrom');
+        assert.deepStrictEqual(movedHereLens.command?.arguments?.[2], ['e2e-moved-src']);
     });
 
     test('tsk.goToMovedTo opens the target file at the target line', async () => {
