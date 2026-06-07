@@ -117,6 +117,17 @@ test('renders the activity calendar as an SVG of day blocks', async ({ page }) =
     expect(await blocks.count()).toBeGreaterThan(50);
 });
 
+test('sizes the calendar to fit the panel width (no horizontal overflow)', async ({ page }) => {
+    await mount(page);
+    // The ResizeObserver must scale the blocks so the whole grid fits the panel —
+    // a regression (e.g. the observer never attaching) leaves it at full size and
+    // overflowing.
+    const box = await page.locator('svg.react-activity-calendar__calendar').boundingBox();
+    const viewport = page.viewportSize();
+    expect(box?.width ?? 0).toBeGreaterThan(0);
+    expect(box?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(viewport?.width ?? 0);
+});
+
 test('switching metric updates the active chip', async ({ page }) => {
     await mount(page);
     await page.getByRole('button', { name: 'Completed' }).click();

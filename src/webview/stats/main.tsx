@@ -1,4 +1,4 @@
-import { type RefObject, StrictMode, useEffect, useRef, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { createRoot } from 'react-dom/client';
 import { EVENT_METRICS, type Metric } from '../../lib/stats-aggregation';
@@ -57,11 +57,15 @@ const GUTTER_PX = 34; // weekday-label column + a little breathing room
 const MIN_BLOCK = 3;
 const MAX_BLOCK = 12;
 
-function useFittedBlockSize(): [RefObject<HTMLElement>, number] {
-    const ref = useRef<HTMLElement>(null);
+function useFittedBlockSize(): [(el: HTMLElement | null) => void, number] {
     const [blockSize, setBlockSize] = useState(MAX_BLOCK);
-    useEffect(() => {
-        const el = ref.current;
+    const observerRef = useRef<ResizeObserver | null>(null);
+    // A CALLBACK ref (not a mount `useEffect`) so the observer attaches when the
+    // calendar section actually mounts — which is AFTER the first render, since
+    // the section only exists once a viewmodel arrives. A mount-time effect sees
+    // a null ref and never observes; the calendar then never resizes.
+    const ref = useCallback((el: HTMLElement | null): void => {
+        observerRef.current?.disconnect();
         if (!el) return;
         const measure = (): void => {
             const width = el.clientWidth;
@@ -71,9 +75,8 @@ function useFittedBlockSize(): [RefObject<HTMLElement>, number] {
             setBlockSize((prev) => (prev === next ? prev : next));
         };
         measure();
-        const observer = new ResizeObserver(measure);
-        observer.observe(el);
-        return () => observer.disconnect();
+        observerRef.current = new ResizeObserver(measure);
+        observerRef.current.observe(el);
     }, []);
     return [ref, blockSize];
 }
