@@ -18,27 +18,6 @@
     padding: 8px 12px;
     border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
 }
-.tsk-chip {
-    padding: 2px 9px;
-    border-radius: 999px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.9em;
-    color: var(--vscode-foreground, #cccccc);
-    border: 1px solid transparent;
-    background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.08));
-}
-.tsk-chip:hover {
-    background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.12));
-}
-.tsk-chip--active {
-    background: var(--vscode-button-background, #0e639c);
-    color: var(--vscode-button-foreground, #ffffff);
-}
-.tsk-chip__count {
-    opacity: 0.7;
-    margin-left: 2px;
-}
 .tsk-tasks__scroll {
     flex: 1;
     overflow-y: auto;

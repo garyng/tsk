@@ -7,6 +7,7 @@ import type {
     TaskListView,
     TaskListWebviewToHost,
 } from '../../lib/task-list-protocol';
+import chipStyles from '../shared/chip.css?raw';
 import { injectStyle } from '../shared/inject-style';
 import markerStyles from '../shared/marker.css?raw';
 import styles from './task-list.css?raw';
@@ -135,6 +136,7 @@ function TaskList() {
 }
 
 injectStyle('tsk-marker-style', markerStyles);
+injectStyle('tsk-chip-style', chipStyles);
 injectStyle('tsk-task-list-style', styles);
 
 const container = document.getElementById('root');

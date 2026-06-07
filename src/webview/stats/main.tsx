@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { EVENT_METRICS, type Metric } from '../../lib/stats-aggregation';
 import { toCalendarData } from '../../lib/stats-calendar';
 import type { StatsHostToWebview, StatsView, StatsWebviewToHost } from '../../lib/stats-protocol';
+import chipStyles from '../shared/chip.css?raw';
 import { injectStyle } from '../shared/inject-style';
 import markerStyles from '../shared/marker.css?raw';
 import styles from './stats.css?raw';
@@ -186,6 +187,7 @@ function Stats() {
 }
 
 injectStyle('tsk-marker-style', markerStyles);
+injectStyle('tsk-chip-style', chipStyles);
 injectStyle('tsk-stats-style', styles);
 
 const container = document.getElementById('root');
