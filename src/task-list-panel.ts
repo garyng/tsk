@@ -95,7 +95,11 @@ export class TaskListPanel implements vscode.Disposable {
 
     private postRender(): void {
         if (!this.panel) return;
-        const view = buildTaskListView(this.cache.listAllTasks());
+        const view = buildTaskListView(
+            this.cache.listAllTasks(),
+            this.cache.listAllTaskTags(),
+            this.cache.listAllMetadata(),
+        );
         const serialized = JSON.stringify(view);
         if (serialized === this.lastPosted) return;
         this.lastPosted = serialized;

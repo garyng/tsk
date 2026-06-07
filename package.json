@@ -567,6 +567,8 @@
         "vscode-textmate": "^9.3.2"
     },
     "dependencies": {
+        "@tanstack/match-sorter-utils": "^8.19.4",
+        "@tanstack/react-table": "^8.21.3",
         "@tanstack/react-virtual": "^3.14.2",
         "date-fns": "^4.3.0",
         "nanoid": "^5.1.11",

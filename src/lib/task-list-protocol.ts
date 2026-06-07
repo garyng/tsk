@@ -17,6 +17,10 @@ export interface TaskRow {
     file: string;
     /** Zero-indexed line, for the `file:line` label (the host re-resolves the jump by `id`). */
     line: number;
+    /** The task's resolved `#tags` (sorted), for the tags column + its header filter. */
+    tags: string[];
+    /** Raw ISO-8601-local `@created` stamp (undefined when unstamped); the webview formats it to a compact relative time so it stays live. */
+    created?: string;
 }
 
 /** Per-status count, for a filter chip. */
