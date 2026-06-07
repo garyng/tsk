@@ -221,4 +221,3 @@ test.describe('golden snapshots', () => {
         await expect(page).toHaveScreenshot('task-list-tags-filter.png');
     });
 });
-

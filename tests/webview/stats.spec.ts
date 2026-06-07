@@ -153,7 +153,11 @@ test('surfaces the best-effort caveat only for a metric with no events', async (
 test('clicking a day with activity posts a jumpToDay for the current metric', async ({ page }) => {
     await mount(page);
     await day(page, '2026-05-10').click(); // active under 'all'
-    expect(await posted(page)).toContainEqual({ type: 'jumpToDay', date: '2026-05-10', metric: 'all' });
+    expect(await posted(page)).toContainEqual({
+        type: 'jumpToDay',
+        date: '2026-05-10',
+        metric: 'all',
+    });
     // Switch metric → the jump carries it (2026-05-12 has a completed event).
     await page.getByRole('button', { name: 'Completed' }).click();
     await day(page, '2026-05-12').click();
@@ -190,4 +194,3 @@ test.describe('golden snapshots', () => {
         await expect(page).toHaveScreenshot('stats-empty-metric.png');
     });
 });
-
