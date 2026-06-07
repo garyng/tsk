@@ -156,6 +156,15 @@ The tree uses **linear-compaction**: the path from root to the current now rende
 
 **Limits (v1).** No in-panel search/filter; a now-task in a *closed* file shows no in-editor highlight (only the tree label); `@movedTo` isn't followed; multi-root workspaces aren't supported yet (same as the cache).
 
+## Stats & task list
+
+Two more React webview panels visualize every task in the workspace, opened from the Command Palette:
+
+- **Tsk: Open Stats** — a GitHub-style **activity calendar** of task events (created / started / completed / cancelled / moved) with a metric toggle, above a row of current-status **count tiles** (todo / in-progress / done / …). It reads the `@created` / `@started` / `@completed` timestamps tsk stamps on each status transition, scales its squares to fit the panel width (so a whole year stays visible in a narrow panel), and tracks your theme. Those stamps are written only when you toggle via the commands — and `@started` / `@completed` clear on toggle-back — so the calendar reflects tasks *currently* bearing each stamp: a best-effort history, not an append-only log.
+- **Tsk: Open Task List** — every task as a **status-filtered, click-to-jump list**: filter chips with live counts, a virtualized scroll list (marker `[glyph]` + content + `file:line`), and a row click that reveals the task beside the panel. The persistent, browse-and-stay companion to *Tsk: Find All Tasks by Status* (which stays the fast keyboard path).
+
+Both refresh live as you edit and revive after a window reload. `docs/many-tasks.tsk` is a ready-made backlog for trying them out.
+
 ## Hover
 
 Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't decode the dimmed `<!-- … -->` comment by eye. It lists the `@id`, each timestamp rendered both absolutely and as friendly relative time (`… (3 days ago)`), the tags, and any relationship links — each link a clickable command URI that jumps to the referenced task. The task content itself is deliberately *not* repeated (it's already under your cursor). Document-local, so it works on untitled buffers too.
