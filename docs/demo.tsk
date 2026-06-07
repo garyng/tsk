@@ -151,6 +151,6 @@ A real slice of a plan — every status, priority, tag, and link at once. The pr
 
 ## More
 
-Open **Tsk: Open Stats** for an activity heatmap of your tasks across the year, and **Tsk: Open Task List** for a status-filterable, click-to-jump list of every task — try them against `many-tasks.tsk`.
+Open **Tsk: Open Stats** for an activity heatmap of your tasks across the year, and **Tsk: Open Task List** for a searchable, sortable table — fuzzy search, Excel-style header filters on status / tags / priority, click-to-jump — try them against `many-tasks.tsk`.
 
 The cache powers tag search and the lenses — run **Tsk: Rebuild Cache** if anything looks stale. Every `tsk.*` setting is documented in the README. It's all plain text you own.
