@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import { COMMANDS, INTERNAL_COMMANDS } from './constants';
 import type { CacheService } from './lib/cache';
@@ -6,6 +5,7 @@ import type { Logger } from './lib/logger';
 import type { HostToWebview, WebviewToHost } from './lib/now-protocol';
 import type { NowStore } from './lib/now-store';
 import { buildNowTreeView } from './lib/now-tree-view-model';
+import { buildWebviewHtml, webviewLocalResourceRoots } from './webview-html';
 
 const VIEW_TYPE = 'tsk.nowStack';
 
@@ -173,35 +173,12 @@ export class NowPanel implements vscode.Disposable {
         return {
             enableScripts: true,
             retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
+            localResourceRoots: webviewLocalResourceRoots(this.extensionUri),
         };
     }
 
     private html(webview: vscode.Webview): string {
-        const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'now-stack.js'),
-        );
-        const nonce = randomBytes(16).toString('hex');
-        const csp = [
-            `default-src 'none'`,
-            `img-src ${webview.cspSource} https: data:`,
-            `style-src ${webview.cspSource} 'unsafe-inline'`,
-            `script-src 'nonce-${nonce}'`,
-            `font-src ${webview.cspSource} data:`,
-        ].join('; ');
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="${csp}" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Now Stack</title>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
+        return buildWebviewHtml(webview, this.extensionUri, 'now-stack.js', 'Now Stack');
     }
 }
 
