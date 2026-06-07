@@ -37,10 +37,42 @@ const HARNESS = `<!DOCTYPE html>
 
 const VIEW = {
     rows: [
-        { id: 't1', marker: 'inprogress', content: 'refactor the cache', file: 'foo.tsk', line: 4 },
-        { id: 't2', marker: 'todo', content: 'write the parser', file: 'foo.tsk', line: 0 },
-        { id: 't3', marker: 'completed', content: 'ship phase 7', file: 'bar.tsk', line: 12 },
-        { id: 't4', marker: 'todo', content: 'add tests', file: 'bar.tsk', line: 13 },
+        {
+            id: 't1',
+            marker: 'inprogress',
+            content: 'refactor the cache',
+            file: 'foo.tsk',
+            line: 4,
+            tags: ['infra', 'perf'],
+            created: '2026-06-07T11:50:00+00:00',
+        },
+        {
+            id: 't2',
+            marker: 'todo',
+            content: 'write the parser',
+            file: 'foo.tsk',
+            line: 0,
+            tags: ['infra'],
+            created: '2026-06-05T09:00:00+00:00',
+        },
+        {
+            id: 't3',
+            marker: 'completed',
+            content: 'ship phase 7',
+            file: 'bar.tsk',
+            line: 12,
+            tags: [],
+            created: '2026-05-20T09:00:00+00:00',
+        },
+        {
+            id: 't4',
+            marker: 'todo',
+            content: 'add tests',
+            file: 'bar.tsk',
+            line: 13,
+            tags: ['testing'],
+            created: undefined,
+        },
     ],
     counts: [
         { marker: 'todo', label: 'Todo', count: 2 },
@@ -76,7 +108,7 @@ async function mount(page: Page, view: unknown = VIEW): Promise<string[]> {
     await page.goto(`${ORIGIN}/`);
     await page.locator('.tsk-tasks').waitFor();
     await page.evaluate((v) => window.postMessage({ type: 'render', view: v }, '*'), view);
-    await page.locator('.tsk-task').first().waitFor();
+    await page.locator('.tsk-row').first().waitFor();
     return errors;
 }
 
@@ -89,20 +121,20 @@ test('mounts cleanly and renders a chip per status plus All', async ({ page }) =
 
 test('lists task rows with content and file:line', async ({ page }) => {
     await mount(page);
-    await expect(page.locator('.tsk-task')).toHaveCount(4);
-    const row = page.locator('.tsk-task', { hasText: 'refactor the cache' });
-    await expect(row.locator('.tsk-task__loc')).toHaveText('foo.tsk:5'); // line 4 → 1-indexed 5
+    await expect(page.locator('.tsk-row')).toHaveCount(4);
+    const row = page.locator('.tsk-row', { hasText: 'refactor the cache' });
+    await expect(row.locator('.tsk-cell[data-col="loc"]')).toHaveText('foo.tsk:5'); // line 4 → 1-indexed 5
 });
 
 test('filtering by a status chip shows only that status', async ({ page }) => {
     await mount(page);
     await page.getByRole('button', { name: /In progress/ }).click();
-    await expect(page.locator('.tsk-task')).toHaveCount(1);
-    await expect(page.locator('.tsk-task')).toContainText('refactor the cache');
+    await expect(page.locator('.tsk-row')).toHaveCount(1);
+    await expect(page.locator('.tsk-row')).toContainText('refactor the cache');
 });
 
 test('clicking a row posts a jump carrying the task @id', async ({ page }) => {
     await mount(page);
-    await page.locator('.tsk-task', { hasText: 'write the parser' }).click();
+    await page.locator('.tsk-row', { hasText: 'write the parser' }).click();
     expect(await posted(page)).toContainEqual({ type: 'jump', id: 't2' });
 });
