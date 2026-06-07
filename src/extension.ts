@@ -45,6 +45,7 @@ import { registerSemanticTokens } from './semantic-tokens';
 import { registerStatsPanel } from './stats-panel';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
+import { registerTaskListPanel } from './task-list-panel';
 import {
     registerCopyTaskIdCommand,
     registerRelationshipCommands,
@@ -154,11 +155,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     // rescan-tail (a cache rebuild changes labels without touching the tree).
     const nowPanel = registerNowPanel(context, nowStore, cache, logger);
     const statsPanel = registerStatsPanel(context, cache, logger);
+    const taskListPanel = registerTaskListPanel(context, cache, logger);
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
     const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger, () => {
         nowDecoration.reapply();
         nowPanel.refresh();
         statsPanel.refresh();
+        taskListPanel.refresh();
     });
 
     state = {
