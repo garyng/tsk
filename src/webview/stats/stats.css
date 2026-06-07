@@ -5,11 +5,6 @@
         var(--vscode-font-size, 13px) / 1.5
         var(--vscode-font-family, system-ui, "Segoe UI", sans-serif);
 }
-.tsk-stats__title {
-    margin: 0 0 14px;
-    font-size: 1.1em;
-    font-weight: 600;
-}
 .tsk-stats__empty,
 .tsk-stats__note {
     color: var(--vscode-descriptionForeground, #8c8c8c);
@@ -36,6 +31,14 @@
     background: var(--vscode-editorWidget-background, rgba(255, 255, 255, 0.04));
     border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
 }
+/* Glyph + count share a line; the count is tinted by the marker (the glyph
+   carries the same colour from the shared .tsk-marker). Base rules first, then
+   the per-marker overrides (ascending specificity — Biome's noDescendingSpecificity). */
+.tsk-tile__head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
 .tsk-tile__count {
     font-size: 1.5em;
     font-weight: 600;
@@ -45,41 +48,52 @@
     font-size: 0.82em;
     color: var(--vscode-descriptionForeground, #8c8c8c);
 }
-/* The status colour is a small legend dot by the label — the count stays neutral
-   so the colour reads as an accent, not a loud number. */
-.tsk-tile[data-marker] .tsk-tile__label::before {
-    content: "";
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    margin-right: 6px;
-    border-radius: 50%;
-    vertical-align: middle;
-    background: var(--vscode-descriptionForeground, #8c8c8c);
+.tsk-tile[data-marker="todo"] .tsk-tile__count {
+    color: var(--tsk-marker-todo);
 }
-.tsk-tile[data-marker="todo"] .tsk-tile__label::before {
-    background: var(--tsk-marker-todo);
+.tsk-tile[data-marker="inprogress"] .tsk-tile__count {
+    color: var(--tsk-marker-inprogress);
 }
-.tsk-tile[data-marker="inprogress"] .tsk-tile__label::before {
-    background: var(--tsk-marker-inprogress);
+.tsk-tile[data-marker="completed"] .tsk-tile__count {
+    color: var(--tsk-marker-completed);
 }
-.tsk-tile[data-marker="completed"] .tsk-tile__label::before {
-    background: var(--tsk-marker-completed);
+.tsk-tile[data-marker="moved"] .tsk-tile__count {
+    color: var(--tsk-marker-moved);
 }
-.tsk-tile[data-marker="moved"] .tsk-tile__label::before {
-    background: var(--tsk-marker-moved);
+.tsk-tile[data-marker="cancelled"] .tsk-tile__count {
+    color: var(--tsk-marker-cancelled);
 }
-.tsk-tile[data-marker="cancelled"] .tsk-tile__label::before {
-    background: var(--tsk-marker-cancelled);
+.tsk-tile[data-marker="notes"] .tsk-tile__count {
+    color: var(--tsk-marker-notes);
 }
-.tsk-tile[data-marker="notes"] .tsk-tile__label::before {
-    background: var(--tsk-marker-notes);
-}
-.tsk-stats__toggle {
-    display: flex;
+/* Segmented metric toggle — one bordered group, buttons divided by hairlines. */
+.tsk-seg {
+    display: inline-flex;
     flex-wrap: wrap;
-    gap: 4px;
     margin-bottom: 14px;
+    border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.12));
+    border-radius: 6px;
+    overflow: hidden;
+}
+.tsk-seg__btn {
+    padding: 3px 12px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9em;
+    color: var(--vscode-foreground, #cccccc);
+    background: none;
+    border: none;
+    border-left: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.12));
+}
+.tsk-seg__btn:first-child {
+    border-left: none;
+}
+.tsk-seg__btn:hover {
+    background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
+}
+.tsk-seg__btn--active {
+    color: var(--vscode-button-foreground, #ffffff);
+    background: var(--vscode-button-background, #0e639c);
 }
 .tsk-stats__calendar {
     overflow-x: auto;

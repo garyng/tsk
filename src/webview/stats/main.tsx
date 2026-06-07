@@ -1,10 +1,10 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { createRoot } from 'react-dom/client';
+import { MARKERS, type Marker } from '../../lib/markers';
 import { EVENT_METRICS, type Metric } from '../../lib/stats-aggregation';
 import { toCalendarData } from '../../lib/stats-calendar';
 import type { StatsHostToWebview, StatsView, StatsWebviewToHost } from '../../lib/stats-protocol';
-import chipStyles from '../shared/chip.css?raw';
 import { injectStyle } from '../shared/inject-style';
 import markerStyles from '../shared/marker.css?raw';
 import styles from './stats.css?raw';
@@ -34,6 +34,12 @@ const METRIC_LABEL: Record<Metric, string> = {
     cancelled: 'Cancelled',
     moved: 'Moved',
 };
+
+/** Canonical `[glyph]` per marker (e.g. todo → `[ ]`, completed → `[x]`). */
+const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as Record<
+    Marker,
+    string
+>;
 
 /**
  * Tooltip text for a calendar day: the date, then a per-type breakdown one line
@@ -129,7 +135,6 @@ function Stats() {
 
     return (
         <main className="tsk-stats">
-            <h1 className="tsk-stats__title">Tsk: Stats</h1>
             <header className="tsk-stats__tiles">
                 <div className="tsk-tile tsk-tile--total">
                     <span className="tsk-tile__count">{view.total}</span>
@@ -137,18 +142,27 @@ function Stats() {
                 </div>
                 {view.tiles.map((tile) => (
                     <div className="tsk-tile" key={tile.marker} data-marker={tile.marker}>
-                        <span className="tsk-tile__count">{tile.count}</span>
+                        <span className="tsk-tile__head">
+                            <span
+                                className="tsk-marker"
+                                data-marker={tile.marker}
+                                aria-hidden="true"
+                            >
+                                [{GLYPH[tile.marker as Marker]}]
+                            </span>
+                            <span className="tsk-tile__count">{tile.count}</span>
+                        </span>
                         <span className="tsk-tile__label">{tile.label}</span>
                     </div>
                 ))}
             </header>
 
-            <nav className="tsk-stats__toggle" aria-label="Activity metric">
+            <nav className="tsk-seg" aria-label="Activity metric">
                 {METRICS.map((m) => (
                     <button
                         type="button"
                         key={m}
-                        className={`tsk-chip${m === metric ? ' tsk-chip--active' : ''}`}
+                        className={`tsk-seg__btn${m === metric ? ' tsk-seg__btn--active' : ''}`}
                         aria-pressed={m === metric}
                         onClick={() => setMetric(m)}
                     >
@@ -187,7 +201,6 @@ function Stats() {
 }
 
 injectStyle('tsk-marker-style', markerStyles);
-injectStyle('tsk-chip-style', chipStyles);
 injectStyle('tsk-stats-style', styles);
 
 const container = document.getElementById('root');
