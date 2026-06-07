@@ -10,11 +10,13 @@ import * as vscode from 'vscode';
  * Keeping the CSP + nonce + resource wiring in one place means a third panel is
  * a one-line call, not a copy of the security-sensitive boilerplate. The CSP
  * allows: inline styles (the bundles inject their CSS as a `<style>` tag),
- * `data:` fonts (the codicon font is inlined), and scripts only from the
- * matching nonce — so each entry must be a SINGLE self-contained bundle (no
- * sibling chunks, which a nonce can't authorize). The caller must restrict
- * `localResourceRoots` to {@link webviewLocalResourceRoots} so the bundle URI
- * resolves.
+ * `data:` fonts (the codicon font is inlined), and scripts from the extension's
+ * own origin (`${webview.cspSource}`) plus the per-load nonce. Origin-scoped
+ * `script-src` (not nonce-only) is what lets an entry import Vite's shared React
+ * chunk — entry and chunk both live in `dist/webview`, which
+ * {@link webviewLocalResourceRoots} locks `localResourceRoots` to, so nothing
+ * outside the extension's own bundles can load. This is the standard VS Code +
+ * Vite webview CSP.
  */
 export function buildWebviewHtml(
     webview: vscode.Webview,
@@ -30,7 +32,7 @@ export function buildWebviewHtml(
         `default-src 'none'`,
         `img-src ${webview.cspSource} https: data:`,
         `style-src ${webview.cspSource} 'unsafe-inline'`,
-        `script-src 'nonce-${nonce}'`,
+        `script-src 'nonce-${nonce}' ${webview.cspSource}`,
         `font-src ${webview.cspSource} data:`,
     ].join('; ');
     return `<!DOCTYPE html>

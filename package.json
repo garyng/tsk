@@ -513,8 +513,7 @@
     },
     "scripts": {
         "build:host": "vite build -c vite.config.host.ts",
-        "clean:webview": "node -e \"require('node:fs').rmSync('dist/webview', { recursive: true, force: true })\"",
-        "build:webview": "npm run clean:webview && TSK_WV_ENTRY=now-stack vite build -c vite.config.webview.ts && TSK_WV_ENTRY=stats vite build -c vite.config.webview.ts && TSK_WV_ENTRY=task-list vite build -c vite.config.webview.ts",
+        "build:webview": "vite build -c vite.config.webview.ts",
         "build": "npm run build:host && npm run build:webview",
         "dev:host": "vite build -c vite.config.host.ts --watch --mode development",
         "dev:webview": "vite build -c vite.config.webview.ts --watch --mode development",

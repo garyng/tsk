@@ -1,15 +1,17 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
 
 /**
- * The built webview bundle, loaded as text and injected as a module script. It's
- * self-contained (React + grida are bundled in, no imports), so it runs
- * standalone in a blank page once `acquireVsCodeApi` is mocked. `npm run
- * test:webview` builds it first; reading it here keeps the test exercising the
- * real shipped artifact. The bundle injects its own `<style>` on load, so the
- * harness only supplies the editor-like backdrop.
+ * The now-stack webview is SERVED from a fake origin (via `page.route` in
+ * {@link mount}) rather than injected inline, so the entry's ESM imports — notably
+ * the shared React chunk Vite emits across the webview entries — resolve against
+ * the page origin. `npm run test:webview` builds `dist/webview` first; serving the
+ * real files keeps the test exercising the shipped artifact. The bundle injects
+ * its own `<style>` on load, so the harness only supplies the editor-like backdrop.
  */
-const bundle = readFileSync('dist/webview/now-stack.js', 'utf8');
+const WEBVIEW_DIR = 'dist/webview';
+const ORIGIN = 'http://tsk.test';
 
 const HARNESS = `<!DOCTYPE html>
 <html>
@@ -32,6 +34,7 @@ const HARNESS = `<!DOCTYPE html>
             setState: (s) => { __state = s; },
         });
     </script>
+    <script type="module" src="/now-stack.js"></script>
 </body>
 </html>`;
 
@@ -122,8 +125,21 @@ async function mount(page: Page): Promise<string[]> {
     page.on('console', (msg) => {
         if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`);
     });
-    await page.setContent(HARNESS);
-    await page.addScriptTag({ content: bundle, type: 'module' });
+    // Serve the harness + the built webview files from a fake origin so the
+    // entry's ESM imports (e.g. the shared React chunk) resolve — inline injection
+    // can't resolve `./chunk.mjs`, an intercepted origin can.
+    await page.route(`${ORIGIN}/**`, (route) => {
+        const { pathname } = new URL(route.request().url());
+        if (pathname === '/') return route.fulfill({ contentType: 'text/html', body: HARNESS });
+        try {
+            const body = readFileSync(join(WEBVIEW_DIR, pathname), 'utf8');
+            const contentType = pathname.endsWith('.map') ? 'application/json' : 'text/javascript';
+            return route.fulfill({ contentType, body });
+        } catch {
+            return route.fulfill({ status: 404, body: '' });
+        }
+    });
+    await page.goto(`${ORIGIN}/`);
     await page.locator('.now-stack').waitFor();
     return errors;
 }
