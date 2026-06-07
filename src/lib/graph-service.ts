@@ -99,8 +99,8 @@ export class GraphService {
      * the workspace. Walks the canonical graph (so dup losers aren't
      * double-reported; their canonical winner is the only source that
      * surfaces a broken edge for the same id). Emits one report per
-     * `(source, key)` pair — a task with all three of `@parent`,
-     * `@dependsOn`, `@relatedTo` pointing at unknown ids produces three
+     * `(source, key)` pair — a task whose `@parent`, `@dependsOn`,
+     * `@relatedTo`, and `@movedTo` all point at unknown ids produces four
      * reports.
      */
     getBrokenForwardEdges(): readonly BrokenEdgeReport[] {

@@ -12,8 +12,8 @@
  * counts → colour `level`s and filling the empty days of a date range is the
  * view-model's job (M2), so swapping the calendar component never touches this.
  *
- * Caveat (see plan `2026-06-07_tsk-webview-stats-lists.md`): these stamps are
- * best-effort, not an append-only event log — a hand-typed marker stamps
+ * Caveat: these stamps are best-effort, not an append-only event log — a
+ * hand-typed marker stamps
  * nothing, and `@started`/`@completed` are cleared on toggle-back. The calendar
  * reflects tasks *currently* bearing each stamp.
  */

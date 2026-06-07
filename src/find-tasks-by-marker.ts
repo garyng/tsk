@@ -15,7 +15,7 @@ const SEARCH_EDITOR_COMMAND = 'search.action.openNewEditor';
  * Register `tsk.findAllTasksByStatus` — the marker sibling of
  * `tsk.findAllTasksByTag` (M6):
  *
- *   1. QuickPick the six status markers (glyph + per-marker task count).
+ *   1. QuickPick the status markers (glyph + per-marker task count).
  *   2. On pick → open VS Code's **Search Editor** with a line-anchored regex
  *      (`^\s*[-*+] \[<glyph>\]`) scoped to `*.tsk`, so every task carrying that
  *      marker is listed (and decorated by the M30/B search-result path — which

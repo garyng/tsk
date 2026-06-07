@@ -256,7 +256,7 @@ Requires **VS Code 1.112+** (the extension declares `engines.vscode = "^1.112.0"
 
 ```sh
 npm install            # one-time
-npm run build          # host (dist/host/extension.cjs) + webview (dist/webview/now-stack.js)
+npm run build          # host (dist/host/extension.cjs) + webview (dist/webview/{now-stack,stats,task-list}.js)
 npm run build:host     # just the extension host bundle (Vite library mode, CJS)
 npm run dev:host       # host bundle, watch mode (dev:webview watches the webview)
 ```
@@ -319,7 +319,7 @@ Workspace fixtures live in `tests/e2e/fixtures/workspace/` — the host opens th
 ```sh
 npm run lint           # biome check .
 npm run format         # biome format --write .
-npm run package        # builds, then @vscode/vsce → tsk-<version>.vsix
+npm run package        # @vscode/vsce packages dist/ → artifacts/tsk-<version>.vsix (build first)
 ```
 
 ### Architecture

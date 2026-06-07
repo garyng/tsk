@@ -21,4 +21,4 @@ Rules in this file apply to all work under `apps/tsk` (the `tsk` VSCode extensio
 
 ## Plan reference
 
-Plans live under `plans/` by phase — Phase 1 `plans/2026-05-24_tsk.md`, Phase 2 `plans/2026-05-27_tsk-phase-2-refactor.md`, Phase 3 `plans/2026-05-27_tsk-phase-3.md`. Work the most recent phase plan; as work progresses, update the milestone checkboxes there (`[ ]` → `[/]` while in progress → `[x]` when done).
+Plans live under the repo-root `plans/` directory, organized by phase. Work the most recent phase plan; as work progresses, update the milestone checkboxes there (`[ ]` → `[/]` while in progress → `[x]` when done).
