@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { type RefObject, StrictMode, useEffect, useRef, useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { createRoot } from 'react-dom/client';
 import { EVENT_METRICS, type Metric } from '../../lib/stats-aggregation';
@@ -43,9 +43,43 @@ function detectColorScheme(): 'light' | 'dark' {
     return document.body.classList.contains('vscode-light') ? 'light' : 'dark';
 }
 
+// Fit-to-width sizing. `react-activity-calendar` has no responsive mode, so we
+// measure the calendar container and scale the block size so all ~53 weeks fit
+// its width (down to MIN_BLOCK-px squares); the library thins crowded month
+// labels itself as the blocks shrink. Measuring `clientWidth` is loop-safe — the
+// container is panel-width (a block element), and a horizontal scrollbar changes
+// only its height, never the measured width.
+const WEEKS = 53;
+const BLOCK_MARGIN = 2;
+const GUTTER_PX = 34; // weekday-label column + a little breathing room
+const MIN_BLOCK = 3;
+const MAX_BLOCK = 12;
+
+function useFittedBlockSize(): [RefObject<HTMLElement>, number] {
+    const ref = useRef<HTMLElement>(null);
+    const [blockSize, setBlockSize] = useState(MAX_BLOCK);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const measure = (): void => {
+            const width = el.clientWidth;
+            if (!width) return;
+            const fitted = Math.floor((width - GUTTER_PX) / WEEKS) - BLOCK_MARGIN;
+            const next = Math.max(MIN_BLOCK, Math.min(MAX_BLOCK, fitted));
+            setBlockSize((prev) => (prev === next ? prev : next));
+        };
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+    return [ref, blockSize];
+}
+
 function Stats() {
     const [view, setView] = useState<StatsView | null>(null);
     const [metric, setMetric] = useState<Metric>('all');
+    const [calendarRef, blockSize] = useFittedBlockSize();
 
     useEffect(() => {
         const onMessage = (event: MessageEvent): void => {
@@ -97,14 +131,15 @@ function Stats() {
                 ))}
             </nav>
 
-            <section className="tsk-stats__calendar">
+            <section className="tsk-stats__calendar" ref={calendarRef}>
                 <ActivityCalendar
                     data={toCalendarData(series, view.range)}
                     theme={THEME}
                     colorScheme={detectColorScheme()}
                     maxLevel={4}
-                    blockSize={11}
-                    blockMargin={3}
+                    blockSize={blockSize}
+                    blockMargin={BLOCK_MARGIN}
+                    fontSize={12}
                     showTotalCount={false}
                     showWeekdayLabels
                     labels={{ legend: { less: 'Less', more: 'More' } }}
