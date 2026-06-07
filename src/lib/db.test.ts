@@ -163,6 +163,30 @@ describe('Db — metadata', () => {
         expect(byKey.get('flag')).toBeNull();
         expect(byKey.get('empty')).toBe('');
     });
+
+    it('lists every (taskId, key, value) row via listAllMetadata', () => {
+        db.insertTask({
+            id: 'def',
+            fileUri: 'file:///a.tsk',
+            line: 2,
+            marker: 'todo',
+            content: '',
+            raw: '',
+        });
+        db.insertMetadata({ taskId: 'abc', key: 'created', value: '2026-01-02T12:45:30+08:00' });
+        db.insertMetadata({ taskId: 'abc', key: 'started', value: '2026-01-03T09:00:00+08:00' });
+        db.insertMetadata({ taskId: 'def', key: 'completed', value: '2026-01-04T18:00:00+08:00' });
+        // Order isn't guaranteed by the query; compare as a sorted set.
+        const sorted = db
+            .listAllMetadata()
+            .map((m) => `${m.taskId}:${m.key}=${m.value}`)
+            .sort();
+        expect(sorted).toEqual([
+            'abc:created=2026-01-02T12:45:30+08:00',
+            'abc:started=2026-01-03T09:00:00+08:00',
+            'def:completed=2026-01-04T18:00:00+08:00',
+        ]);
+    });
 });
 
 describe('Db — tags', () => {

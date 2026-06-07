@@ -109,6 +109,7 @@ interface PreparedStatements {
     findTaskById: StatementSync;
     insertMetadata: StatementSync;
     listMetadataForTask: StatementSync;
+    listAllMetadata: StatementSync;
     insertTag: StatementSync;
     listTagsForTask: StatementSync;
     listAllTags: StatementSync;
@@ -166,6 +167,7 @@ export class Db {
 
             insertMetadata: p('INSERT INTO metadata (task_id, key, value) VALUES (?, ?, ?)'),
             listMetadataForTask: p('SELECT task_id, key, value FROM metadata WHERE task_id = ?'),
+            listAllMetadata: p('SELECT task_id, key, value FROM metadata'),
 
             insertTag: p('INSERT INTO tags (task_id, tag) VALUES (?, ?)'),
             listTagsForTask: p('SELECT tag FROM tags WHERE task_id = ? ORDER BY tag'),
@@ -245,6 +247,16 @@ export class Db {
 
     listMetadataForTask(taskId: string): MetadataRecord[] {
         return this.stmts.listMetadataForTask.all(taskId).map(toMetadata);
+    }
+
+    /**
+     * Every `(taskId, key, value)` metadata row across the workspace in one
+     * query — the bulk counterpart to {@link listMetadataForTask}. Feeds the
+     * stats aggregation (date-bucketing `@created`/`@started`/`@completed`/…)
+     * without a per-task fan-out, mirroring {@link listAllTaskTags}.
+     */
+    listAllMetadata(): MetadataRecord[] {
+        return this.stmts.listAllMetadata.all().map(toMetadata);
     }
 
     // ── Tags ────────────────────────────────────────────────────────────────

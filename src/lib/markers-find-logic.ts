@@ -35,6 +35,33 @@ export function countTasksByMarker(tasks: Iterable<{ marker: Marker }>): Map<Mar
     return counts;
 }
 
+/** A marker's tasks, for the task-list webview. Generic so callers keep their row shape. */
+export interface MarkerGroup<T> {
+    marker: Marker;
+    /** Human label from {@link MARKERS}, e.g. "In progress". */
+    label: string;
+    tasks: T[];
+}
+
+/**
+ * Group tasks by marker in canonical {@link MARKERS} order, preserving each
+ * task's shape (`T`). Every marker gets a group — even empty — mirroring
+ * {@link markersToPickItems}, so the task-list webview can render a stable
+ * section / filter chip per status. Pure — fed `cache.listAllTasks()`.
+ */
+export function groupTasksByMarker<T extends { marker: Marker }>(
+    tasks: Iterable<T>,
+): MarkerGroup<T>[] {
+    const byMarker = new Map<Marker, T[]>();
+    for (const def of MARKERS) byMarker.set(def.name, []);
+    for (const task of tasks) byMarker.get(task.marker)?.push(task);
+    return MARKERS.map((def) => ({
+        marker: def.name,
+        label: def.label,
+        tasks: byMarker.get(def.name) ?? [],
+    }));
+}
+
 /**
  * Project the canonical {@link MARKERS} into QuickPick rows — one per marker, in
  * registry order, each showing its `[glyph]` and current task count. Every marker is

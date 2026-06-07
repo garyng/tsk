@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Marker } from './markers';
+import { MARKERS, type Marker } from './markers';
 import {
     buildMarkerSearchArgs,
     countTasksByMarker,
+    groupTasksByMarker,
     markersToPickItems,
 } from './markers-find-logic';
 
@@ -20,6 +21,35 @@ describe('countTasksByMarker', () => {
 
     it('is empty for no tasks', () => {
         expect(countTasksByMarker([]).size).toBe(0);
+    });
+});
+
+describe('groupTasksByMarker', () => {
+    it('groups tasks by marker in registry order, preserving task shape', () => {
+        const tasks = [
+            { id: 'a', marker: 'todo' },
+            { id: 'b', marker: 'completed' },
+            { id: 'c', marker: 'todo' },
+        ] satisfies { id: string; marker: Marker }[];
+        const groups = groupTasksByMarker(tasks);
+        expect(groups.map((g) => g.marker)).toEqual([
+            'todo',
+            'inprogress',
+            'completed',
+            'moved',
+            'cancelled',
+            'notes',
+        ]);
+        const todo = groups.find((g) => g.marker === 'todo');
+        expect(todo?.label).toBe('Todo');
+        expect(todo?.tasks.map((t) => t.id)).toEqual(['a', 'c']);
+        expect(groups.find((g) => g.marker === 'completed')?.tasks.map((t) => t.id)).toEqual(['b']);
+    });
+
+    it('lists every marker even with no tasks (empty groups)', () => {
+        const groups = groupTasksByMarker([]);
+        expect(groups).toHaveLength(MARKERS.length);
+        expect(groups.every((g) => g.tasks.length === 0)).toBe(true);
     });
 });
 
