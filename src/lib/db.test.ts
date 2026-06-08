@@ -49,7 +49,7 @@ describe('Db — tasks', () => {
     });
 
     it('inserts a task and lists it by file', () => {
-        const inserted = db.insertTask({
+        db.insertTask({
             id: 'abc12345',
             fileUri: 'file:///a.tsk',
             line: 3,
@@ -57,7 +57,6 @@ describe('Db — tasks', () => {
             content: 'do thing',
             raw: '- [ ] do thing <!-- @id:abc12345 -->',
         });
-        expect(inserted).toBe(true);
         const tasks = db.listTasksForFile('file:///a.tsk');
         expect(tasks).toHaveLength(1);
         expect(tasks[0]).toEqual({
@@ -88,7 +87,7 @@ describe('Db — tasks', () => {
         expect(db.listTasksForFile('file:///a.tsk').map((t) => t.id)).toEqual(['a', 'c', 'b']);
     });
 
-    it('finds a unique task by id (PK lookup)', () => {
+    it('finds a unique task by id', () => {
         db.insertTask({
             id: 'unique',
             fileUri: 'file:///a.tsk',
@@ -105,17 +104,11 @@ describe('Db — tasks', () => {
         expect(db.findTaskById('missing')).toBeUndefined();
     });
 
-    it('ignores duplicate ids (first-occurrence wins) and reports insert=false', () => {
+    it('stores every occurrence of a duplicate @id; findTaskById returns the lex-lowest', () => {
         db.upsertFile('file:///b.tsk', 100);
-        const first = db.insertTask({
-            id: 'x',
-            fileUri: 'file:///a.tsk',
-            line: 1,
-            marker: 'todo',
-            content: 'first',
-            raw: '',
-        });
-        const second = db.insertTask({
+        // Insert the higher-sorting occurrence first to prove the winner is by
+        // (file_uri, line), not scan order.
+        db.insertTask({
             id: 'x',
             fileUri: 'file:///b.tsk',
             line: 9,
@@ -123,12 +116,51 @@ describe('Db — tasks', () => {
             content: 'second',
             raw: '',
         });
-        expect(first).toBe(true);
-        expect(second).toBe(false);
-        // First-occurrence wins — the row from file A survives.
+        db.insertTask({
+            id: 'x',
+            fileUri: 'file:///a.tsk',
+            line: 1,
+            marker: 'todo',
+            content: 'first',
+            raw: '',
+        });
+        // Both occurrences are stored…
+        expect(db.listTasksForFile('file:///a.tsk')).toHaveLength(1);
+        expect(db.listTasksForFile('file:///b.tsk')).toHaveLength(1);
+        // …and findTaskById resolves the lex-lowest (file a, line 1).
         const found = db.findTaskById('x');
         expect(found?.fileUri).toBe('file:///a.tsk');
         expect(found?.content).toBe('first');
+        // The picker view (canonical-only) lists the id once.
+        expect(db.listAllTasks().filter((t) => t.id === 'x')).toHaveLength(1);
+    });
+
+    it('re-promotes the surviving occurrence when the winner file is deleted', () => {
+        db.upsertFile('file:///b.tsk', 100);
+        db.insertTask({
+            id: 'x',
+            fileUri: 'file:///a.tsk',
+            line: 1,
+            marker: 'todo',
+            content: 'winner',
+            raw: '',
+        });
+        db.insertTask({
+            id: 'x',
+            fileUri: 'file:///b.tsk',
+            line: 9,
+            marker: 'completed',
+            content: 'survivor',
+            raw: '',
+        });
+        expect(db.findTaskById('x')?.fileUri).toBe('file:///a.tsk');
+
+        db.deleteFile('file:///a.tsk');
+
+        // The survivor in file b is promoted automatically — no reconcile step.
+        const found = db.findTaskById('x');
+        expect(found?.fileUri).toBe('file:///b.tsk');
+        expect(found?.content).toBe('survivor');
     });
 });
 
@@ -145,26 +177,23 @@ describe('Db — metadata', () => {
         });
     });
 
-    it('inserts and retrieves metadata for a task', () => {
-        db.insertMetadata({ taskId: 'abc', key: 'created', value: '2026-01-02T12:45:30+08:00' });
-        const list = db.listMetadataForTask('abc');
-        expect(list).toHaveLength(1);
-        expect(list[0]).toEqual({
-            taskId: 'abc',
-            key: 'created',
-            value: '2026-01-02T12:45:30+08:00',
-        });
+    it('inserts and retrieves metadata for an occurrence', () => {
+        db.insertMetadata('file:///a.tsk', 1, 'created', '2026-01-02T12:45:30+08:00');
+        const list = db.listMetadataForOccurrence('file:///a.tsk', 1);
+        expect(list).toEqual([{ key: 'created', value: '2026-01-02T12:45:30+08:00' }]);
     });
 
     it('preserves the null/empty-string distinction round-trip', () => {
-        db.insertMetadata({ taskId: 'abc', key: 'flag', value: null });
-        db.insertMetadata({ taskId: 'abc', key: 'empty', value: '' });
-        const byKey = new Map(db.listMetadataForTask('abc').map((m) => [m.key, m.value]));
+        db.insertMetadata('file:///a.tsk', 1, 'flag', null);
+        db.insertMetadata('file:///a.tsk', 1, 'empty', '');
+        const byKey = new Map(
+            db.listMetadataForOccurrence('file:///a.tsk', 1).map((m) => [m.key, m.value]),
+        );
         expect(byKey.get('flag')).toBeNull();
         expect(byKey.get('empty')).toBe('');
     });
 
-    it('lists every (taskId, key, value) row via listAllMetadata', () => {
+    it('lists canonical (taskId, key, value) rows via listAllMetadata', () => {
         db.insertTask({
             id: 'def',
             fileUri: 'file:///a.tsk',
@@ -173,10 +202,9 @@ describe('Db — metadata', () => {
             content: '',
             raw: '',
         });
-        db.insertMetadata({ taskId: 'abc', key: 'created', value: '2026-01-02T12:45:30+08:00' });
-        db.insertMetadata({ taskId: 'abc', key: 'started', value: '2026-01-03T09:00:00+08:00' });
-        db.insertMetadata({ taskId: 'def', key: 'completed', value: '2026-01-04T18:00:00+08:00' });
-        // Order isn't guaranteed by the query; compare as a sorted set.
+        db.insertMetadata('file:///a.tsk', 1, 'created', '2026-01-02T12:45:30+08:00');
+        db.insertMetadata('file:///a.tsk', 1, 'started', '2026-01-03T09:00:00+08:00');
+        db.insertMetadata('file:///a.tsk', 2, 'completed', '2026-01-04T18:00:00+08:00');
         const sorted = db
             .listAllMetadata()
             .map((m) => `${m.taskId}:${m.key}=${m.value}`)
@@ -186,6 +214,25 @@ describe('Db — metadata', () => {
             'abc:started=2026-01-03T09:00:00+08:00',
             'def:completed=2026-01-04T18:00:00+08:00',
         ]);
+    });
+
+    it('listAllMetadata reports only the canonical occurrence of a duplicate id', () => {
+        db.upsertFile('file:///b.tsk', 100);
+        // Two occurrences of id 'abc' — the canonical is file a (already inserted).
+        db.insertTask({
+            id: 'abc',
+            fileUri: 'file:///b.tsk',
+            line: 5,
+            marker: 'todo',
+            content: '',
+            raw: '',
+        });
+        db.insertMetadata('file:///a.tsk', 1, 'created', 'CANON');
+        db.insertMetadata('file:///b.tsk', 5, 'created', 'DUP');
+        const created = db
+            .listAllMetadata()
+            .filter((m) => m.taskId === 'abc' && m.key === 'created');
+        expect(created).toEqual([{ taskId: 'abc', key: 'created', value: 'CANON' }]);
     });
 });
 
@@ -210,27 +257,41 @@ describe('Db — tags', () => {
         });
     });
 
-    it('inserts and lists tags for a task', () => {
-        db.insertTag({ taskId: 'a', tag: 'project/test' });
-        db.insertTag({ taskId: 'a', tag: 'JIRAID-123' });
-        expect(db.listTagsForTask('a').sort()).toEqual(['JIRAID-123', 'project/test']);
-    });
-
-    it('lists distinct tags across all tasks', () => {
-        db.insertTag({ taskId: 'a', tag: 'x' });
-        db.insertTag({ taskId: 'b', tag: 'x' });
-        db.insertTag({ taskId: 'b', tag: 'y' });
+    it('lists distinct tags across all occurrences', () => {
+        db.insertTag('file:///a.tsk', 1, 'x');
+        db.insertTag('file:///a.tsk', 2, 'x');
+        db.insertTag('file:///a.tsk', 2, 'y');
         expect(db.listAllTags()).toEqual(['x', 'y']);
     });
 
-    it('lists every (taskId, tag) pair via listAllTaskTags', () => {
-        db.insertTag({ taskId: 'a', tag: 'x' });
-        db.insertTag({ taskId: 'b', tag: 'x' });
-        db.insertTag({ taskId: 'b', tag: 'y' });
-        const pairs = db.listAllTaskTags();
-        // Order isn't guaranteed by the query; compare as a sorted set.
-        const sorted = pairs.map(([t, g]) => `${t}:${g}`).sort();
+    it('lists canonical (taskId, tag) pairs via listAllTaskTags', () => {
+        db.insertTag('file:///a.tsk', 1, 'x');
+        db.insertTag('file:///a.tsk', 2, 'x');
+        db.insertTag('file:///a.tsk', 2, 'y');
+        const sorted = db
+            .listAllTaskTags()
+            .map(([t, g]) => `${t}:${g}`)
+            .sort();
         expect(sorted).toEqual(['a:x', 'b:x', 'b:y']);
+    });
+
+    it('listAllTaskTags reports only the canonical occurrence of a duplicate id', () => {
+        db.upsertFile('file:///b.tsk', 100);
+        db.insertTask({
+            id: 'a',
+            fileUri: 'file:///b.tsk',
+            line: 7,
+            marker: 'todo',
+            content: '',
+            raw: '',
+        });
+        db.insertTag('file:///a.tsk', 1, 'canon'); // canonical occurrence of 'a'
+        db.insertTag('file:///b.tsk', 7, 'dup'); // non-canonical occurrence of 'a'
+        const tagsForA = db
+            .listAllTaskTags()
+            .filter(([t]) => t === 'a')
+            .map(([, g]) => g);
+        expect(tagsForA).toEqual(['canon']);
     });
 });
 
@@ -281,14 +342,14 @@ describe('Db — cascade delete', () => {
             content: '',
             raw: '',
         });
-        db.insertMetadata({ taskId: 'abc', key: 'id', value: 'abc' });
-        db.insertTag({ taskId: 'abc', tag: 'x' });
+        db.insertMetadata('file:///a.tsk', 1, 'id', 'abc');
+        db.insertTag('file:///a.tsk', 1, 'x');
 
         db.deleteFile('file:///a.tsk');
 
         expect(db.findTaskById('abc')).toBeUndefined();
-        expect(db.listMetadataForTask('abc')).toEqual([]);
-        expect(db.listTagsForTask('abc')).toEqual([]);
+        expect(db.listMetadataForOccurrence('file:///a.tsk', 1)).toEqual([]);
+        expect(db.listAllTaskTags()).toEqual([]);
         expect(db.listAllTags()).toEqual([]);
     });
 });
@@ -326,7 +387,7 @@ describe('Db — counts', () => {
         expect(db.counts()).toEqual({ files: 0, tasks: 0, tags: 0 });
     });
 
-    it('counts files, tasks, and distinct tags', () => {
+    it('counts files, distinct task ids, and distinct tags', () => {
         db.upsertFile('file:///a.tsk', 100);
         db.upsertFile('file:///b.tsk', 100);
         db.insertTask({
@@ -345,11 +406,33 @@ describe('Db — counts', () => {
             content: '',
             raw: '',
         });
-        db.insertTag({ taskId: 'ta', tag: 'shared' });
-        db.insertTag({ taskId: 'tb', tag: 'shared' });
-        db.insertTag({ taskId: 'ta', tag: 'unique' });
+        db.insertTag('file:///a.tsk', 1, 'shared');
+        db.insertTag('file:///b.tsk', 1, 'shared');
+        db.insertTag('file:///a.tsk', 1, 'unique');
 
         expect(db.counts()).toEqual({ files: 2, tasks: 2, tags: 2 });
+    });
+
+    it('counts a duplicate @id once (COUNT DISTINCT id)', () => {
+        db.upsertFile('file:///a.tsk', 100);
+        db.upsertFile('file:///b.tsk', 100);
+        db.insertTask({
+            id: 'dup',
+            fileUri: 'file:///a.tsk',
+            line: 1,
+            marker: 'todo',
+            content: '',
+            raw: '',
+        });
+        db.insertTask({
+            id: 'dup',
+            fileUri: 'file:///b.tsk',
+            line: 1,
+            marker: 'todo',
+            content: '',
+            raw: '',
+        });
+        expect(db.counts().tasks).toBe(1);
     });
 });
 

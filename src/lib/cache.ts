@@ -9,7 +9,7 @@ import { readRelationships } from './relationships';
  * channel + `vscode.Diagnostic` squiggle on `(line, 0)..(line, columnEnd)`.
  */
 export interface CacheWarning {
-    kind: 'duplicate-id' | 'no-id';
+    kind: 'no-id';
     fileUri: string;
     /** Zero-indexed line, matching VSCode's `Position.line`. */
     line: number;
@@ -17,25 +17,20 @@ export interface CacheWarning {
     columnEnd: number;
     /** Human-readable text used for both log and diagnostic message. */
     message: string;
-    /** For `duplicate-id`: the conflicting `@id` value. */
-    id?: string;
-    /** For `duplicate-id`: the location of the kept (first) occurrence. */
-    firstOccurrence?: { fileUri: string; line: number };
 }
 
 export interface RescanResult {
-    /** Tasks successfully cached. */
+    /** Id'd task occurrences stored (duplicates included). */
     inserted: number;
-    /** Tasks skipped due to warnings (no-id, duplicate-id). */
+    /** Tasks skipped — only the no-id case now (duplicate @ids are stored). */
     skipped: number;
     /** Warnings to surface. */
     warnings: CacheWarning[];
     /**
-     * Projection of every id'd task in the file into the shape the graph
-     * layer needs. Includes tasks that the cache subsequently skipped due
-     * to a duplicate-id (the graph maintains its own occurrences index and
-     * applies the lex-lowest canonical-winner rule independently of the
-     * cache's first-insert-wins).
+     * Projection of every id'd task occurrence in the file into the shape the
+     * graph layer needs. The graph maintains its own occurrences index and
+     * applies the lex-lowest canonical-winner rule — the same rule the cache's
+     * occurrence store now uses on read, so the two agree.
      */
     relationships: TaskRelationshipInput[];
 }
@@ -54,10 +49,11 @@ export class CacheService {
      *
      * - Cascade-deletes the existing rows for this file (tasks → metadata,
      *   tags via FK).
-     * - Re-inserts each `parseDocument`-returned task and its metadata/tags.
+     * - Re-inserts each `parseDocument`-returned task occurrence and its
+     *   metadata/tags, keyed by `(fileUri, line)`. A duplicate `@id` is stored
+     *   as another occurrence (not skipped) — duplicate detection is the
+     *   graph's job; the cache resolves the canonical occurrence on read.
      * - Skips tasks that lack an `@id` (returns a `no-id` warning).
-     * - Skips tasks whose `@id` is already cached (returns a `duplicate-id`
-     *   warning naming the first-occurrence location — spec: first wins).
      *
      * Idempotent: rescanning the same `text` twice produces the same state
      * and the same warnings.
@@ -88,11 +84,9 @@ export class CacheService {
                     continue;
                 }
 
-                // Record the graph projection BEFORE the cache's
-                // INSERT OR IGNORE — so even tasks the cache skips for
-                // duplicate-id reasons still feed the graph's per-id
-                // occurrences index (the graph applies its own
-                // canonical-winner rule downstream).
+                // Feed the graph's per-id occurrences index — it applies the
+                // lex-lowest canonical-winner rule, the same rule the cache's
+                // occurrence store uses on read.
                 relationships.push({
                     id,
                     fileUri: uri,
@@ -100,7 +94,9 @@ export class CacheService {
                     ...readRelationships(task.metadata),
                 });
 
-                const ok = this.db.insertTask({
+                // Store every occurrence; a duplicate @id becomes another row,
+                // resolved to its canonical occurrence by findTaskById.
+                this.db.insertTask({
                     id,
                     fileUri: uri,
                     line: task.line,
@@ -108,34 +104,13 @@ export class CacheService {
                     content: task.content,
                     raw: task.raw,
                 });
-
-                if (!ok) {
-                    const existing = this.db.findTaskById(id);
-                    const where = existing
-                        ? `${existing.fileUri}:${existing.line + 1}`
-                        : 'unknown location';
-                    warnings.push({
-                        kind: 'duplicate-id',
-                        fileUri: uri,
-                        line: task.line,
-                        columnEnd: task.raw.length,
-                        message: `Duplicate @id "${id}" — first occurrence at ${where} takes precedence.`,
-                        id,
-                        firstOccurrence: existing
-                            ? { fileUri: existing.fileUri, line: existing.line }
-                            : undefined,
-                    });
-                    skipped++;
-                    continue;
-                }
-
                 inserted++;
 
                 for (const [key, value] of task.metadata) {
-                    this.db.insertMetadata({ taskId: id, key, value });
+                    this.db.insertMetadata(uri, task.line, key, value);
                 }
                 for (const tag of task.tags) {
-                    this.db.insertTag({ taskId: id, tag });
+                    this.db.insertTag(uri, task.line, tag);
                 }
             }
 
@@ -160,7 +135,7 @@ export class CacheService {
         const out: TaskRelationshipInput[] = [];
         for (const task of tasks) {
             const metadata = new Map<string, string | null>();
-            for (const m of this.db.listMetadataForTask(task.id)) {
+            for (const m of this.db.listMetadataForOccurrence(task.fileUri, task.line)) {
                 metadata.set(m.key, m.value);
             }
             out.push({

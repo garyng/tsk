@@ -152,10 +152,8 @@ export class ScanController {
 
     /** Log every scan warning + push the file's diagnostics. */
     private applyWarnings(uriString: string, warnings: CacheWarning[]): void {
-        // Log every warning so the chronological record is complete; duplicate-id
-        // warnings still log here (cache-internal signal), while the diagnostics-
-        // side dedup that hides them from the Problems panel happens inside
-        // DiagnosticsManager.setScanWarnings.
+        // Log every warning (today only no-id). Duplicate-id diagnostics come
+        // from the graph (setGraphDuplicates), not from cache scan warnings.
         for (const warning of warnings) {
             this.logger.warn(`${warning.fileUri}:${warning.line + 1}: ${warning.message}`);
         }
