@@ -69,6 +69,8 @@ The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via 
 
 **Duplicating tasks** — `Shift+Alt+↓` / `Shift+Alt+↑` wrap VS Code's built-in line duplication in `.tsk` files: the copy is stamped with a fresh `@id` + `@created` so it can't collide with its source, while lifecycle stamps (`@started` / `@completed`) are preserved. (Two undo steps by design — the duplicate, then the id rewrite — which also makes multi-cursor duplication work for free.)
 
+**Moving a task to another file** — **Tsk: Move Task to File…** (Command Palette, or a `Ctrl+.` → *Move task to file…* refactor on any task carrying an `@id`) relocates the task *and its indented sub-block* to a `.tsk` file you pick — or a new one via a save dialog — appending it there. The relocated task **keeps its `@id`**, so every `@parent` / `@dependsOn` / … reference still resolves at the new location (id→location lookup is file-independent), while a `[>]` breadcrumb stays behind with a *fresh* `@id` + `@movedTo:<original>` — reusing the moved-marker lens, so you can click straight to where the task went. It's one atomic edit (single undo). Tasks with no `@id` are rejected (add one first); inline `#tags` are stripped from the breadcrumb so a tag isn't double-counted.
+
 Every list-edit keybinding carries `when: editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`, so `Enter` accepts an IntelliSense suggestion when one is visible and `Tab` advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
 ## Tags & search

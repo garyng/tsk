@@ -109,6 +109,11 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 
 - [ ] belongs in another project <!-- @id:move-demo -->
 
+**Tsk: Move Task to File…** is different — it *relocates* a task (and its indented sub-items) to another `.tsk` file. Run it from the Command Palette, or `Ctrl+.` → *Move task to file…*, on the task below and pick a file (or make a new one): the task keeps its `@id` so every link still resolves, its child rides along, and a `[>]` breadcrumb stays here pointing (`@movedTo`) at its new home.
+
+- [ ] relocate me to another file <!-- @id:movefile-demo -->
+    - [ ] my child rides along <!-- @id:movefile-child @parent:movefile-demo -->
+
 ## 9. Copy id
 
 `` Alt+` `` copies the task's `@id`.

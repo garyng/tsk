@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildMoveStub, computeTaskBlockRange, dedentBlock } from './move-task-logic';
+import {
+    buildAppendText,
+    buildMoveStub,
+    computeTaskBlockRange,
+    dedentBlock,
+} from './move-task-logic';
 import { parseLine } from './parser';
 
 describe('computeTaskBlockRange', () => {
@@ -98,5 +103,24 @@ describe('buildMoveStub', () => {
         const task = parseLine('- [ ] no id here');
         if (!task) throw new Error('expected a task');
         expect(() => buildMoveStub(task, 'N', 'T')).toThrow(/no @id/);
+    });
+});
+
+describe('buildAppendText', () => {
+    it('an empty target gets just the block + trailing newline', () => {
+        expect(buildAppendText('', ['- [ ] a', '- [ ] b'], '\n')).toBe('- [ ] a\n- [ ] b\n');
+        expect(buildAppendText('   \n', ['- [ ] a'], '\n')).toBe('- [ ] a\n');
+    });
+
+    it('separates from a newline-terminated file with one blank line', () => {
+        expect(buildAppendText('# notes\n', ['- [ ] a'], '\n')).toBe('\n- [ ] a\n');
+    });
+
+    it('separates from a file with no trailing newline using two', () => {
+        expect(buildAppendText('# notes', ['- [ ] a'], '\n')).toBe('\n\n- [ ] a\n');
+    });
+
+    it('honors CRLF', () => {
+        expect(buildAppendText('# notes\r\n', ['- [ ] a'], '\r\n')).toBe('\r\n- [ ] a\r\n');
     });
 });

@@ -3,7 +3,12 @@ import { COMMANDS, TSK_LANGUAGE_ID } from './constants';
 import { isTskDocument } from './editor-guards';
 import { generateId } from './lib/ids';
 import type { Logger } from './lib/logger';
-import { buildMoveStub, computeTaskBlockRange, dedentBlock } from './lib/move-task-logic';
+import {
+    buildAppendText,
+    buildMoveStub,
+    computeTaskBlockRange,
+    dedentBlock,
+} from './lib/move-task-logic';
 import { parseLine } from './lib/parser';
 import { localTimestamp } from './lib/time';
 
@@ -172,16 +177,17 @@ async function appendBlockToTarget(
         edit.insert(
             target.uri,
             new vscode.Position(0, 0),
-            destLines.join(fallbackEol) + fallbackEol,
+            buildAppendText('', destLines, fallbackEol),
         );
         return;
     }
     const targetDoc = await vscode.workspace.openTextDocument(target.uri);
-    const eol = eolOf(targetDoc);
-    const block = destLines.join(eol);
-    const isEmpty = targetDoc.getText().trim() === '';
-    const text = isEmpty ? `${block}${eol}` : `${eol}${eol}${block}${eol}`;
-    edit.insert(target.uri, targetDoc.lineAt(targetDoc.lineCount - 1).range.end, text);
+    const endPos = targetDoc.lineAt(targetDoc.lineCount - 1).range.end;
+    edit.insert(
+        target.uri,
+        endPos,
+        buildAppendText(targetDoc.getText(), destLines, eolOf(targetDoc)),
+    );
 }
 
 /** Open the destination and put the cursor on the relocated task (start of the appended block). */

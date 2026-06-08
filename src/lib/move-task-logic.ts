@@ -94,3 +94,20 @@ export function buildMoveStub(task: ParsedTask, freshId: string, nowIso: string)
         ? `${task.indent}${bullet} ${marker} ${content} ${comment}`
         : `${task.indent}${bullet} ${marker} ${comment}`;
 }
+
+/**
+ * Text to append the relocated block to a destination file's end. Empty target
+ * → just the block; non-empty → a blank-line separator first (one `eol` when the
+ * file already ends in a newline, two otherwise), always a trailing newline. The
+ * caller inserts this at the end of the document.
+ */
+export function buildAppendText(
+    existing: string,
+    destLines: readonly string[],
+    eol: string,
+): string {
+    const block = destLines.join(eol);
+    if (existing.trim() === '') return `${block}${eol}`;
+    const separator = existing.endsWith('\n') ? eol : `${eol}${eol}`;
+    return `${separator}${block}${eol}`;
+}
