@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRelationshipKey, readRelationships, RELATIONSHIP_KEYS } from './relationships';
+import { isRelationshipKey, RELATIONSHIP_KEYS, readRelationships } from './relationships';
 
 describe('RELATIONSHIP_KEYS', () => {
     it('is the four forward edge keys', () => {
