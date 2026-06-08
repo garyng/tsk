@@ -358,8 +358,10 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
             // Evict the decoration snapshot for a closed buffer so the Map
             // doesn't grow unbounded across untitled docs (Untitled-1, …),
             // which never reach the on-disk delete watcher. (M31/A — the leak
-            // flagged in M18.) Also clear any pending decorate timer for it.
+            // flagged in M18.) Both controllers also clear any pending timer for
+            // the closed doc — a queued rescan/decorate against it is moot.
             state?.decorations.evict(doc.uri.toString());
+            state?.scan.cancelScheduled(doc.uri.toString());
         }),
     );
 }

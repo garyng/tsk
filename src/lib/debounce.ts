@@ -27,3 +27,20 @@ export function scheduleDebounced(
     }, ms);
     map.set(key, timer);
 }
+
+/**
+ * Cancel the pending {@link scheduleDebounced} timer for `key`, if any, and drop
+ * its bookkeeping entry — the same clear-and-delete a re-schedule does, exposed
+ * for eviction. A no-op when nothing is scheduled.
+ *
+ * Used so a queued action can be revoked when its target goes away (a closed or
+ * deleted document whose rescan would otherwise fire against — and resurrect —
+ * the gone file).
+ */
+export function cancelDebounced(map: Map<string, NodeJS.Timeout>, key: string): void {
+    const timer = map.get(key);
+    if (timer) {
+        clearTimeout(timer);
+        map.delete(key);
+    }
+}

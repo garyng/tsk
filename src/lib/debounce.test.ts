@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { scheduleDebounced } from './debounce';
+import { cancelDebounced, scheduleDebounced } from './debounce';
 
 describe('scheduleDebounced', () => {
     beforeEach(() => {
@@ -76,5 +76,49 @@ describe('scheduleDebounced', () => {
         const secondTimer = map.get('k');
         expect(firstTimer).not.toBe(secondTimer);
         expect(map.size).toBe(1);
+    });
+});
+
+describe('cancelDebounced', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('stops a pending timer from firing', () => {
+        const map = new Map<string, NodeJS.Timeout>();
+        const fn = vi.fn();
+        scheduleDebounced(map, 'k', 100, fn);
+        cancelDebounced(map, 'k');
+        vi.advanceTimersByTime(200);
+        expect(fn).not.toHaveBeenCalled();
+    });
+
+    it('removes the key from the map', () => {
+        const map = new Map<string, NodeJS.Timeout>();
+        scheduleDebounced(map, 'k', 100, () => {});
+        expect(map.has('k')).toBe(true);
+        cancelDebounced(map, 'k');
+        expect(map.has('k')).toBe(false);
+    });
+
+    it('is a no-op for a key with nothing scheduled', () => {
+        const map = new Map<string, NodeJS.Timeout>();
+        expect(() => cancelDebounced(map, 'absent')).not.toThrow();
+        expect(map.size).toBe(0);
+    });
+
+    it('cancels only the named key, leaving others pending', () => {
+        const map = new Map<string, NodeJS.Timeout>();
+        const fnA = vi.fn();
+        const fnB = vi.fn();
+        scheduleDebounced(map, 'a', 100, fnA);
+        scheduleDebounced(map, 'b', 100, fnB);
+        cancelDebounced(map, 'a');
+        vi.advanceTimersByTime(100);
+        expect(fnA).not.toHaveBeenCalled();
+        expect(fnB).toHaveBeenCalledTimes(1);
     });
 });
