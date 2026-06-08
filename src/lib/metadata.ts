@@ -35,6 +35,21 @@ export function extractMetadata(text: string): {
 }
 
 /**
+ * The `[start, end)` index span of every `<!-- ... -->` comment block in
+ * `text`, in appearance order. Reuses {@link COMMENT_RE} — the single owner of
+ * the comment shape — so the decoration dimmer consumes this instead of
+ * re-declaring its own copy of the pattern.
+ */
+export function findMetadataCommentSpans(text: string): Array<{ start: number; end: number }> {
+    const spans: Array<{ start: number; end: number }> = [];
+    for (const match of text.matchAll(COMMENT_RE)) {
+        if (match.index === undefined) continue;
+        spans.push({ start: match.index, end: match.index + match[0].length });
+    }
+    return spans;
+}
+
+/**
  * Render a metadata Map back into an inline comment.
  *
  * - Empty Map → `""` (caller appends nothing).
