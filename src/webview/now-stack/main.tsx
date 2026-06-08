@@ -18,7 +18,7 @@ import {
     useState,
 } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MARKERS, type Marker } from '../../lib/markers';
+import { GLYPH } from '../../lib/markers';
 import type { HostToWebview, WebviewToHost } from '../../lib/now-protocol';
 import type { NowRowView } from '../../lib/now-row';
 import { buildNowTreeSource, expandedNowIds } from '../../lib/now-tree-source';
@@ -57,12 +57,6 @@ const saveCollapsed = (collapsed: Set<string>): void =>
 /** px of indent per compacted depth level. */
 const INDENT_STEP = 16;
 const rowDomId = (id: string): string => `now-row-${id}`;
-
-/** Canonical `[glyph]` per marker (e.g. todo → `[ ]`, in-progress → `[/]`). */
-const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as Record<
-    Marker,
-    string
->;
 
 // `defaultKeymap` binds Enter/F2 to `rename` — but the now-tree has no inline
 // rename. Remap them to `activate` so Enter jumps the focused row (↑/↓ move,

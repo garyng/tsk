@@ -1,7 +1,7 @@
 import { cloneElement, StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { createRoot } from 'react-dom/client';
-import { MARKERS, type Marker } from '../../lib/markers';
+import { GLYPH, type Marker } from '../../lib/markers';
 import { EVENT_METRICS, type Metric } from '../../lib/stats-aggregation';
 import { toCalendarData } from '../../lib/stats-calendar';
 import type { StatsHostToWebview, StatsView, StatsWebviewToHost } from '../../lib/stats-protocol';
@@ -35,12 +35,6 @@ const METRIC_LABEL: Record<Metric, string> = {
     cancelled: 'Cancelled',
     moved: 'Moved',
 };
-
-/** Canonical `[glyph]` per marker (e.g. todo → `[ ]`, completed → `[x]`). */
-const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as Record<
-    Marker,
-    string
->;
 
 /**
  * The status marker each metric reads as, for the toggle-chip glyph (consistent

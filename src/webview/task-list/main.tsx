@@ -15,7 +15,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type MouseEvent, StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MARKERS, type Marker } from '../../lib/markers';
+import { GLYPH, type Marker } from '../../lib/markers';
 import { priorityForLevel } from '../../lib/priorities';
 import { formatRelativeShort } from '../../lib/relative-time';
 import type {
@@ -45,12 +45,6 @@ declare function acquireVsCodeApi(): {
 };
 const vscode = acquireVsCodeApi();
 const post = (message: TaskListWebviewToHost): void => vscode.postMessage(message);
-
-/** Canonical `[glyph]` per marker (e.g. todo → `[ ]`, in-progress → `[/]`). */
-const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as Record<
-    Marker,
-    string
->;
 
 const ROW_HEIGHT = 28;
 /** Columns whose header carries an Excel-style filter dropdown. */

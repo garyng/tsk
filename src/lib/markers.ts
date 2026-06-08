@@ -151,3 +151,14 @@ export function markerForSymbol(ch: string): Marker | undefined {
     }
     return undefined;
 }
+
+/**
+ * Canonical display glyph per marker — the primary (first) symbol, e.g.
+ * `todo → ' '`, `completed → 'x'`. The webview surfaces render
+ * `` `[${GLYPH[marker]}]` ``; exported here so the three of them don't each
+ * hand-copy the same `Object.fromEntries`.
+ */
+export const GLYPH = Object.fromEntries(MARKERS.map((m) => [m.name, m.symbols[0]])) as Record<
+    Marker,
+    string
+>;
