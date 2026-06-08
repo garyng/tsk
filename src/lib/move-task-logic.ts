@@ -1,0 +1,96 @@
+import { GLYPH } from './markers';
+import { serializeMetadata } from './metadata';
+import type { ParsedTask } from './parser';
+
+/**
+ * Pure logic behind `Tsk: Move Task to File…` — compute the indented block a
+ * task owns, re-base it to column 0, and build the `[>]` breadcrumb that stays
+ * behind. No `vscode`; the activation layer (`move-task-commands.ts`) turns
+ * these into a single `WorkspaceEdit`.
+ */
+
+/** Inline-tag matcher (mirrors the parser's `TAG_RE`) — for stripping tags from the stub. */
+const TAG_RE = /(?:^|\s)#[A-Za-z][A-Za-z0-9_/-]*/g;
+
+const isBlank = (line: string): boolean => line.trim() === '';
+
+/**
+ * Visual indent column of `line`: a leading space counts 1, a tab advances to
+ * the next `tabSize` multiple; stops at the first non-whitespace char. Comparing
+ * by column (not raw char count) keeps tab- and space-indented files honest.
+ */
+function indentColumn(line: string, tabSize: number): number {
+    let col = 0;
+    for (const ch of line) {
+        if (ch === ' ') col += 1;
+        else if (ch === '\t') col += tabSize - (col % tabSize);
+        else break;
+    }
+    return col;
+}
+
+/**
+ * The inclusive `{ start, end }` line range of a task's block: the task line
+ * plus every line nested beneath it (a deeper indent column). Interior blank
+ * lines are kept (they belong to the block when deeper content follows); blank
+ * lines trailing the block are excluded. A sibling or ancestor line ends it.
+ */
+export function computeTaskBlockRange(
+    lines: readonly string[],
+    taskLine: number,
+    tabSize: number,
+): { start: number; end: number } {
+    const parentCol = indentColumn(lines[taskLine] ?? '', tabSize);
+    let end = taskLine;
+    for (let j = taskLine + 1; j < lines.length; j++) {
+        const line = lines[j] as string;
+        if (isBlank(line)) continue; // tentative — kept only if a deeper line follows
+        if (indentColumn(line, tabSize) > parentCol) end = j;
+        else break; // sibling or ancestor closes the block
+    }
+    return { start: taskLine, end };
+}
+
+/**
+ * Re-base a block to column 0 by stripping the parent's literal indent `prefix`
+ * from each line. Children share that prefix (plus more), so they keep their
+ * relative depth; blank lines collapse to empty. Correct under any tab/space mix
+ * (a prefix strip, not column arithmetic).
+ */
+export function dedentBlock(blockLines: readonly string[], prefix: string): string[] {
+    return blockLines.map((line) => {
+        if (isBlank(line)) return '';
+        return line.startsWith(prefix) ? line.slice(prefix.length) : line;
+    });
+}
+
+/** Drop inline `#tags` from `content` and tidy the leftover whitespace. */
+function stripTags(content: string): string {
+    return content.replace(TAG_RE, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The `[>]` breadcrumb that replaces the relocated task in the source file.
+ * Keeps the task's bullet, indentation, and (tag-stripped) content; takes a
+ * FRESH `@id` — it cannot reuse `originalId`, which now lives on the relocated
+ * task — and wires `@movedTo:<originalId>` + `@moved:<nowIso>` so the existing
+ * moved-marker codelens resolves stub → relocated task. Throws if the task has
+ * no `@id` (the command rejects that upstream).
+ */
+export function buildMoveStub(task: ParsedTask, freshId: string, nowIso: string): string {
+    const originalId = task.metadata.get('id');
+    if (!originalId) throw new Error('buildMoveStub: task has no @id to point @movedTo at');
+    const bullet = task.raw[task.indent.length] ?? '-';
+    const content = stripTags(task.content);
+    const comment = serializeMetadata(
+        new Map<string, string | null>([
+            ['id', freshId],
+            ['movedTo', originalId],
+            ['moved', nowIso],
+        ]),
+    );
+    const marker = `[${GLYPH.moved}]`;
+    return content
+        ? `${task.indent}${bullet} ${marker} ${content} ${comment}`
+        : `${task.indent}${bullet} ${marker} ${comment}`;
+}
