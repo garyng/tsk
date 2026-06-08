@@ -1,6 +1,7 @@
 import type { CacheCounts, Db, MetadataRecord, TaskRecord } from './db';
 import type { TaskRelationshipInput } from './graph';
 import { parseDocument } from './parser';
+import { readRelationships } from './relationships';
 
 /**
  * A warning produced during a file rescan. The activation layer (M3/D)
@@ -96,10 +97,7 @@ export class CacheService {
                     id,
                     fileUri: uri,
                     line: task.line,
-                    parent: task.metadata.get('parent') ?? undefined,
-                    dependsOn: task.metadata.get('dependsOn') ?? undefined,
-                    relatedTo: task.metadata.get('relatedTo') ?? undefined,
-                    movedTo: task.metadata.get('movedTo') ?? undefined,
+                    ...readRelationships(task.metadata),
                 });
 
                 const ok = this.db.insertTask({
@@ -169,10 +167,7 @@ export class CacheService {
                 id: task.id,
                 fileUri: task.fileUri,
                 line: task.line,
-                parent: metadata.get('parent') ?? undefined,
-                dependsOn: metadata.get('dependsOn') ?? undefined,
-                relatedTo: metadata.get('relatedTo') ?? undefined,
-                movedTo: metadata.get('movedTo') ?? undefined,
+                ...readRelationships(metadata),
             });
         }
         return out;

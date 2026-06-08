@@ -6,6 +6,7 @@ import {
     type GraphNode,
     type TaskRelationshipInput,
 } from './graph';
+import { RELATIONSHIP_KEYS } from './relationships';
 
 /**
  * Stateful, file-scoped view of the relationship graph. Mirrors
@@ -106,7 +107,7 @@ export class GraphService {
     getBrokenForwardEdges(): readonly BrokenEdgeReport[] {
         const reports: BrokenEdgeReport[] = [];
         for (const node of this.snapshot.graph.values()) {
-            for (const key of ['parent', 'dependsOn', 'relatedTo', 'movedTo'] as const) {
+            for (const key of RELATIONSHIP_KEYS) {
                 const targetId = node.forward[key];
                 if (!targetId) continue;
                 if (this.snapshot.graph.has(targetId)) continue;

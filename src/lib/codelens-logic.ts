@@ -1,5 +1,6 @@
 import { INTERNAL_COMMANDS } from '../constants';
 import type { GraphNode } from './graph';
+import type { RelationshipKey } from './relationships';
 
 /** Union of the navigate command ids (single-arg, target id). */
 type NavigateCommand = (typeof INTERNAL_COMMANDS)[
@@ -89,7 +90,7 @@ export const CODICONS = {
     missing: 'warning',
 } as const;
 
-type ForwardLabel = 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo';
+type ForwardLabel = RelationshipKey;
 type InverseLabel = 'children' | 'dependents' | 'related' | 'movedHereFrom';
 
 /** The minimum projection of a parsed task the lens computer needs. */

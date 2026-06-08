@@ -225,7 +225,7 @@ export const INTERNAL_COMMANDS = {
     nowPruneOffPath: 'tsk.now.pruneOffPath',
     /**
      * Quick-fix backing for broken-ref diagnostics (M20/C). Takes
-     * `(uri: vscode.Uri, line: number, key: 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo')`,
+     * `(uri: vscode.Uri, line: number, key: RelationshipKey)`,
      * opens the task picker, and rewrites `@<key>:<picked-id>` on the
      * given line. Hidden from the palette because the args make no
      * sense outside a code-action invocation.
