@@ -34,6 +34,7 @@ import type { NowTreeState } from './lib/now-tree';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
+import { registerMoveTaskCommand } from './move-task-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerNowCommands } from './now-commands';
 import { NowDecoration } from './now-decoration';
@@ -388,6 +389,7 @@ function registerAllCommands(
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
     registerDuplicateCommands(context, logger);
+    registerMoveTaskCommand(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
     registerFindAllTasksByStatusCommand(context, cache, logger);

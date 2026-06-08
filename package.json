@@ -237,6 +237,11 @@
                 "command": "tsk.openTaskList",
                 "title": "Open Task List",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.moveTaskToFile",
+                "title": "Move Task to File…",
+                "category": "Tsk"
             }
         ],
         "menus": {

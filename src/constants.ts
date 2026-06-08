@@ -183,6 +183,7 @@ export const COMMANDS = {
     handleBackspace: 'tsk.handleBackspace',
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
+    moveTaskToFile: 'tsk.moveTaskToFile',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
     markNow: 'tsk.markNow',
     openNowStack: 'tsk.now.openStack',
