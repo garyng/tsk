@@ -1,7 +1,7 @@
 import { formatDistance } from 'date-fns';
 import type { TaskRecord } from './db';
 import type { GraphNode } from './graph';
-import type { Marker } from './markers';
+import { MARKERS, type Marker } from './markers';
 
 /**
  * Shape of one task projected for hover rendering. Subset of `ParsedTask`
@@ -39,16 +39,15 @@ export interface HoverDeps {
 /**
  * Marker → human-readable status word for the hover header. Avoids
  * re-printing the marker glyph itself (already visible in the source
- * line) while still naming the state at a glance.
+ * line) while still naming the state at a glance. Derived from the
+ * {@link MARKERS} registry so the word matches the task-list chips, the
+ * find-by-status picker, and the stats tiles for the same marker (this
+ * map had drifted to "In Progress"/"Note").
  */
-const MARKER_LABEL: Record<Marker, string> = {
-    todo: 'Todo',
-    inprogress: 'In Progress',
-    completed: 'Completed',
-    cancelled: 'Cancelled',
-    moved: 'Moved',
-    notes: 'Note',
-};
+const MARKER_LABEL = Object.fromEntries(MARKERS.map((m) => [m.name, m.label])) as Record<
+    Marker,
+    string
+>;
 
 /**
  * Build the markdown body for a task's hover popup. Pure — no vscode
