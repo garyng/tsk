@@ -34,6 +34,7 @@ import type { NowTreeState } from './lib/now-tree';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
+import { registerMoveTaskCommand } from './move-task-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerNowCommands } from './now-commands';
 import { NowDecoration } from './now-decoration';
@@ -358,8 +359,10 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
             // Evict the decoration snapshot for a closed buffer so the Map
             // doesn't grow unbounded across untitled docs (Untitled-1, …),
             // which never reach the on-disk delete watcher. (M31/A — the leak
-            // flagged in M18.) Also clear any pending decorate timer for it.
+            // flagged in M18.) Both controllers also clear any pending timer for
+            // the closed doc — a queued rescan/decorate against it is moot.
             state?.decorations.evict(doc.uri.toString());
+            state?.scan.cancelScheduled(doc.uri.toString());
         }),
     );
 }
@@ -386,6 +389,7 @@ function registerAllCommands(
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
     registerDuplicateCommands(context, logger);
+    registerMoveTaskCommand(context, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
     registerFindAllTasksByStatusCommand(context, cache, logger);

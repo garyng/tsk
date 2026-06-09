@@ -31,6 +31,8 @@
  *   `occurrences` array is sorted by `(fileUri, line)`.
  */
 
+import type { RelationshipKey } from './relationships';
+
 /**
  * The minimal per-task projection the builder needs. The wiring layer
  * joins the cache's `tasks` + `metadata` tables into this shape; the pure
@@ -90,7 +92,7 @@ export interface BrokenEdgeReport {
     readonly sourceId: string;
     readonly sourceFile: string;
     readonly sourceLine: number;
-    readonly key: 'parent' | 'dependsOn' | 'relatedTo' | 'movedTo';
+    readonly key: RelationshipKey;
     readonly targetId: string;
 }
 

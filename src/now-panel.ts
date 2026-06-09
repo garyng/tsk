@@ -9,6 +9,9 @@ import { buildWebviewHtml, webviewLocalResourceRoots } from './webview-html';
 
 const VIEW_TYPE = 'tsk.nowStack';
 
+/** How often a visible panel re-renders so relative "when" times don't freeze. */
+const RELATIVE_TIME_TICK_MS = 60_000;
+
 /**
  * Owns the single "Now Stack" webview panel — an EDITOR-area `WebviewPanel` (not
  * a sidebar view) so the user can "Move/Copy into a New Window". It loads the
@@ -25,6 +28,8 @@ export class NowPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
     /** The last viewmodel posted (serialized) — to skip re-posting an identical one. */
     private lastPosted: string | undefined;
+    /** Per-minute re-render so relative "when" times advance on an idle panel. */
+    private ticker: ReturnType<typeof setInterval> | undefined;
     private readonly storeSub: { dispose(): void };
     private readonly editorSub: { dispose(): void };
     /**
@@ -85,6 +90,7 @@ export class NowPanel implements vscode.Disposable {
     }
 
     dispose(): void {
+        this.stopTicker();
         this.storeSub.dispose();
         this.editorSub.dispose();
         this.panel?.dispose();
@@ -98,11 +104,37 @@ export class NowPanel implements vscode.Disposable {
         this.panel = panel;
         this.lastPosted = undefined; // a fresh webview needs the next render unconditionally
         panel.webview.options = this.webviewOptions();
-        panel.webview.html = this.html(panel.webview);
+        // Attach the message listener BEFORE setting `html`: the webview posts
+        // `ready` the moment it mounts, and a missed `ready` leaves a revived
+        // panel without its first render.
         panel.webview.onDidReceiveMessage((message: WebviewToHost) => this.onMessage(message));
-        panel.onDidDispose(() => {
-            if (this.panel === panel) this.panel = undefined;
+        panel.webview.html = this.html(panel.webview);
+        // Re-render when the panel is revealed (instant freshness) and once a
+        // minute while it's visible (relative "when" times advance on idle).
+        panel.onDidChangeViewState(() => {
+            if (panel.visible) this.postRender();
         });
+        panel.onDidDispose(() => {
+            if (this.panel === panel) {
+                this.panel = undefined;
+                this.stopTicker();
+            }
+        });
+        this.startTicker();
+    }
+
+    private startTicker(): void {
+        this.stopTicker();
+        this.ticker = setInterval(() => {
+            if (this.panel?.visible) this.postRender();
+        }, RELATIVE_TIME_TICK_MS);
+    }
+
+    private stopTicker(): void {
+        if (this.ticker !== undefined) {
+            clearInterval(this.ticker);
+            this.ticker = undefined;
+        }
     }
 
     private onMessage(message: WebviewToHost): void {
@@ -111,6 +143,13 @@ export class NowPanel implements vscode.Disposable {
         // handshake. Unknown / malformed messages are ignored.
         switch (message?.type) {
             case 'ready':
+                // A freshly mounted / revived webview has nothing yet — send the
+                // current state UNCONDITIONALLY. `lastPosted` may already hold a
+                // viewmodel from a refresh()/store post that fired before the
+                // webview was listening (that `render` dropped on the floor); without
+                // this reset the dedup would skip the first paint and leave the panel
+                // blank when VS Code reopens with the stack already open.
+                this.lastPosted = undefined;
                 this.postRender();
                 return;
             case 'jump':
@@ -122,6 +161,13 @@ export class NowPanel implements vscode.Disposable {
                 return;
             case 'switchTo':
                 void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowSwitchTo, message.entryId);
+                return;
+            case 'bump':
+                void vscode.commands.executeCommand(
+                    INTERNAL_COMMANDS.nowBump,
+                    message.entryId,
+                    this.sourceColumn,
+                );
                 return;
             case 'remove':
                 void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowRemove, message.entryId);

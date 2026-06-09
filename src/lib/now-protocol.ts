@@ -28,6 +28,7 @@ export type WebviewToHost =
     | { type: 'ready' }
     | { type: 'jump'; id: string }
     | { type: 'switchTo'; entryId: string }
+    | { type: 'bump'; entryId: string }
     | { type: 'remove'; entryId: string }
     | { type: 'pruneSubtree'; entryId: string }
     | { type: 'pruneChildren'; entryId: string }

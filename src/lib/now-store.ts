@@ -1,6 +1,7 @@
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import { generateId } from './ids';
 import {
+    bump as bumpTree,
     clear as clearTree,
     currentNowId,
     markNow as markNowTree,
@@ -148,6 +149,11 @@ export class NowStore {
 
     switchTo(entryId: string): void {
         this.apply(switchToTree(this.state, entryId));
+    }
+
+    /** Move an entry to the top (a root) and make it current — no new node, no branch. */
+    bump(entryId: string): void {
+        this.apply(bumpTree(this.state, entryId));
     }
 
     removeEntry(entryId: string): void {

@@ -1,4 +1,5 @@
 import { MARKERS, type Marker } from './markers';
+import { findMetadataCommentSpans } from './metadata';
 import type { Task } from './parser';
 import { type PriorityLevel, priorityForLevel } from './priorities';
 
@@ -127,36 +128,29 @@ export function computePriorityRanges(tasks: readonly Task[]): Map<PriorityLevel
 }
 
 /**
- * Non-greedy match of an entire `<!-- ... -->` HTML comment block. `[\s\S]`
- * tolerates a stray newline inside (parser strips trailing `\r` but doesn't
- * forbid a `\n` inside the comment body); the `?` keeps multi-comment lines
- * from being captured as one giant match.
- */
-const METADATA_COMMENT_RE = /<!--[\s\S]*?-->/g;
-
-/**
  * Find every inline `<!-- ... -->` block across the given tasks and emit
  * one `RangeLike` per comment (covering the full `<!--` … `-->` span,
- * including the brackets and dashes).
+ * including the brackets and dashes). The comment shape itself is owned by
+ * `metadata.ts` ({@link findMetadataCommentSpans}); this just maps each span
+ * onto the task's line.
  *
  * The activation layer applies a single dimmed decoration type to this
  * flat list so metadata recedes into the editor background. The
  * hover-on-task surface displays those parsed values on demand; the
  * dimmed comment text is present-but-quiet bookkeeping.
  *
- * Unclosed `<!--` is silently dropped — non-greedy matching just won't
- * fire without a closing `-->`. Pure — no `vscode` import.
+ * `task.raw` is one line (the parser splits on `\r?\n`), so each task
+ * contributes its own metadata comment(s). Pure — no `vscode` import.
  */
 export function computeMetadataRanges(tasks: readonly Task[]): RangeLike[] {
     const out: RangeLike[] = [];
     for (const task of tasks) {
-        for (const match of task.raw.matchAll(METADATA_COMMENT_RE)) {
-            if (match.index === undefined) continue;
+        for (const span of findMetadataCommentSpans(task.raw)) {
             out.push({
                 startLine: task.line,
-                startCol: match.index,
+                startCol: span.start,
                 endLine: task.line,
-                endCol: match.index + match[0].length,
+                endCol: span.end,
             });
         }
     }

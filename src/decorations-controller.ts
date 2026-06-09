@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { METADATA_FOREGROUND_COLOR_ID } from './constants';
 import { isTskDocument } from './editor-guards';
-import { scheduleDebounced } from './lib/debounce';
+import { cancelDebounced, scheduleDebounced } from './lib/debounce';
 import { computePriorityRanges, priorityBackgroundColor, type RangeLike } from './lib/decorations';
 import { MARKERS, type Marker } from './lib/markers';
 import { parseDocument } from './lib/parser';
@@ -135,11 +135,7 @@ export class DecorationsController {
     /** Drop the URI's snapshot and cancel any pending decorate timer. */
     evict(uri: string): void {
         this.snapshots.delete(uri);
-        const timer = this.timers.get(uri);
-        if (timer) {
-            clearTimeout(timer);
-            this.timers.delete(uri);
-        }
+        cancelDebounced(this.timers, uri);
     }
 
     /** Cancel all pending decorate timers (deactivation). */

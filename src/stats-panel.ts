@@ -19,6 +19,9 @@ const METRIC_LABEL: Record<Metric, string> = {
     moved: 'Moved',
 };
 
+/** How often a visible panel checks whether the local date rolled (trailing-window advance). */
+const RANGE_TICK_MS = 60_000;
+
 /**
  * Owns the "Tsk Stats" webview panel — an editor-area `WebviewPanel` (like
  * {@link NowPanel}) showing a GitHub-style activity calendar of task events plus
@@ -33,6 +36,9 @@ export class StatsPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
     /** Last viewmodel posted (serialized) — to skip re-posting an identical one. */
     private lastPosted: string | undefined;
+    /** Advances the trailing-year window across midnight on an idle panel. */
+    private ticker: ReturnType<typeof setInterval> | undefined;
+    private lastTickDate: string | undefined;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -69,6 +75,7 @@ export class StatsPanel implements vscode.Disposable {
     }
 
     dispose(): void {
+        this.stopTicker();
         this.panel?.dispose();
         this.panel = undefined;
     }
@@ -90,9 +97,36 @@ export class StatsPanel implements vscode.Disposable {
             if (message?.type === 'ready') this.postRender();
             else if (message?.type === 'jumpToDay') this.jumpToDay(message.date, message.metric);
         });
-        panel.onDidDispose(() => {
-            if (this.panel === panel) this.panel = undefined;
+        // Re-render when revealed; advance the trailing-year window when the
+        // local date rolls over while the panel is left open across midnight.
+        panel.onDidChangeViewState(() => {
+            if (panel.visible) this.postRender();
         });
+        panel.onDidDispose(() => {
+            if (this.panel === panel) {
+                this.panel = undefined;
+                this.stopTicker();
+            }
+        });
+        this.startTicker();
+    }
+
+    private startTicker(): void {
+        this.stopTicker();
+        this.lastTickDate = new Date().toDateString();
+        this.ticker = setInterval(() => {
+            const today = new Date().toDateString();
+            if (today === this.lastTickDate) return;
+            this.lastTickDate = today;
+            if (this.panel?.visible) this.postRender();
+        }, RANGE_TICK_MS);
+    }
+
+    private stopTicker(): void {
+        if (this.ticker !== undefined) {
+            clearInterval(this.ticker);
+            this.ticker = undefined;
+        }
     }
 
     private postRender(): void {

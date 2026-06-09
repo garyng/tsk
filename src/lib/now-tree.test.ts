@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+    bump,
     clear,
     currentNowId,
     emptyNowTree,
@@ -103,6 +104,104 @@ describe('switchTo', () => {
     it('is a same-state no-op when already current or unknown', () => {
         expect(switchTo(base, 'b')).toBe(base);
         expect(switchTo(base, 'nope')).toBe(base);
+    });
+});
+
+describe('bump (by example — the four owner diagrams)', () => {
+    /** a → b → c, current c (a linear stack). */
+    function chain(): NowTreeState {
+        let s = markNow(emptyNowTree(), mk('a'));
+        s = markNow(s, mk('b'));
+        s = markNow(s, mk('c'));
+        return s;
+    }
+
+    it('Example 1 — bumps a mid-stack node to the top, healing the gap', () => {
+        // a → b → c (current c); bump b. b grafts under old-current c; its
+        // on-path child c inherits b's slot (→ a). Result: a → c → b, current b.
+        expect(snap(bump(chain(), 'b'))).toEqual({
+            ids: ['a', 'b', 'c'],
+            parents: { a: null, c: 'a', b: 'c' },
+            current: 'b',
+        });
+    });
+
+    it('Example 2 — bumping an off-path child of the current just makes it current', () => {
+        // a → b → c, switch to b → c hangs off the current b. Bump c.
+        const s = switchTo(chain(), 'b');
+        expect(snap(bump(s, 'c'))).toEqual({
+            ids: ['a', 'b', 'c'],
+            parents: { a: null, b: 'a', c: 'b' },
+            current: 'c',
+        });
+    });
+
+    /** a → b → {c, d}, current a (b is an off-path fork). */
+    function fork(): NowTreeState {
+        let s = markNow(emptyNowTree(), mk('a'));
+        s = markNow(s, mk('b'));
+        s = markNow(s, mk('c'));
+        s = switchTo(s, 'b');
+        s = markNow(s, mk('d'));
+        return switchTo(s, 'a');
+    }
+
+    it('Example 3 — sheds the bumped node children onto its parent (they do not travel)', () => {
+        // a → b → {c, d} (current a); bump b. b floats up under a; c, d stay
+        // behind, re-homed to b's parent a. Result: a → {b, c, d}, current b.
+        expect(snap(bump(fork(), 'b'))).toEqual({
+            ids: ['a', 'b', 'c', 'd'],
+            parents: { a: null, b: 'a', c: 'a', d: 'a' },
+            current: 'b',
+        });
+    });
+
+    /** a → b → c, b → d, a → e, current c. */
+    function wide(): NowTreeState {
+        let s = markNow(emptyNowTree(), mk('a'));
+        s = markNow(s, mk('b'));
+        s = markNow(s, mk('c'));
+        s = switchTo(s, 'b');
+        s = markNow(s, mk('d'));
+        s = switchTo(s, 'a');
+        s = markNow(s, mk('e'));
+        return switchTo(s, 'c');
+    }
+
+    it('Example 4 — bumping an ancestor promotes its on-path child, siblings follow it', () => {
+        // a → b → c, b → d, a → e (current c). Bump a: a grafts under old-current
+        // c; on-path child b takes a's root slot; off-path sibling e follows b
+        // (stays connected, not orphaned to a hidden root).
+        const s1 = bump(wide(), 'a');
+        expect(snap(s1)).toEqual({
+            ids: ['a', 'b', 'c', 'd', 'e'],
+            parents: { b: null, c: 'b', d: 'b', e: 'b', a: 'c' },
+            current: 'a',
+        });
+
+        // Bump b next: b grafts under old-current a; on-path child c takes b's
+        // root slot; d, e follow c. Result: c → {a, d, e}, a → b, current b.
+        expect(snap(bump(s1, 'b'))).toEqual({
+            ids: ['a', 'b', 'c', 'd', 'e'],
+            parents: { c: null, a: 'c', d: 'c', e: 'c', b: 'a' },
+            current: 'b',
+        });
+    });
+
+    it('creates no new node — the bumped entry keeps its identity', () => {
+        const before = chain();
+        const after = bump(before, 'b');
+        expect(after.entries.length).toBe(before.entries.length);
+        const b = after.entries.find((e) => e.entryId === 'b');
+        const b0 = before.entries.find((e) => e.entryId === 'b');
+        expect(b?.markedAt).toBe(b0?.markedAt);
+        expect(b?.createdSeq).toBe(b0?.createdSeq);
+    });
+
+    it('is a same-state no-op when already the current, or unknown', () => {
+        const s = chain(); // current c — already the top row
+        expect(bump(s, 'c')).toBe(s);
+        expect(bump(s, 'nope')).toBe(s);
     });
 });
 
@@ -438,6 +537,7 @@ describe('immutability', () => {
         const frozen = JSON.parse(JSON.stringify(s));
         markNow(s, mk('c'));
         switchTo(s, 'a');
+        bump(s, 'a');
         removeEntry(s, 'a');
         pruneSubtree(s, 'a');
         pruneChildren(s, 'a');

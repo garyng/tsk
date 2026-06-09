@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { CodelensHandle } from './codelens';
 import type { DiagnosticsManager } from './diagnostics-manager';
 import type { CacheService, CacheWarning, RescanResult } from './lib/cache';
-import { scheduleDebounced } from './lib/debounce';
+import { cancelDebounced, scheduleDebounced } from './lib/debounce';
 import type { GraphService } from './lib/graph-service';
 import type { Logger } from './lib/logger';
 
@@ -107,8 +107,21 @@ export class ScanController {
         );
     }
 
+    /**
+     * Cancel a pending change-rescan timer for one URI — mirrors
+     * `DecorationsController.evict`'s timer eviction. Called when the file is
+     * deleted or its document closed, so a queued `rescanFromDoc` can't fire
+     * against the gone file and re-insert (resurrect) its tasks.
+     */
+    cancelScheduled(uriString: string): void {
+        cancelDebounced(this.changeTimers, uriString);
+    }
+
     /** Drop a deleted file from the cache + graph + diagnostics, then refresh. */
     removeFile(uriString: string): void {
+        // Revoke any in-flight debounced rescan first; otherwise an edit-then-
+        // delete within the debounce window resurrects the just-removed file.
+        this.cancelScheduled(uriString);
         this.cache.removeFile(uriString);
         this.graph.removeFile(uriString);
         this.diagnosticsManager.deleteFile(uriString);
@@ -139,10 +152,8 @@ export class ScanController {
 
     /** Log every scan warning + push the file's diagnostics. */
     private applyWarnings(uriString: string, warnings: CacheWarning[]): void {
-        // Log every warning so the chronological record is complete; duplicate-id
-        // warnings still log here (cache-internal signal), while the diagnostics-
-        // side dedup that hides them from the Problems panel happens inside
-        // DiagnosticsManager.setScanWarnings.
+        // Log every warning (today only no-id). Duplicate-id diagnostics come
+        // from the graph (setGraphDuplicates), not from cache scan warnings.
         for (const warning of warnings) {
             this.logger.warn(`${warning.fileUri}:${warning.line + 1}: ${warning.message}`);
         }

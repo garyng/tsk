@@ -8,10 +8,19 @@ import { openDatabase, transaction as runTransaction } from './sqlite';
  * (the `CacheService` in M3/C) compose into file-scoped rescans.
  *
  * - WAL mode + relaxed synchronous for concurrent-window tolerance.
- * - `foreign_keys = ON` so deleting a file row cascades to its tasks,
- *   metadata, and tags in one statement.
+ * - `foreign_keys = ON` so deleting a file row cascades to its tasks, and each
+ *   task to its metadata/tags, in one statement.
  * - All schema DDL is `IF NOT EXISTS`, so re-opening an existing DB is a
  *   no-op for tables (the data survives).
+ *
+ * **Occurrence store.** Tasks are keyed by `(file_uri, line)` and EVERY
+ * occurrence of an `@id` is stored (duplicates included). `findTaskById`
+ * returns the lexicographically-lowest `(file_uri, line)` occurrence — the
+ * same canonical-winner rule `graph.ts` applies — so the cache and graph agree
+ * by construction, and deleting the winner's file auto-promotes the next
+ * occurrence through the FK cascade (no reconcile step). The aggregate reads
+ * (`listAllTasks` / `listAllMetadata` / `listAllTaskTags` / `counts.tasks`)
+ * filter to the canonical occurrence per id, so a duplicate id counts once.
  */
 
 export interface FileRecord {
@@ -20,7 +29,8 @@ export interface FileRecord {
 }
 
 export interface TaskRecord {
-    /** The `@id` value from the task's metadata. Primary key — must be set. */
+    /** The `@id` value from the task's metadata. Indexed, NOT unique — a
+     *  duplicate `@id` is stored as multiple occurrences. */
     id: string;
     fileUri: string;
     line: number;
@@ -37,11 +47,6 @@ export interface MetadataRecord {
     value: string | null;
 }
 
-export interface TagRecord {
-    taskId: string;
-    tag: string;
-}
-
 export interface TagDef {
     tag: string;
     description: string | null;
@@ -54,6 +59,21 @@ export interface CacheCounts {
     tags: number;
 }
 
+/**
+ * SQL predicate: the `alias` task occurrence is canonical — no occurrence of
+ * the same id is lexicographically lower by `(file_uri, line)`. Used to fold
+ * a duplicate `@id` to its single winner in the aggregate reads.
+ */
+function canonical(alias: string): string {
+    return `NOT EXISTS (
+        SELECT 1 FROM tasks c
+        WHERE c.id = ${alias}.id
+          AND (c.file_uri < ${alias}.file_uri
+               OR (c.file_uri = ${alias}.file_uri AND c.line < ${alias}.line)))`;
+}
+
+const TASK_COLS = 'id, file_uri, line, marker, content, raw';
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS files (
     uri TEXT PRIMARY KEY,
@@ -61,34 +81,38 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY,
     file_uri TEXT NOT NULL,
     line INTEGER NOT NULL,
+    id TEXT NOT NULL,
     marker TEXT NOT NULL,
     content TEXT NOT NULL,
     raw TEXT NOT NULL,
+    PRIMARY KEY (file_uri, line),
     FOREIGN KEY (file_uri) REFERENCES files(uri) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_file ON tasks(file_uri);
+CREATE INDEX IF NOT EXISTS idx_tasks_id ON tasks(id);
 
 CREATE TABLE IF NOT EXISTS metadata (
-    task_id TEXT NOT NULL,
+    file_uri TEXT NOT NULL,
+    line INTEGER NOT NULL,
     key TEXT NOT NULL,
     value TEXT,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    FOREIGN KEY (file_uri, line) REFERENCES tasks(file_uri, line) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_metadata_task ON metadata(task_id);
+CREATE INDEX IF NOT EXISTS idx_metadata_occ ON metadata(file_uri, line);
 CREATE INDEX IF NOT EXISTS idx_metadata_key ON metadata(key);
 
 CREATE TABLE IF NOT EXISTS tags (
-    task_id TEXT NOT NULL,
+    file_uri TEXT NOT NULL,
+    line INTEGER NOT NULL,
     tag TEXT NOT NULL,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    FOREIGN KEY (file_uri, line) REFERENCES tasks(file_uri, line) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_tags_task ON tags(task_id);
+CREATE INDEX IF NOT EXISTS idx_tags_occ ON tags(file_uri, line);
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
 
 CREATE TABLE IF NOT EXISTS tag_defs (
@@ -108,10 +132,9 @@ interface PreparedStatements {
     listAllTasks: StatementSync;
     findTaskById: StatementSync;
     insertMetadata: StatementSync;
-    listMetadataForTask: StatementSync;
+    listMetadataForOccurrence: StatementSync;
     listAllMetadata: StatementSync;
     insertTag: StatementSync;
-    listTagsForTask: StatementSync;
     listAllTags: StatementSync;
     listAllTaskTags: StatementSync;
     upsertTagDef: StatementSync;
@@ -128,9 +151,8 @@ export class Db {
 
     constructor(path: string) {
         // WAL + synchronous hardening is shared via `openDatabase`. cache.db
-        // relies on FK cascades (deleting a `files` row wipes its
-        // tasks/metadata/tags), so assert foreign_keys ON explicitly (node:sqlite
-        // defaults it on, but the cascades are load-bearing — be explicit).
+        // relies on FK cascades (deleting a `files` row wipes its tasks, and
+        // each task its metadata/tags), so assert foreign_keys ON explicitly.
         this.db = openDatabase(path);
         this.db.exec('PRAGMA foreign_keys = ON');
         this.db.exec(SCHEMA);
@@ -149,30 +171,37 @@ export class Db {
             listFiles: p('SELECT uri, mtime FROM files ORDER BY uri'),
 
             insertTask: p(
-                `INSERT OR IGNORE INTO tasks (id, file_uri, line, marker, content, raw)
+                `INSERT INTO tasks (file_uri, line, id, marker, content, raw)
                  VALUES (?, ?, ?, ?, ?, ?)`,
             ),
-            listTasksForFile: p(
-                `SELECT id, file_uri, line, marker, content, raw
-                 FROM tasks WHERE file_uri = ? ORDER BY line`,
-            ),
+            listTasksForFile: p(`SELECT ${TASK_COLS} FROM tasks WHERE file_uri = ? ORDER BY line`),
             listAllTasks: p(
-                `SELECT id, file_uri, line, marker, content, raw
-                 FROM tasks ORDER BY file_uri, line`,
+                `SELECT ${TASK_COLS} FROM tasks t WHERE ${canonical('t')} ORDER BY file_uri, line`,
             ),
+            // Canonical (lex-lowest occurrence) — the graph's winner rule.
             findTaskById: p(
-                `SELECT id, file_uri, line, marker, content, raw
-                 FROM tasks WHERE id = ?`,
+                `SELECT ${TASK_COLS} FROM tasks WHERE id = ? ORDER BY file_uri, line LIMIT 1`,
             ),
 
-            insertMetadata: p('INSERT INTO metadata (task_id, key, value) VALUES (?, ?, ?)'),
-            listMetadataForTask: p('SELECT task_id, key, value FROM metadata WHERE task_id = ?'),
-            listAllMetadata: p('SELECT task_id, key, value FROM metadata'),
+            insertMetadata: p(
+                'INSERT INTO metadata (file_uri, line, key, value) VALUES (?, ?, ?, ?)',
+            ),
+            listMetadataForOccurrence: p(
+                'SELECT key, value FROM metadata WHERE file_uri = ? AND line = ?',
+            ),
+            listAllMetadata: p(
+                `SELECT t.id AS task_id, m.key, m.value
+                 FROM metadata m JOIN tasks t ON m.file_uri = t.file_uri AND m.line = t.line
+                 WHERE ${canonical('t')}`,
+            ),
 
-            insertTag: p('INSERT INTO tags (task_id, tag) VALUES (?, ?)'),
-            listTagsForTask: p('SELECT tag FROM tags WHERE task_id = ? ORDER BY tag'),
+            insertTag: p('INSERT INTO tags (file_uri, line, tag) VALUES (?, ?, ?)'),
             listAllTags: p('SELECT DISTINCT tag FROM tags ORDER BY tag'),
-            listAllTaskTags: p('SELECT task_id, tag FROM tags'),
+            listAllTaskTags: p(
+                `SELECT t.id AS task_id, tg.tag
+                 FROM tags tg JOIN tasks t ON tg.file_uri = t.file_uri AND tg.line = t.line
+                 WHERE ${canonical('t')}`,
+            ),
 
             upsertTagDef: p(
                 `INSERT INTO tag_defs (tag, description, parent) VALUES (?, ?, ?)
@@ -184,7 +213,7 @@ export class Db {
             listTagDefs: p('SELECT tag, description, parent FROM tag_defs ORDER BY tag'),
 
             countFiles: p('SELECT COUNT(*) AS n FROM files'),
-            countTasks: p('SELECT COUNT(*) AS n FROM tasks'),
+            countTasks: p('SELECT COUNT(DISTINCT id) AS n FROM tasks'),
             countTags: p('SELECT COUNT(DISTINCT tag) AS n FROM tags'),
         };
     }
@@ -209,63 +238,66 @@ export class Db {
 
     // ── Tasks ───────────────────────────────────────────────────────────────
     /**
-     * Insert a task. Returns `true` if the row was inserted, `false` if the
-     * id already existed (duplicate — first-occurrence wins). Callers should
-     * skip writing metadata/tags for the task on `false` to keep their FK
-     * targets correct.
+     * Insert a task occurrence, keyed by `(file_uri, line)`. Every occurrence
+     * is stored — a duplicate `@id` yields multiple rows; {@link findTaskById}
+     * resolves the canonical one. Occurrences never collide on `(file_uri,
+     * line)` (one task per line), so no conflict handling is needed.
      */
-    insertTask(task: TaskRecord): boolean {
-        const result = this.stmts.insertTask.run(
-            task.id,
+    insertTask(task: TaskRecord): void {
+        this.stmts.insertTask.run(
             task.fileUri,
             task.line,
+            task.id,
             task.marker,
             task.content,
             task.raw,
         );
-        return Number(result.changes) > 0;
     }
 
     listTasksForFile(uri: string): TaskRecord[] {
         return this.stmts.listTasksForFile.all(uri).map(toTask);
     }
 
-    /** Enumerate every cached task across all files; used by the picker UX. */
+    /** Every canonical task (one per id) across all files; used by the picker UX. */
     listAllTasks(): TaskRecord[] {
         return this.stmts.listAllTasks.all().map(toTask);
     }
 
+    /** The canonical (lex-lowest `(fileUri, line)`) occurrence of `id`, or undefined. */
     findTaskById(id: string): TaskRecord | undefined {
         const row = this.stmts.findTaskById.get(id);
         return row ? toTask(row) : undefined;
     }
 
     // ── Metadata ────────────────────────────────────────────────────────────
-    insertMetadata(record: MetadataRecord): void {
-        this.stmts.insertMetadata.run(record.taskId, record.key, record.value);
+    insertMetadata(fileUri: string, line: number, key: string, value: string | null): void {
+        this.stmts.insertMetadata.run(fileUri, line, key, value);
     }
 
-    listMetadataForTask(taskId: string): MetadataRecord[] {
-        return this.stmts.listMetadataForTask.all(taskId).map(toMetadata);
+    /** Raw `(key, value)` metadata of one occurrence — for the graph projection. */
+    listMetadataForOccurrence(
+        fileUri: string,
+        line: number,
+    ): Array<{ key: string; value: string | null }> {
+        return this.stmts.listMetadataForOccurrence.all(fileUri, line).map((r) => ({
+            key: r.key as string,
+            value: r.value as string | null,
+        }));
     }
 
     /**
-     * Every `(taskId, key, value)` metadata row across the workspace in one
-     * query — the bulk counterpart to {@link listMetadataForTask}. Feeds the
-     * stats aggregation (date-bucketing `@created`/`@started`/`@completed`/…)
-     * without a per-task fan-out, mirroring {@link listAllTaskTags}.
+     * Every `(taskId, key, value)` metadata row of the CANONICAL occurrence per
+     * id, in one query — the bulk counterpart to {@link listMetadataForOccurrence}.
+     * Feeds the stats aggregation (date-bucketing `@created`/`@started`/…); the
+     * canonical filter keeps a duplicate id from double-counting its events.
      */
     listAllMetadata(): MetadataRecord[] {
         return this.stmts.listAllMetadata.all().map(toMetadata);
     }
 
     // ── Tags ────────────────────────────────────────────────────────────────
-    insertTag(record: TagRecord): void {
-        this.stmts.insertTag.run(record.taskId, record.tag);
-    }
-
-    listTagsForTask(taskId: string): string[] {
-        return this.stmts.listTagsForTask.all(taskId).map((r) => r.tag as string);
+    insertTag(fileUri: string, line: number, tag: string): void {
+        this.stmts.insertTag.run(fileUri, line, tag);
     }
 
     listAllTags(): string[] {
@@ -273,10 +305,9 @@ export class Db {
     }
 
     /**
-     * Every `(taskId, tag)` pair across the workspace, unordered. Feeds
-     * the hierarchical task-count computation in `tags-find-logic`. One
-     * query (no per-task fan-out) so the whole picker count is a single
-     * round-trip.
+     * Every `(taskId, tag)` pair of the CANONICAL occurrence per id, unordered.
+     * Feeds the hierarchical task-count computation in `tags-find-logic`; the
+     * canonical filter keeps a duplicate id from double-counting its tags.
      */
     listAllTaskTags(): Array<[taskId: string, tag: string]> {
         return this.stmts.listAllTaskTags.all().map((r) => [r.task_id as string, r.tag as string]);

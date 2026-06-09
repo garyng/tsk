@@ -13,6 +13,7 @@ import { MARKER_SYMBOL_CHAR_CLASS, MARKERS, markerForSymbol } from './markers';
 const REPO_ROOT = resolve(__dirname, '../..');
 const PACKAGE_JSON_PATH = resolve(REPO_ROOT, 'package.json');
 const GRAMMAR_PATH = resolve(REPO_ROOT, 'syntaxes/tsk.tmLanguage.json');
+const MARKER_CSS_PATH = resolve(REPO_ROOT, 'src/webview/shared/marker.css');
 
 interface PackageColor {
     id: string;
@@ -130,6 +131,34 @@ describe('drift — tsk.tmLanguage.json mentions every MARKER scope', () => {
                 grammarText.includes(def.scopeName),
                 `grammar is missing scope ${def.scopeName}`,
             ).toBe(true);
+        }
+    });
+});
+
+describe('drift — marker.css fallbacks mirror MARKERS dark colors', () => {
+    const cssText = readFileSync(MARKER_CSS_PATH, 'utf-8');
+    // Each palette alias reads `--tsk-marker-<name>: var(--vscode-tsk-marker-<name>, <hex>)`.
+    // The <hex> fallback is what renders when no theme overrides the host color
+    // (e.g. the Playwright harness), so it must match the registry's dark value —
+    // a check the package.json / grammar drift tests don't cover.
+    const FALLBACK_RE =
+        /--tsk-marker-([a-z]+):\s*var\(--vscode-tsk-marker-\1,\s*(#[0-9a-fA-F]{6})\)/g;
+    const fallbacks = new Map<string, string>();
+    for (const match of cssText.matchAll(FALLBACK_RE)) {
+        fallbacks.set(match[1] as string, (match[2] as string).toLowerCase());
+    }
+
+    it('declares a fallback alias for every MARKER color', () => {
+        const expected = MARKERS.flatMap((m) => (m.color ? [m.name] : [])).sort();
+        expect([...fallbacks.keys()].sort()).toEqual(expected);
+    });
+
+    it('each fallback hex equals the registry dark color', () => {
+        for (const def of MARKERS) {
+            if (!def.color) continue;
+            expect(fallbacks.get(def.name), `marker.css fallback for ${def.name}`).toBe(
+                def.color.dark.toLowerCase(),
+            );
         }
     });
 });

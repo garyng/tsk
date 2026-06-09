@@ -7,10 +7,9 @@ import type { BrokenEdgeReport, DuplicateIdReport } from './lib/graph';
  * three warning sources before writing to `diagnostics.set`:
  *
  *   - **Per-file scan warnings** from `CacheService.rescanFile` — today
- *     only `no-id` after this merge layer filters out `duplicate-id`.
- *     Cache continues to track its own first-insert-wins semantics for
- *     data integrity, but the user-facing dup story is owned by the
- *     graph.
+ *     only `no-id`. The cache's occurrence store no longer reports
+ *     duplicate-id at all; the user-facing dup story is owned entirely by
+ *     the graph.
  *   - **Graph-layer duplicate-id reports** from `GraphService.getDuplicates`.
  *     One report per id; emits one diagnostic per occurrence so every
  *     conflicting file gets squiggled, not just the loser as the cache
@@ -39,16 +38,15 @@ export class DiagnosticsManager {
     constructor(private readonly collection: vscode.DiagnosticCollection) {}
 
     /**
-     * Update this file's scan warnings (output of the cache layer). Any
-     * `duplicate-id` entries are silently filtered — the graph owns that
-     * warning kind via `setGraphDuplicates`.
+     * Update this file's scan warnings (output of the cache layer). Today the
+     * cache emits only `no-id`; the duplicate-id story is owned entirely by the
+     * graph via `setGraphDuplicates`.
      */
     setScanWarnings(fileUri: string, warnings: readonly CacheWarning[]): void {
-        const filtered = warnings.filter((w) => w.kind !== 'duplicate-id');
-        if (filtered.length === 0) {
+        if (warnings.length === 0) {
             this.scanWarningsByFile.delete(fileUri);
         } else {
-            this.scanWarningsByFile.set(fileUri, [...filtered]);
+            this.scanWarningsByFile.set(fileUri, [...warnings]);
         }
         this.flushFile(fileUri);
     }

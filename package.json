@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -236,6 +236,11 @@
             {
                 "command": "tsk.openTaskList",
                 "title": "Open Task List",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.moveTaskToFile",
+                "title": "Move Task to File…",
                 "category": "Tsk"
             }
         ],

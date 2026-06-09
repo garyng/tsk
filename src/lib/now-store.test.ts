@@ -57,6 +57,18 @@ describe('NowStore (in-memory)', () => {
         expect(s.currentEntryId).toBe('e3');
     });
 
+    it('bump lifts an entry to the top, healing the gap, without a new node', () => {
+        store.markNow('task-a'); // e1 root
+        store.markNow('task-b'); // e2 child of e1
+        store.markNow('task-c'); // e3 child of e2 (current e3)
+        store.bump('e2'); // e2 → top (current); on-path child e3 takes e2's slot
+        const s = store.getState();
+        expect(s.currentEntryId).toBe('e2');
+        expect(s.entries.find((e) => e.entryId === 'e2')?.parentId).toBe('e3'); // grafted under old current
+        expect(s.entries.find((e) => e.entryId === 'e3')?.parentId).toBe('e1'); // e3 inherits e2's slot
+        expect(s.entries.map((e) => e.entryId)).toEqual(['e1', 'e2', 'e3']); // no new node
+    });
+
     it('exposes every destructive reducer as a persisted mutator', () => {
         store.markNow('task-a'); // e1 root
         store.markNow('task-b'); // e2 under e1

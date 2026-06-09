@@ -34,18 +34,19 @@ describe('buildTaskHoverMarkdown', () => {
     it('renders only the marker status label in the header (no content duplication)', () => {
         // The task's content is already on the source line under the cursor;
         // re-printing it in the hover adds noise. Each marker maps to a
-        // human-readable status word ("Todo" / "In Progress" / etc).
+        // human-readable status word from the MARKERS registry ("Todo" /
+        // "In progress" / etc) — same word the chips/picker/stats show.
         expect(buildTaskHoverMarkdown(makeTask({ marker: 'todo' }), emptyDeps)).toMatch(
             /^\*\*Todo\*\*/,
         );
         expect(buildTaskHoverMarkdown(makeTask({ marker: 'inprogress' }), emptyDeps)).toMatch(
-            /^\*\*In Progress\*\*/,
+            /^\*\*In progress\*\*/,
         );
         expect(buildTaskHoverMarkdown(makeTask({ marker: 'completed' }), emptyDeps)).toMatch(
             /^\*\*Completed\*\*/,
         );
         expect(buildTaskHoverMarkdown(makeTask({ marker: 'notes' }), emptyDeps)).toMatch(
-            /^\*\*Note\*\*/,
+            /^\*\*Notes\*\*/,
         );
     });
 

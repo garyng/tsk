@@ -69,6 +69,8 @@ The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via 
 
 **Duplicating tasks** — `Shift+Alt+↓` / `Shift+Alt+↑` wrap VS Code's built-in line duplication in `.tsk` files: the copy is stamped with a fresh `@id` + `@created` so it can't collide with its source, while lifecycle stamps (`@started` / `@completed`) are preserved. (Two undo steps by design — the duplicate, then the id rewrite — which also makes multi-cursor duplication work for free.)
 
+**Moving a task to another file** — **Tsk: Move Task to File…** (Command Palette, or a `Ctrl+.` → *Move task to file…* refactor on any task carrying an `@id`) relocates the task *and its indented sub-block* to a `.tsk` file you pick — or a new one via a save dialog — appending it there. The relocated task **keeps its `@id`**, so every `@parent` / `@dependsOn` / … reference still resolves at the new location (id→location lookup is file-independent), while a `[>]` breadcrumb stays behind with a *fresh* `@id` + `@movedTo:<original>` — reusing the moved-marker lens, so you can click straight to where the task went. It's one atomic edit (single undo). Tasks with no `@id` are rejected (add one first); inline `#tags` are stripped from the breadcrumb so a tag isn't double-counted.
+
 Every list-edit keybinding carries `when: editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`, so `Enter` accepts an IntelliSense suggestion when one is visible and `Tab` advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
 ## Tags & search
@@ -143,6 +145,7 @@ The tree uses **linear-compaction**: the path from root to the current now rende
 |--------|--------------|
 | **Click a node** | Jump to that task. Reuses the editor beside the panel (a task in another file opens in that group — never a stray tab over the panel). Read-only; never edits. |
 | **Set as current** | Switch the now-pointer to that node. Undo / redo is a pointer move — nothing is deleted. |
+| **Bump** | Lift the node to the top **and** make it the current now — **jumping to the task** and flipping it to `[/]` in-progress (like `Alt+W`, configurable via `tsk.now.autoInProgress`), no new node, no branch. Its children stay where they are (they do *not* travel with it); the tree heals around the moved node so nothing else is disturbed. Contrast *Set as current* (a pointer move that leaves the node in place) and marking (which adds a *child*). |
 | **Back** (toolbar) | Switch to the current node's parent (undo one step). |
 | **Remove** | Drop one node, re-parenting its children onto its parent. |
 | **Delete branch** | Drop a node and its whole subtree. |

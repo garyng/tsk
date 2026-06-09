@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyNowTree, markNow, type NowTreeState, removeEntry, switchTo } from './now-tree';
+import { bump, emptyNowTree, markNow, type NowTreeState, removeEntry, switchTo } from './now-tree';
 import {
     buildNowTreeView,
     layoutNowTree,
@@ -132,6 +132,53 @@ describe('layoutNowTree — linear-compaction', () => {
             layoutNowTree(s).map((r) => [r.entryId, r.onCurrentPath]),
         );
         expect(onPath).toEqual({ A: true, B: true, C: true, D: false, E: false });
+    });
+
+    // Render assertions for the owner's bump diagrams — proves the post-bump
+    // trees draw exactly as drawn, under the UNCHANGED current-first layout.
+    it('renders Example 3 — bump a fork node, children stay behind', () => {
+        // A → B → {C, D}, current A; bump B. B floats to the top; C, D shed onto A.
+        let s = mk(emptyNowTree(), 'A');
+        s = mk(s, 'B');
+        s = mk(s, 'C');
+        s = switchTo(s, 'B');
+        s = mk(s, 'D');
+        s = switchTo(s, 'A');
+        expect(proj(layoutNowTree(bump(s, 'B')))).toEqual([
+            'B:0:trunk:cur',
+            'A:0:trunk:fork',
+            'C:1:branch',
+            'D:1:branch',
+        ]);
+    });
+
+    it('renders Example 4 — bump an ancestor twice, nothing disappears', () => {
+        // A → B → C, B → D, A → E, current C.
+        let s = mk(emptyNowTree(), 'A');
+        s = mk(s, 'B');
+        s = mk(s, 'C');
+        s = switchTo(s, 'B');
+        s = mk(s, 'D');
+        s = switchTo(s, 'A');
+        s = mk(s, 'E');
+        s = switchTo(s, 'C');
+
+        const afterA = bump(s, 'A'); // A to the top; B keeps the trunk, E follows it
+        expect(proj(layoutNowTree(afterA))).toEqual([
+            'A:0:trunk:cur',
+            'C:0:trunk',
+            'B:0:trunk:fork',
+            'D:1:branch',
+            'E:1:branch',
+        ]);
+
+        expect(proj(layoutNowTree(bump(afterA, 'B')))).toEqual([
+            'B:0:trunk:cur',
+            'A:0:trunk',
+            'C:0:trunk:fork',
+            'D:1:branch',
+            'E:1:branch',
+        ]);
     });
 });
 

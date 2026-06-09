@@ -45,15 +45,19 @@ describe('CacheService — rescanFile happy path', () => {
             '- [x] done <!-- @id:abc @created:2026-01-02T12:45:30+08:00 -->',
             100,
         );
-        const metadata = db.listMetadataForTask('abc');
-        const byKey = new Map(metadata.map((m) => [m.key, m.value]));
+        const byKey = new Map(db.listMetadataForOccurrence(URI_A, 0).map((m) => [m.key, m.value]));
         expect(byKey.get('id')).toBe('abc');
         expect(byKey.get('created')).toBe('2026-01-02T12:45:30+08:00');
     });
 
     it('stores tags for the inserted task', () => {
         cache.rescanFile(URI_A, '- [ ] do #project/test #JIRAID-123 <!-- @id:tagged -->', 100);
-        expect(db.listTagsForTask('tagged').sort()).toEqual(['JIRAID-123', 'project/test']);
+        const tags = cache
+            .listAllTaskTags()
+            .filter(([t]) => t === 'tagged')
+            .map(([, g]) => g)
+            .sort();
+        expect(tags).toEqual(['JIRAID-123', 'project/test']);
     });
 
     it('inserts multiple tasks from one document', () => {
@@ -102,48 +106,53 @@ describe('CacheService — rescanFile warnings', () => {
         expect(w?.message).toMatch(/Task has no @id/);
     });
 
-    it('warns and skips a task whose @id collides with one already cached (cross-file)', () => {
+    it('stores both occurrences of a cross-file duplicate @id; canonical wins lookup', () => {
         cache.rescanFile(URI_A, '- [x] first <!-- @id:dup -->', 100);
         const result = cache.rescanFile(URI_B, '- [ ] second <!-- @id:dup -->', 100);
 
-        expect(result.inserted).toBe(0);
-        expect(result.skipped).toBe(1);
-        expect(result.warnings).toHaveLength(1);
-        const w = result.warnings[0];
-        expect(w?.kind).toBe('duplicate-id');
-        expect(w?.id).toBe('dup');
-        expect(w?.fileUri).toBe(URI_B);
-        expect(w?.firstOccurrence).toEqual({ fileUri: URI_A, line: 0 });
-        expect(w?.message).toContain('first occurrence at');
-        expect(w?.message).toContain(URI_A);
+        // The second occurrence is stored, not skipped — duplicate detection is
+        // the graph's job, and the cache resolves the canonical on read.
+        expect(result.inserted).toBe(1);
+        expect(result.skipped).toBe(0);
+        expect(result.warnings).toEqual([]);
 
-        // The first-occurrence task survives unchanged.
+        // lookupById resolves the lex-lowest occurrence (a.tsk < b.tsk).
         expect(cache.lookupById('dup')?.fileUri).toBe(URI_A);
         expect(cache.lookupById('dup')?.content).toBe('first');
     });
 
-    it('warns and skips an in-file duplicate @id (second wins lookup loses)', () => {
+    it('stores both occurrences of an in-file duplicate @id; lower line wins lookup', () => {
         const text = ['- [ ] first <!-- @id:dup -->', '- [x] second <!-- @id:dup -->'].join('\n');
         const result = cache.rescanFile(URI_A, text, 100);
-        expect(result.inserted).toBe(1);
-        expect(result.skipped).toBe(1);
-        expect(result.warnings).toHaveLength(1);
-        expect(result.warnings[0]?.kind).toBe('duplicate-id');
+        expect(result.inserted).toBe(2);
+        expect(result.skipped).toBe(0);
+        expect(result.warnings).toEqual([]);
         expect(cache.lookupById('dup')?.line).toBe(0);
         expect(cache.lookupById('dup')?.content).toBe('first');
     });
 
-    it('mixes warnings and successful inserts in the same scan', () => {
+    it('re-promotes the survivor when the winning file is removed', () => {
+        cache.rescanFile(URI_A, '- [x] winner <!-- @id:dup -->', 100);
+        cache.rescanFile(URI_B, '- [ ] survivor <!-- @id:dup -->', 100);
+        expect(cache.lookupById('dup')?.fileUri).toBe(URI_A);
+
+        cache.removeFile(URI_A);
+
+        expect(cache.lookupById('dup')?.fileUri).toBe(URI_B);
+        expect(cache.lookupById('dup')?.content).toBe('survivor');
+    });
+
+    it('mixes a no-id warning with successful inserts in the same scan', () => {
         const text = [
             '- [ ] good one <!-- @id:keep -->',
             '- [ ] anon',
             '- [x] another <!-- @id:keep -->',
         ].join('\n');
         const result = cache.rescanFile(URI_A, text, 100);
-        expect(result.inserted).toBe(1);
-        expect(result.skipped).toBe(2);
-        const kinds = result.warnings.map((w) => w.kind).sort();
-        expect(kinds).toEqual(['duplicate-id', 'no-id']);
+        // Both @id:keep occurrences are stored; only the anon line is skipped.
+        expect(result.inserted).toBe(2);
+        expect(result.skipped).toBe(1);
+        expect(result.warnings.map((w) => w.kind)).toEqual(['no-id']);
     });
 });
 
@@ -168,8 +177,8 @@ describe('CacheService — rescan idempotency', () => {
     it('cascades deletion of metadata and tags when rescanning', () => {
         cache.rescanFile(URI_A, '- [ ] old #project/old <!-- @id:old @custom:val -->', 100);
         cache.rescanFile(URI_A, '- [ ] new <!-- @id:new -->', 200);
-        expect(db.listMetadataForTask('old')).toEqual([]);
-        expect(db.listTagsForTask('old')).toEqual([]);
+        expect(cache.lookupById('old')).toBeUndefined();
+        expect(db.listAllMetadata().some((m) => m.taskId === 'old')).toBe(false);
         expect(cache.listAllTags()).toEqual([]);
     });
 });
