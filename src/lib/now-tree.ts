@@ -82,20 +82,47 @@ export function switchTo(state: NowTreeState, entryId: string): NowTreeState {
 }
 
 /**
- * "Bump" a node to the top: re-parent it to a root (`parentId = null`) AND make
- * it the current now. Unlike {@link markNow} (which appends a fresh *child* — a
+ * "Bump" a node to the top of the stack: graft it under the *old* current (so it
+ * becomes the new current — the deepest trunk node, hence the top row) and heal
+ * the gap it leaves. Unlike {@link markNow} (which appends a fresh *child* — a
  * branch) and {@link switchTo} (which only moves the pointer), bump reuses the
- * existing node, so there's no new entry and no branch — the node keeps its
- * identity and its own subtree travels with it. Nothing else is re-parented. A
- * no-op if `entryId` is absent, or already a root AND already current.
+ * existing node (no new entry, no branch) and leaves its children behind.
+ *
+ * Healing keeps every node connected to the new current, so the unchanged
+ * current-first layout still renders them all (nothing disappears). Among the
+ * bumped node's children, the ONE on the path from the old current up to the
+ * root (its "on-path child", ≤1) inherits the bumped node's old parent slot; the
+ * other children re-home onto that on-path child. With no on-path child (the
+ * bumped node wasn't an ancestor of the old current) all children re-home to the
+ * bumped node's old parent — exactly {@link removeEntry}'s rule.
+ *
+ * A no-op if `entryId` is absent, or already the current (already the top row).
  */
 export function bump(state: NowTreeState, entryId: string): NowTreeState {
     const target = state.entries.find((e) => e.entryId === entryId);
     if (!target) return state;
-    if (target.parentId === null && state.currentEntryId === entryId) return state;
-    const entries = state.entries.map((e) =>
-        e.entryId === entryId ? { ...e, parentId: null } : e,
-    );
+    const old = state.currentEntryId;
+    if (old === entryId) return state;
+
+    // The bumped node's child that continues toward the old current, if any.
+    const onPath =
+        old === null
+            ? new Set<string>()
+            : new Set(pathToRoot(state.entries, old).map((e) => e.entryId));
+    const onPathChild = state.entries.find((e) => e.parentId === entryId && onPath.has(e.entryId));
+
+    const entries = state.entries.map((e) => {
+        if (e.entryId === entryId) return { ...e, parentId: old }; // graft under old current
+        if (e.parentId === entryId) {
+            // Heal: the on-path child takes the bumped node's slot; its siblings
+            // follow it. With no on-path child, everyone falls to the parent.
+            if (onPathChild === undefined || e.entryId === onPathChild.entryId) {
+                return { ...e, parentId: target.parentId };
+            }
+            return { ...e, parentId: onPathChild.entryId };
+        }
+        return e;
+    });
     return { ...state, entries, currentEntryId: entryId };
 }
 

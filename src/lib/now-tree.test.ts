@@ -107,8 +107,8 @@ describe('switchTo', () => {
     });
 });
 
-describe('bump', () => {
-    /** a → b → c, current c. */
+describe('bump (by example — the four owner diagrams)', () => {
+    /** a → b → c, current c (a linear stack). */
     function chain(): NowTreeState {
         let s = markNow(emptyNowTree(), mk('a'));
         s = markNow(s, mk('b'));
@@ -116,21 +116,76 @@ describe('bump', () => {
         return s;
     }
 
-    it('re-roots a mid-path node, carries its subtree, and makes it current', () => {
-        const s = bump(chain(), 'b'); // bump b out of a → b → c
-        expect(snap(s)).toEqual({
+    it('Example 1 — bumps a mid-stack node to the top, healing the gap', () => {
+        // a → b → c (current c); bump b. b grafts under old-current c; its
+        // on-path child c inherits b's slot (→ a). Result: a → c → b, current b.
+        expect(snap(bump(chain(), 'b'))).toEqual({
             ids: ['a', 'b', 'c'],
-            // b is now a root; its child c travels with it; a loses b (a unchanged otherwise).
-            parents: { a: null, b: null, c: 'b' },
+            parents: { a: null, c: 'a', b: 'c' },
             current: 'b',
         });
     });
 
-    it('does NOT re-parent the previous current under the bumped node', () => {
-        const s = bump(chain(), 'a'); // a is already a root; current was c
-        expect(s.currentEntryId).toBe('a');
-        // c must stay where it was — bumping a does not pull c under a.
-        expect(s.entries.find((e) => e.entryId === 'c')?.parentId).toBe('b');
+    it('Example 2 — bumping an off-path child of the current just makes it current', () => {
+        // a → b → c, switch to b → c hangs off the current b. Bump c.
+        const s = switchTo(chain(), 'b');
+        expect(snap(bump(s, 'c'))).toEqual({
+            ids: ['a', 'b', 'c'],
+            parents: { a: null, b: 'a', c: 'b' },
+            current: 'c',
+        });
+    });
+
+    /** a → b → {c, d}, current a (b is an off-path fork). */
+    function fork(): NowTreeState {
+        let s = markNow(emptyNowTree(), mk('a'));
+        s = markNow(s, mk('b'));
+        s = markNow(s, mk('c'));
+        s = switchTo(s, 'b');
+        s = markNow(s, mk('d'));
+        return switchTo(s, 'a');
+    }
+
+    it('Example 3 — sheds the bumped node children onto its parent (they do not travel)', () => {
+        // a → b → {c, d} (current a); bump b. b floats up under a; c, d stay
+        // behind, re-homed to b's parent a. Result: a → {b, c, d}, current b.
+        expect(snap(bump(fork(), 'b'))).toEqual({
+            ids: ['a', 'b', 'c', 'd'],
+            parents: { a: null, b: 'a', c: 'a', d: 'a' },
+            current: 'b',
+        });
+    });
+
+    /** a → b → c, b → d, a → e, current c. */
+    function wide(): NowTreeState {
+        let s = markNow(emptyNowTree(), mk('a'));
+        s = markNow(s, mk('b'));
+        s = markNow(s, mk('c'));
+        s = switchTo(s, 'b');
+        s = markNow(s, mk('d'));
+        s = switchTo(s, 'a');
+        s = markNow(s, mk('e'));
+        return switchTo(s, 'c');
+    }
+
+    it('Example 4 — bumping an ancestor promotes its on-path child, siblings follow it', () => {
+        // a → b → c, b → d, a → e (current c). Bump a: a grafts under old-current
+        // c; on-path child b takes a's root slot; off-path sibling e follows b
+        // (stays connected, not orphaned to a hidden root).
+        const s1 = bump(wide(), 'a');
+        expect(snap(s1)).toEqual({
+            ids: ['a', 'b', 'c', 'd', 'e'],
+            parents: { b: null, c: 'b', d: 'b', e: 'b', a: 'c' },
+            current: 'a',
+        });
+
+        // Bump b next: b grafts under old-current a; on-path child c takes b's
+        // root slot; d, e follow c. Result: c → {a, d, e}, a → b, current b.
+        expect(snap(bump(s1, 'b'))).toEqual({
+            ids: ['a', 'b', 'c', 'd', 'e'],
+            parents: { c: null, a: 'c', d: 'c', e: 'c', b: 'a' },
+            current: 'b',
+        });
     });
 
     it('creates no new node — the bumped entry keeps its identity', () => {
@@ -143,20 +198,9 @@ describe('bump', () => {
         expect(b?.createdSeq).toBe(b0?.createdSeq);
     });
 
-    it('a non-current root simply becomes current (no restructure)', () => {
-        let s = markNow(emptyNowTree(), mk('a')); // a root, current a
-        s = markNow(s, mk('b')); // a → b, current b
-        const bumped = bump(s, 'a'); // a is a root but not current
-        expect(bumped.currentEntryId).toBe('a');
-        expect(bumped.entries.find((e) => e.entryId === 'a')?.parentId).toBe(null);
-        expect(bumped.entries.find((e) => e.entryId === 'b')?.parentId).toBe('a');
-        expect(bumped.entries.length).toBe(2);
-    });
-
-    it('is a same-state no-op when already a root and current, or unknown', () => {
-        const root = markNow(emptyNowTree(), mk('a')); // a root, current a
-        expect(bump(root, 'a')).toBe(root);
-        const s = chain();
+    it('is a same-state no-op when already the current, or unknown', () => {
+        const s = chain(); // current c — already the top row
+        expect(bump(s, 'c')).toBe(s);
         expect(bump(s, 'nope')).toBe(s);
     });
 });
@@ -493,6 +537,7 @@ describe('immutability', () => {
         const frozen = JSON.parse(JSON.stringify(s));
         markNow(s, mk('c'));
         switchTo(s, 'a');
+        bump(s, 'a');
         removeEntry(s, 'a');
         pruneSubtree(s, 'a');
         pruneChildren(s, 'a');
