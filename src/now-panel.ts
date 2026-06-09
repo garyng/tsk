@@ -104,8 +104,11 @@ export class NowPanel implements vscode.Disposable {
         this.panel = panel;
         this.lastPosted = undefined; // a fresh webview needs the next render unconditionally
         panel.webview.options = this.webviewOptions();
-        panel.webview.html = this.html(panel.webview);
+        // Attach the message listener BEFORE setting `html`: the webview posts
+        // `ready` the moment it mounts, and a missed `ready` leaves a revived
+        // panel without its first render.
         panel.webview.onDidReceiveMessage((message: WebviewToHost) => this.onMessage(message));
+        panel.webview.html = this.html(panel.webview);
         // Re-render when the panel is revealed (instant freshness) and once a
         // minute while it's visible (relative "when" times advance on idle).
         panel.onDidChangeViewState(() => {
@@ -140,6 +143,13 @@ export class NowPanel implements vscode.Disposable {
         // handshake. Unknown / malformed messages are ignored.
         switch (message?.type) {
             case 'ready':
+                // A freshly mounted / revived webview has nothing yet — send the
+                // current state UNCONDITIONALLY. `lastPosted` may already hold a
+                // viewmodel from a refresh()/store post that fired before the
+                // webview was listening (that `render` dropped on the floor); without
+                // this reset the dedup would skip the first paint and leave the panel
+                // blank when VS Code reopens with the stack already open.
+                this.lastPosted = undefined;
                 this.postRender();
                 return;
             case 'jump':
