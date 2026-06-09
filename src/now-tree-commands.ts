@@ -1,11 +1,14 @@
 import * as vscode from 'vscode';
-import { COMMANDS, INTERNAL_COMMANDS } from './constants';
+import { COMMANDS, INTERNAL_COMMANDS, NOW_AUTO_IN_PROGRESS_KEY } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import type { NowStore } from './lib/now-store';
+import { parseLine } from './lib/parser';
+import { defaultToggleDeps, enterInprogress, type ToggleDeps } from './lib/toggle-mutators';
 import { navigateTo, targetNotFoundMessage } from './navigation';
 import type { NavigationHighlight } from './navigation-highlight';
 import { resolveNowTarget } from './now-resolve';
+import { replaceLine } from './range-helpers';
 
 /**
  * Register the now-stack tree actions. All but `clear` are
@@ -25,6 +28,7 @@ export function registerNowTreeCommands(
     cache: CacheService,
     navigationHighlight: NavigationHighlight,
     logger: Logger,
+    deps: ToggleDeps = defaultToggleDeps,
 ): void {
     /**
      * Reveal + highlight the task `@id`'s line in the SOURCE-side editor group —
@@ -54,6 +58,40 @@ export function registerNowTreeCommands(
                 preserveFocus: false,
             },
         );
+    }
+
+    /**
+     * Flip the bumped task into `[/]` in-progress (stamping `@started`) — the
+     * same `enterInprogress` transition mark-now applies, gated on
+     * `tsk.now.autoInProgress`. The task is found by `@id` (it may live in a
+     * CLOSED file, so we `openTextDocument` rather than rely on an active
+     * editor), and we re-verify the resolved line still carries that `@id` before
+     * editing, so a stale cache location never flips the wrong line. Already-`[/]`
+     * or unresolved (untitled / missing / unscanned) tasks are left untouched.
+     */
+    async function flipInProgress(id: string): Promise<void> {
+        if (!readAutoInProgress()) return;
+        const located = resolveNowTarget(cache, id);
+        if (!located) return;
+        let doc: vscode.TextDocument;
+        try {
+            doc = await vscode.workspace.openTextDocument(located.uri);
+        } catch {
+            logger.warn(
+                `${INTERNAL_COMMANDS.nowBump}: could not open ${located.uri.fsPath} to flip [/]`,
+            );
+            return;
+        }
+        if (located.line >= doc.lineCount) return;
+        const before = doc.lineAt(located.line).text;
+        if (parseLine(before)?.metadata.get('id') !== id) return; // stale location — don't touch
+        const after = enterInprogress(before, deps);
+        if (after === before) return; // already in-progress
+        const edit = new vscode.WorkspaceEdit();
+        replaceLine(edit, located.uri, located.line, before, after);
+        if (!(await vscode.workspace.applyEdit(edit))) {
+            logger.warn(`${INTERNAL_COMMANDS.nowBump}: [/] flip edit was rejected`);
+        }
     }
 
     /** Switch the current "now" to the parent of the current node (undo one step). */
@@ -89,8 +127,14 @@ export function registerNowTreeCommands(
         vscode.commands.registerCommand(INTERNAL_COMMANDS.nowSwitchTo, (entryId: string) => {
             if (entryId) nowStore.switchTo(entryId);
         }),
-        vscode.commands.registerCommand(INTERNAL_COMMANDS.nowBump, (entryId: string) => {
-            if (entryId) nowStore.bump(entryId);
+        vscode.commands.registerCommand(INTERNAL_COMMANDS.nowBump, async (entryId: string) => {
+            if (!entryId) return;
+            nowStore.bump(entryId);
+            // Bump means "I'm working on this now" → flip the task to [/] like
+            // mark-now (gated on tsk.now.autoInProgress). Resolve by @id off the
+            // bumped entry — its task may be in a closed file, not a live editor.
+            const id = nowStore.getState().entries.find((e) => e.entryId === entryId)?.id;
+            if (id) await flipInProgress(id);
         }),
         vscode.commands.registerCommand(INTERNAL_COMMANDS.nowBack, () => back()),
         vscode.commands.registerCommand(INTERNAL_COMMANDS.nowRemove, (entryId: string) => {
@@ -107,4 +151,9 @@ export function registerNowTreeCommands(
         ),
         vscode.commands.registerCommand(COMMANDS.nowClear, () => clear()),
     );
+}
+
+function readAutoInProgress(): boolean {
+    // The contributed default (true); off only via an explicit user setting.
+    return vscode.workspace.getConfiguration('tsk').get<boolean>(NOW_AUTO_IN_PROGRESS_KEY, true);
 }

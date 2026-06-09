@@ -140,7 +140,7 @@ Mark the first line, then the second (it becomes a *child*). Open the stack, cli
 - [ ] handle the review notes <!-- @id:now-review -->
 - [ ] cut the release <!-- @id:now-release -->
 
-In the stack, hover a node for its actions — `↑` **Bump** moves that entry to the top as the current now *without* branching (unlike marking, which nests a child); alongside set-as-current, prune, and remove.
+In the stack, hover a node for its actions — `↑` **Bump** lifts that entry to the top as the current now and flips it to `[/]` (like `Alt+W`), *without* branching (unlike marking, which nests a child) and leaving its children where they are; alongside set-as-current, prune, and remove.
 
 ## 12. Putting it together
 

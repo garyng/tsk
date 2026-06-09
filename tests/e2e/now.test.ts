@@ -166,7 +166,7 @@ suite('now feature (M45 mark + M48 tree actions)', () => {
         assert.strictEqual(tree.currentEntryId, c, 'current is the newest mark');
     });
 
-    test('tsk.now.bump re-roots an entry and makes it current (no branch)', async () => {
+    test('tsk.now.bump lifts an entry to the top, healing the gap (no subtree drag)', async () => {
         const p = await mark('- [ ] bump P', 'm-bumpP');
         const mid = await mark('- [ ] bump mid', 'm-bumpMid'); // child of P
         const leaf = await mark('- [ ] bump leaf', 'm-bumpLeaf'); // child of mid, current = leaf
@@ -175,15 +175,52 @@ suite('now feature (M45 mark + M48 tree actions)', () => {
         assert.strictEqual(tree.currentEntryId, mid, 'bump made mid the current now');
         assert.strictEqual(
             tree.entries.find((e) => e.entryId === mid)?.parentId,
-            null,
-            'mid is re-rooted to the top',
+            leaf,
+            'mid grafts under the old current (leaf)',
         );
         assert.strictEqual(
             tree.entries.find((e) => e.entryId === leaf)?.parentId,
-            mid,
-            "mid's subtree travels with it",
+            p,
+            "mid's on-path child (leaf) inherits mid's slot — the subtree does NOT travel",
         );
-        assert.ok(p, 'P stays in the tree (unused beyond setup)');
+    });
+
+    test('tsk.now.bump flips the bumped task to [/] in-progress, like mark-now', async () => {
+        const doc = await vscode.workspace.openTextDocument({
+            content: ['- [ ] alpha <!-- @id:m-flipA -->', '- [ ] beta <!-- @id:m-flipB -->'].join(
+                '\n',
+            ),
+            language: 'tsk',
+        });
+        const editor = await vscode.window.showTextDocument(doc);
+
+        // Mark alpha (line 0) then beta (line 1): mark-now flips both to [/]; beta is current.
+        editor.selections = [new vscode.Selection(0, 0, 0, 0)];
+        await run('tsk.markNow');
+        await new Promise((r) => setImmediate(r));
+        const alpha = api.getNowTree().currentEntryId;
+        assert.ok(alpha, 'alpha was marked');
+        editor.selections = [new vscode.Selection(1, 0, 1, 0)];
+        await run('tsk.markNow');
+        await new Promise((r) => setImmediate(r));
+
+        // Knock alpha back to [ ] so the bump has an actual marker to flip.
+        const knock = new vscode.WorkspaceEdit();
+        knock.replace(doc.uri, doc.lineAt(0).range, doc.lineAt(0).text.replace('[/]', '[ ]'));
+        assert.ok(await vscode.workspace.applyEdit(knock));
+        assert.match(doc.lineAt(0).text, /^- \[ \] alpha/, 'alpha is back to todo before the bump');
+
+        // Bump alpha → it becomes current AND its task flips back to [/] (like mark-now).
+        await run('tsk.now.bump', alpha);
+        await new Promise((r) => setImmediate(r));
+        assert.strictEqual(
+            api.getNowTree().currentEntryId,
+            alpha,
+            'bump made alpha the current now',
+        );
+        const flipped = doc.lineAt(0).text;
+        assert.match(flipped, /^- \[\/\] alpha /, 'bump flipped alpha to [/] in-progress');
+        assert.ok(/@started:[\d\-T:+]+/.test(flipped), 'bump stamped @started, like mark-now');
     });
 
     test('tsk.now.back switches the current to its parent', async () => {

@@ -145,7 +145,7 @@ The tree uses **linear-compaction**: the path from root to the current now rende
 |--------|--------------|
 | **Click a node** | Jump to that task. Reuses the editor beside the panel (a task in another file opens in that group — never a stray tab over the panel). Read-only; never edits. |
 | **Set as current** | Switch the now-pointer to that node. Undo / redo is a pointer move — nothing is deleted. |
-| **Bump** | Move the node to the top (re-root it) **and** make it the current now — no new node, no branch. Its subtree travels with it; nothing else is re-parented. Contrast *Set as current* (a pointer move that leaves the node in place) and marking (which adds a *child*). |
+| **Bump** | Lift the node to the top **and** make it the current now — flipping its task to `[/]` in-progress (like `Alt+W`, configurable via `tsk.now.autoInProgress`), no new node, no branch. Its children stay where they are (they do *not* travel with it); the tree heals around the moved node so nothing else is disturbed. Contrast *Set as current* (a pointer move that leaves the node in place) and marking (which adds a *child*). |
 | **Back** (toolbar) | Switch to the current node's parent (undo one step). |
 | **Remove** | Drop one node, re-parenting its children onto its parent. |
 | **Delete branch** | Drop a node and its whole subtree. |
