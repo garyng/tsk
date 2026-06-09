@@ -272,6 +272,12 @@ function NowRowItem({ row, focused }: { row: Row; focused: boolean }) {
                     entryId={row.id}
                 />
                 <RowAction
+                    icon="arrow-up"
+                    title="Bump to top (set as current, no branch)"
+                    action="bump"
+                    entryId={row.id}
+                />
+                <RowAction
                     icon="remove"
                     title="Remove children"
                     action="pruneChildren"
@@ -294,7 +300,7 @@ function NowRowItem({ row, focused }: { row: Row; focused: boolean }) {
     );
 }
 
-type RowActionType = 'switchTo' | 'remove' | 'pruneSubtree' | 'pruneChildren';
+type RowActionType = 'switchTo' | 'bump' | 'remove' | 'pruneSubtree' | 'pruneChildren';
 
 function RowAction({
     icon,

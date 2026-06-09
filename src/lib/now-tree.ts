@@ -82,6 +82,24 @@ export function switchTo(state: NowTreeState, entryId: string): NowTreeState {
 }
 
 /**
+ * "Bump" a node to the top: re-parent it to a root (`parentId = null`) AND make
+ * it the current now. Unlike {@link markNow} (which appends a fresh *child* — a
+ * branch) and {@link switchTo} (which only moves the pointer), bump reuses the
+ * existing node, so there's no new entry and no branch — the node keeps its
+ * identity and its own subtree travels with it. Nothing else is re-parented. A
+ * no-op if `entryId` is absent, or already a root AND already current.
+ */
+export function bump(state: NowTreeState, entryId: string): NowTreeState {
+    const target = state.entries.find((e) => e.entryId === entryId);
+    if (!target) return state;
+    if (target.parentId === null && state.currentEntryId === entryId) return state;
+    const entries = state.entries.map((e) =>
+        e.entryId === entryId ? { ...e, parentId: null } : e,
+    );
+    return { ...state, entries, currentEntryId: entryId };
+}
+
+/**
  * Remove a single node, re-parenting its children onto its own parent (so the
  * surrounding branches stay connected). If the removed node was current, the
  * pointer re-homes to its parent (which may be `null` — leaving a non-empty

@@ -89,6 +89,9 @@ export function registerNowTreeCommands(
         vscode.commands.registerCommand(INTERNAL_COMMANDS.nowSwitchTo, (entryId: string) => {
             if (entryId) nowStore.switchTo(entryId);
         }),
+        vscode.commands.registerCommand(INTERNAL_COMMANDS.nowBump, (entryId: string) => {
+            if (entryId) nowStore.bump(entryId);
+        }),
         vscode.commands.registerCommand(INTERNAL_COMMANDS.nowBack, () => back()),
         vscode.commands.registerCommand(INTERNAL_COMMANDS.nowRemove, (entryId: string) => {
             if (entryId) nowStore.removeEntry(entryId);

@@ -140,6 +140,8 @@ Mark the first line, then the second (it becomes a *child*). Open the stack, cli
 - [ ] handle the review notes <!-- @id:now-review -->
 - [ ] cut the release <!-- @id:now-release -->
 
+In the stack, hover a node for its actions — `↑` **Bump** moves that entry to the top as the current now *without* branching (unlike marking, which nests a child); alongside set-as-current, prune, and remove.
+
 ## 12. Putting it together
 
 A real slice of a plan — every status, priority, tag, and link at once. The priorities tint their rows, the cancelled line is struck through, the metadata stays dimmed. Hover any task, click a `children:` / `parent:` / `dependsOn:` / `movedTo:` lens to jump, or `Alt+T` a tag to find more like it. The task text itself is plain Markdown — inline `code`, **bold**, and *italic* all render in place.

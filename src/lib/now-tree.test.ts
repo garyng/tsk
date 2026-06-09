@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+    bump,
     clear,
     currentNowId,
     emptyNowTree,
@@ -103,6 +104,60 @@ describe('switchTo', () => {
     it('is a same-state no-op when already current or unknown', () => {
         expect(switchTo(base, 'b')).toBe(base);
         expect(switchTo(base, 'nope')).toBe(base);
+    });
+});
+
+describe('bump', () => {
+    /** a → b → c, current c. */
+    function chain(): NowTreeState {
+        let s = markNow(emptyNowTree(), mk('a'));
+        s = markNow(s, mk('b'));
+        s = markNow(s, mk('c'));
+        return s;
+    }
+
+    it('re-roots a mid-path node, carries its subtree, and makes it current', () => {
+        const s = bump(chain(), 'b'); // bump b out of a → b → c
+        expect(snap(s)).toEqual({
+            ids: ['a', 'b', 'c'],
+            // b is now a root; its child c travels with it; a loses b (a unchanged otherwise).
+            parents: { a: null, b: null, c: 'b' },
+            current: 'b',
+        });
+    });
+
+    it('does NOT re-parent the previous current under the bumped node', () => {
+        const s = bump(chain(), 'a'); // a is already a root; current was c
+        expect(s.currentEntryId).toBe('a');
+        // c must stay where it was — bumping a does not pull c under a.
+        expect(s.entries.find((e) => e.entryId === 'c')?.parentId).toBe('b');
+    });
+
+    it('creates no new node — the bumped entry keeps its identity', () => {
+        const before = chain();
+        const after = bump(before, 'b');
+        expect(after.entries.length).toBe(before.entries.length);
+        const b = after.entries.find((e) => e.entryId === 'b');
+        const b0 = before.entries.find((e) => e.entryId === 'b');
+        expect(b?.markedAt).toBe(b0?.markedAt);
+        expect(b?.createdSeq).toBe(b0?.createdSeq);
+    });
+
+    it('a non-current root simply becomes current (no restructure)', () => {
+        let s = markNow(emptyNowTree(), mk('a')); // a root, current a
+        s = markNow(s, mk('b')); // a → b, current b
+        const bumped = bump(s, 'a'); // a is a root but not current
+        expect(bumped.currentEntryId).toBe('a');
+        expect(bumped.entries.find((e) => e.entryId === 'a')?.parentId).toBe(null);
+        expect(bumped.entries.find((e) => e.entryId === 'b')?.parentId).toBe('a');
+        expect(bumped.entries.length).toBe(2);
+    });
+
+    it('is a same-state no-op when already a root and current, or unknown', () => {
+        const root = markNow(emptyNowTree(), mk('a')); // a root, current a
+        expect(bump(root, 'a')).toBe(root);
+        const s = chain();
+        expect(bump(s, 'nope')).toBe(s);
     });
 });
 

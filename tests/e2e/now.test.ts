@@ -166,6 +166,26 @@ suite('now feature (M45 mark + M48 tree actions)', () => {
         assert.strictEqual(tree.currentEntryId, c, 'current is the newest mark');
     });
 
+    test('tsk.now.bump re-roots an entry and makes it current (no branch)', async () => {
+        const p = await mark('- [ ] bump P', 'm-bumpP');
+        const mid = await mark('- [ ] bump mid', 'm-bumpMid'); // child of P
+        const leaf = await mark('- [ ] bump leaf', 'm-bumpLeaf'); // child of mid, current = leaf
+        await run('tsk.now.bump', mid);
+        const tree = api.getNowTree();
+        assert.strictEqual(tree.currentEntryId, mid, 'bump made mid the current now');
+        assert.strictEqual(
+            tree.entries.find((e) => e.entryId === mid)?.parentId,
+            null,
+            'mid is re-rooted to the top',
+        );
+        assert.strictEqual(
+            tree.entries.find((e) => e.entryId === leaf)?.parentId,
+            mid,
+            "mid's subtree travels with it",
+        );
+        assert.ok(p, 'P stays in the tree (unused beyond setup)');
+    });
+
     test('tsk.now.back switches the current to its parent', async () => {
         const a = await mark('- [ ] back A', 'm48-backA');
         await mark('- [ ] back B', 'm48-backB'); // child of A, current = B

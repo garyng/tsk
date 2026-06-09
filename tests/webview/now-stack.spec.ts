@@ -342,6 +342,7 @@ test('posts {type:"ready"} to the host on mount', async ({ page }) => {
 
 for (const [label, expected] of [
     ['Set as current now', { type: 'switchTo', entryId: 'B' }],
+    ['Bump to top (set as current, no branch)', { type: 'bump', entryId: 'B' }],
     ['Remove children', { type: 'pruneChildren', entryId: 'B' }],
     ['Remove this entry', { type: 'remove', entryId: 'B' }],
     ['Delete this branch', { type: 'pruneSubtree', entryId: 'B' }],

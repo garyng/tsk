@@ -152,6 +152,9 @@ export class NowPanel implements vscode.Disposable {
             case 'switchTo':
                 void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowSwitchTo, message.entryId);
                 return;
+            case 'bump':
+                void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowBump, message.entryId);
+                return;
             case 'remove':
                 void vscode.commands.executeCommand(INTERNAL_COMMANDS.nowRemove, message.entryId);
                 return;

@@ -219,6 +219,7 @@ export const INTERNAL_COMMANDS = {
     // except back/pruneOffPath which act on the current).
     nowJump: 'tsk.now.jump',
     nowSwitchTo: 'tsk.now.switchTo',
+    nowBump: 'tsk.now.bump',
     nowBack: 'tsk.now.back',
     nowRemove: 'tsk.now.remove',
     nowPruneSubtree: 'tsk.now.pruneSubtree',
