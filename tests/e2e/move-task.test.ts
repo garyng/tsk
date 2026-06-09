@@ -120,6 +120,43 @@ suite('move task to file', () => {
         assert.match(newText, / {2}- \[ \] child <!-- @id:childY -->/);
     });
 
+    test('undo of a move to a new file is atomic — no leftover duplicate @id', async () => {
+        const src = await writeFile('mv-src3.tsk', SRC);
+        const newUri = vscode.Uri.joinPath(workspaceUri, 'mv-new2.tsk');
+        created.push(newUri);
+
+        win.showQuickPick = async (items: ReadonlyArray<{ newFile?: boolean }>) =>
+            items.find((i) => i.newFile);
+        win.showSaveDialog = async () => newUri;
+
+        await cursorOn(src, 1);
+        await vscode.commands.executeCommand('tsk.moveTaskToFile');
+        assert.ok(
+            (await vscode.workspace.openTextDocument(newUri)).getText().includes('@id:moveX'),
+            'precondition: the task moved into the new file',
+        );
+
+        // One undo must revert the whole bulk edit: source restored, new file gone.
+        // A split undo (createFile + separate insert) would leave @id:moveX in BOTH.
+        await vscode.commands.executeCommand('undo');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        const srcText = (await vscode.workspace.openTextDocument(src)).getText();
+        assert.ok(srcText.includes('@id:moveX'), 'the original task is restored in the source');
+        assert.ok(!srcText.includes('@movedTo:moveX'), 'the breadcrumb was undone');
+
+        let newText = '';
+        try {
+            newText = (await vscode.workspace.openTextDocument(newUri)).getText();
+        } catch {
+            /* the undo removed the file — also fine */
+        }
+        assert.ok(
+            !newText.includes('@id:moveX'),
+            'the new file no longer holds the task, so @id:moveX is not duplicated',
+        );
+    });
+
     test('rejects a task with no @id (no move, no picker)', async () => {
         const src = await writeFile('mv-noid.tsk', '- [ ] no id here\n');
         let pickerCalled = false;

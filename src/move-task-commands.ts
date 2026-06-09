@@ -173,12 +173,14 @@ async function appendBlockToTarget(
     fallbackEol: string,
 ): Promise<void> {
     if (target.isNew) {
-        edit.createFile(target.uri, { ignoreIfExists: true });
-        edit.insert(
-            target.uri,
-            new vscode.Position(0, 0),
-            buildAppendText('', destLines, fallbackEol),
-        );
+        // Create the file WITH its contents in one resource edit — NOT createFile +
+        // a separate insert, which splits the bulk-edit undo so a single Ctrl+Z
+        // restores the source but leaves the new file behind (a phantom duplicate
+        // @id). With contents, the whole move undoes atomically.
+        edit.createFile(target.uri, {
+            ignoreIfExists: true,
+            contents: Buffer.from(buildAppendText('', destLines, fallbackEol), 'utf8'),
+        });
         return;
     }
     const targetDoc = await vscode.workspace.openTextDocument(target.uri);

@@ -1,4 +1,5 @@
 {
     "tsk.cache.path": "",
-    "tsk.state.path": ""
+    "tsk.state.path": "",
+    "files.enableTrash": false
 }
