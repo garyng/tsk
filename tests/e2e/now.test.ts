@@ -185,7 +185,7 @@ suite('now feature (M45 mark + M48 tree actions)', () => {
         );
     });
 
-    test('tsk.now.bump flips the bumped task to [/] in-progress, like mark-now', async () => {
+    test('tsk.now.bump navigates to the bumped task and flips it to [/]', async () => {
         const doc = await vscode.workspace.openTextDocument({
             content: ['- [ ] alpha <!-- @id:m-flipA -->', '- [ ] beta <!-- @id:m-flipB -->'].join(
                 '\n',
@@ -210,13 +210,28 @@ suite('now feature (M45 mark + M48 tree actions)', () => {
         assert.ok(await vscode.workspace.applyEdit(knock));
         assert.match(doc.lineAt(0).text, /^- \[ \] alpha/, 'alpha is back to todo before the bump');
 
-        // Bump alpha → it becomes current AND its task flips back to [/] (like mark-now).
+        // Cursor is on beta (line 1) from the last mark — so navigating to alpha
+        // (line 0) on bump is observable.
+        assert.strictEqual(editor.selection.active.line, 1, 'cursor starts on beta');
+
+        // Bump alpha → it becomes current, the editor NAVIGATES to alpha, AND its
+        // task flips back to [/] (like mark-now).
         await run('tsk.now.bump', alpha);
         await new Promise((r) => setImmediate(r));
         assert.strictEqual(
             api.getNowTree().currentEntryId,
             alpha,
             'bump made alpha the current now',
+        );
+        assert.strictEqual(
+            vscode.window.activeTextEditor?.document.uri.toString(),
+            doc.uri.toString(),
+            'bump navigated to the task document',
+        );
+        assert.strictEqual(
+            vscode.window.activeTextEditor?.selection.active.line,
+            0,
+            'bump moved the cursor to the bumped task line',
         );
         const flipped = doc.lineAt(0).text;
         assert.match(flipped, /^- \[\/\] alpha /, 'bump flipped alpha to [/] in-progress');
