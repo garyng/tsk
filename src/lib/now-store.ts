@@ -151,7 +151,7 @@ export class NowStore {
         this.apply(switchToTree(this.state, entryId));
     }
 
-    /** Move an entry to the top (a root) and make it current — no new node, no branch. */
+    /** Bump an entry to the top as the new current — grafts it under the old current, children stay put; no new node, no branch. */
     bump(entryId: string): void {
         this.apply(bumpTree(this.state, entryId));
     }

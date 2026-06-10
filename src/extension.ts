@@ -319,7 +319,7 @@ function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Wire the four document / editor lifecycle listeners. Save triggers a
+ * Wire the document / editor lifecycle listeners. Save triggers a
  * synchronous rescan; change triggers a debounced rescan + decorate.
  * Editor visibility events (active / visible-list changed) trigger
  * decoration only — the cache state is unaffected by which editor is

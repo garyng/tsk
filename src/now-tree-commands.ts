@@ -31,16 +31,10 @@ export function registerNowTreeCommands(
     deps: ToggleDeps = defaultToggleDeps,
 ): void {
     /**
-     * Reveal + highlight the task `@id`'s line in the SOURCE-side editor group —
-     * the one the panel sits beside (the `sourceColumn` it passes) — reusing the
-     * tab that's already showing the file, like markdown preview drives its
-     * source. Never opens over the panel's own column (which is "active" right
-     * after a webview click, and would spawn a stray new tab). Never edits.
-     */
-    /**
      * Navigate to a resolved task in the SOURCE editor group — reusing the tab
      * already showing the file (markdown-preview-source style); else the panel's
-     * source column; else the first group — never a stray tab over the panel.
+     * source column; else the first group — never a stray tab over the panel
+     * (which is "active" right after a webview click).
      */
     async function navigateToTarget(
         located: NowTarget,
