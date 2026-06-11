@@ -108,6 +108,9 @@ export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
 export const AUTOLINKS_SETTING = 'tsk.autolinks';
 export const AUTOLINKS_KEY = 'autolinks';
 
+export const MIGRATE_MARKERS_SETTING = 'tsk.migrate.markers';
+export const MIGRATE_MARKERS_KEY = 'migrate.markers';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every
@@ -184,6 +187,7 @@ export const COMMANDS = {
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
     moveTaskToFile: 'tsk.moveTaskToFile',
+    migrateMarkdownTasks: 'tsk.migrateMarkdownTasks',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
     markNow: 'tsk.markNow',
     openNowStack: 'tsk.now.openStack',

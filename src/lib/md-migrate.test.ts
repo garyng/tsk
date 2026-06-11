@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { MARKERS } from './markers';
 import {
     DEFAULT_MD_MARKER_MAP,
     type MdStamps,
@@ -16,6 +19,28 @@ const STAMPS: MdStamps = {
     created: '2026-03-01T10:00:00+08:00',
     status: '2026-04-02T18:30:00+08:00',
 };
+
+describe('package.json drift gates (tsk.migrate.markers)', () => {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8')) as {
+        contributes: {
+            configuration: {
+                properties: Record<
+                    string,
+                    { default?: unknown; additionalProperties?: { enum?: string[] } }
+                >;
+            };
+        };
+    };
+    const setting = pkg.contributes.configuration.properties['tsk.migrate.markers'];
+
+    it('the manifest default mirrors DEFAULT_MD_MARKER_MAP', () => {
+        expect(setting?.default).toEqual(DEFAULT_MD_MARKER_MAP);
+    });
+
+    it('the manifest enum mirrors the MARKERS registry names', () => {
+        expect(setting?.additionalProperties?.enum).toEqual(MARKERS.map((m) => m.name));
+    });
+});
 
 describe('validateMarkerMap', () => {
     it('accepts the default map verbatim', () => {
