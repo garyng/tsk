@@ -68,11 +68,12 @@ type StateMarker = 'inprogress' | 'completed' | 'cancelled';
 
 /**
  * Lifecycle marker → its timestamp metadata key. The single source for the
- * marker↔timestamp pairing — shared by the state toggles below AND by
- * {@link enterInprogress} (which `tsk.markNow` reuses), so the two can't drift
- * on what "moving a task into `[/]`" actually writes.
+ * marker↔timestamp pairing — shared by the state toggles below, by
+ * {@link enterInprogress} (which `tsk.markNow` reuses), and by the markdown
+ * migration's stamp derivation (`md-migrate.ts`), so none can drift on what
+ * "moving a task into `[/]`" actually writes.
  */
-const STATE_TIMESTAMP_KEY: Record<StateMarker, string> = {
+export const STATE_TIMESTAMP_KEY: Record<StateMarker, string> = {
     inprogress: 'started',
     completed: 'completed',
     cancelled: 'cancelled',
