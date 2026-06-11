@@ -247,6 +247,16 @@
                 "command": "tsk.migrateMarkdownTasks",
                 "title": "Migrate Markdown Tasks",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.sendMarkdownTaskToFile",
+                "title": "Send Markdown Task to Tsk File…",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.sendAllMarkdownTasks",
+                "title": "Send All Markdown Tasks to Tsk File…",
+                "category": "Tsk"
             }
         ],
         "menus": {

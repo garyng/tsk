@@ -4,6 +4,7 @@ import { isTskDocument } from './editor-guards';
 import type { CacheService } from './lib/cache';
 import { generateId } from './lib/ids';
 import type { Logger } from './lib/logger';
+import type { Marker } from './lib/markers';
 import { type MdStamps, matchMdTask, prepareMdBlockForTsk } from './lib/md-migrate';
 import { extractMetadata } from './lib/metadata';
 import {
@@ -129,28 +130,16 @@ async function moveTaskToFile(
     // file would be misread by the glyph collision (md-done [/] = tsk
     // in-progress). Stamps derive from git like the migrate command's.
     if (doc.languageId === MARKDOWN_LANGUAGE_ID) {
-        const map = readMigrateMarkerMap(logger);
-        const candidates: number[] = [];
-        blockLines.forEach((line, i) => {
-            if (matchMdTask(line, map) && !extractMetadata(line).metadata.has('id')) {
-                candidates.push(start + i);
-            }
-        });
-        if (candidates.length > 0) {
-            const { stamps } = await deriveStampsForDocLines(doc, lines, candidates, map, deps.now);
-            const prepared = prepareMdBlockForTsk(
-                blockLines,
-                map,
-                (i) => stamps.get(start + i) as MdStamps,
-                makeGuardedIdFactory(cache, deps.generateId),
-            );
-            blockLines = prepared.lines;
-            if (prepared.passedThrough.length > 0) {
-                void vscode.window.showWarningMessage(
-                    `Tsk: ${prepared.passedThrough.length} bracketed line(s) in the moved block match neither the markdown marker map nor tsk — moved as-is.`,
-                );
-            }
-        }
+        const converted = await convertBlocks(
+            doc,
+            lines,
+            [{ start, end }],
+            readMigrateMarkerMap(logger),
+            cache,
+            deps,
+        );
+        blockLines = converted.prepared.get(start) ?? blockLines;
+        warnPassedThrough(converted.passedThrough);
     }
 
     const destLines = dedentBlock(blockLines, task.indent);
@@ -270,4 +259,269 @@ function eolOf(doc: vscode.TextDocument): string {
 function resolveTabSize(): number {
     const ts = vscode.window.activeTextEditor?.options.tabSize;
     return typeof ts === 'number' ? ts : 4;
+}
+
+// ── "Send to tsk file" — the migrate+move one-shot ──────────────────────────
+
+/**
+ * Register the send commands: `tsk.sendMarkdownTaskToFile` (one id-less md
+ * task block: derive git stamps → convert the whole block, top included →
+ * relocate, in ONE edit — the converted form never materializes in the md
+ * file, just the `[>]` breadcrumb) and `tsk.sendAllMarkdownTasks` (every
+ * top-level task block in the file/selection to one picked target — the md
+ * evacuation command). Send on an id-carrying line delegates to the plain
+ * move (same pipeline; the only difference is whether the top needs an id).
+ */
+export function registerSendMarkdownCommands(
+    context: vscode.ExtensionContext,
+    logger: Logger,
+    cache: CacheService,
+    deps: MoveDeps = defaultMoveDeps,
+): void {
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            COMMANDS.sendMarkdownTaskToFile,
+            (uri?: vscode.Uri, line?: number) =>
+                sendMarkdownTaskToFile(deps, cache, logger, uri, line),
+        ),
+        vscode.commands.registerCommand(COMMANDS.sendAllMarkdownTasks, (uri?: vscode.Uri) =>
+            sendAllMarkdownTasks(deps, cache, logger, uri),
+        ),
+    );
+}
+
+interface BlockRange {
+    start: number;
+    end: number;
+}
+
+/**
+ * Convert the id-less md-task lines of each block (shared by move-from-md and
+ * both sends): ONE stamp-derivation pass across every block's candidates, ONE
+ * guarded id factory for the whole run, then `prepareMdBlockForTsk` per
+ * block. Returns the prepared lines keyed by block start.
+ */
+async function convertBlocks(
+    doc: vscode.TextDocument,
+    lines: readonly string[],
+    blocks: readonly BlockRange[],
+    map: ReadonlyMap<string, Marker>,
+    cache: CacheService,
+    deps: MoveDeps,
+    token?: vscode.CancellationToken,
+    onProgress?: (done: number, total: number) => void,
+): Promise<{
+    prepared: Map<number, readonly string[]>;
+    fallbacks: number;
+    passedThrough: number;
+    cancelled: boolean;
+}> {
+    const candidates: number[] = [];
+    for (const { start, end } of blocks) {
+        for (let i = start; i <= end; i++) {
+            const line = lines[i] as string;
+            if (matchMdTask(line, map) && !extractMetadata(line).metadata.has('id')) {
+                candidates.push(i);
+            }
+        }
+    }
+    const derived = await deriveStampsForDocLines(
+        doc,
+        lines,
+        candidates,
+        map,
+        deps.now,
+        token,
+        onProgress,
+    );
+    if (derived.cancelled) {
+        return { prepared: new Map(), fallbacks: 0, passedThrough: 0, cancelled: true };
+    }
+
+    const freshId = makeGuardedIdFactory(cache, deps.generateId);
+    const prepared = new Map<number, readonly string[]>();
+    let passedThrough = 0;
+    for (const { start, end } of blocks) {
+        const block = prepareMdBlockForTsk(
+            lines.slice(start, end + 1),
+            map,
+            (i) => derived.stamps.get(start + i) as MdStamps,
+            freshId,
+        );
+        prepared.set(start, block.lines);
+        passedThrough += block.passedThrough.length;
+    }
+    return { prepared, fallbacks: derived.fallbacks, passedThrough, cancelled: false };
+}
+
+function warnPassedThrough(count: number): void {
+    if (count === 0) return;
+    void vscode.window.showWarningMessage(
+        `Tsk: ${count} bracketed line(s) match neither the markdown marker map nor tsk — moved as-is.`,
+    );
+}
+
+async function sendMarkdownTaskToFile(
+    deps: MoveDeps,
+    cache: CacheService,
+    logger: Logger,
+    uriArg?: vscode.Uri,
+    lineArg?: number,
+): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    const doc = uriArg ? await vscode.workspace.openTextDocument(uriArg) : editor?.document;
+    if (!doc || doc.languageId !== MARKDOWN_LANGUAGE_ID) {
+        void vscode.window.showInformationMessage('Tsk: open a Markdown file to send tasks from.');
+        return;
+    }
+    const taskLine = lineArg ?? editor?.selection.active.line ?? 0;
+    const lineText = doc.lineAt(taskLine).text;
+
+    // An id-carrying line is already tsk — send degenerates to the plain move.
+    if (parseLine(lineText)?.metadata.get('id')) {
+        return moveTaskToFile(deps, cache, logger, doc.uri, taskLine);
+    }
+    const map = readMigrateMarkerMap(logger);
+    if (!matchMdTask(lineText, map) || extractMetadata(lineText).metadata.has('id')) {
+        void vscode.window.showInformationMessage('Tsk: not on a markdown task line.');
+        return;
+    }
+
+    const lines = doc.getText().split(/\r?\n/);
+    const block = computeTaskBlockRange(lines, taskLine, resolveTabSize());
+    const converted = await convertBlocks(doc, lines, [block], map, cache, deps);
+    const prepared = converted.prepared.get(block.start) as readonly string[];
+    warnPassedThrough(converted.passedThrough);
+
+    // The converted top now carries the fresh @id the breadcrumb points at.
+    const top = parseLine(prepared[0] as string);
+    if (!top?.metadata.get('id')) {
+        void vscode.window.showWarningMessage('Tsk: could not convert the task for sending.');
+        return;
+    }
+    const stub = buildMoveStub(top, deps.generateId(), deps.now());
+
+    const target = await pickTarget(doc.uri);
+    if (!target) return;
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(
+        doc.uri,
+        new vscode.Range(block.start, 0, block.end, doc.lineAt(block.end).text.length),
+        stub,
+    );
+    const destLines = dedentBlock(prepared, top.indent);
+    await appendBlockToTarget(edit, target, destLines, eolOf(doc));
+    if (!(await vscode.workspace.applyEdit(edit))) {
+        void vscode.window.showWarningMessage('Tsk: the send could not be applied.');
+        return;
+    }
+    await revealMovedTask(target.uri, destLines.length);
+    const parts = [`sent 1 task (${destLines.length} line${destLines.length === 1 ? '' : 's'})`];
+    if (converted.fallbacks > 0) parts.push(`${converted.fallbacks} stamped now (no git history)`);
+    void vscode.window.showInformationMessage(`Tsk: ${parts.join(' · ')}.`);
+    logger.info(`${COMMANDS.sendMarkdownTaskToFile}: ${parts.join(', ')} → ${target.uri.fsPath}`);
+}
+
+async function sendAllMarkdownTasks(
+    deps: MoveDeps,
+    cache: CacheService,
+    logger: Logger,
+    uriArg?: vscode.Uri,
+): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    const doc = uriArg ? await vscode.workspace.openTextDocument(uriArg) : editor?.document;
+    if (!doc || doc.languageId !== MARKDOWN_LANGUAGE_ID) {
+        void vscode.window.showInformationMessage('Tsk: open a Markdown file to send tasks from.');
+        return;
+    }
+
+    const map = readMigrateMarkerMap(logger);
+    const lines = doc.getText().split(/\r?\n/);
+    const tabSize = resolveTabSize();
+
+    // Top-level task blocks: every line (in EITHER vocabulary) not already
+    // inside a previous block tops one; nested tasks travel inside it.
+    const blocks: BlockRange[] = [];
+    for (let i = 0; i < lines.length; ) {
+        const line = lines[i] as string;
+        if (matchMdTask(line, map) || parseLine(line)) {
+            const block = computeTaskBlockRange(lines, i, tabSize);
+            blocks.push(block);
+            i = block.end + 1;
+        } else {
+            i++;
+        }
+    }
+    // A selection touching ANY line of a block sends the whole block (a torn
+    // block would corrupt structure).
+    const selection =
+        editor?.document === doc && !editor.selection.isEmpty ? editor.selection : undefined;
+    const chosen = selection
+        ? blocks.filter((b) => b.start <= selection.end.line && b.end >= selection.start.line)
+        : blocks;
+    if (chosen.length === 0) {
+        void vscode.window.showInformationMessage('Tsk: no task blocks to send here.');
+        return;
+    }
+
+    // Pick the one target FIRST — don't run a long derivation only to present
+    // a dialog afterwards.
+    const target = await pickTarget(doc.uri);
+    if (!target) return;
+
+    const converted = await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Tsk: deriving task history from git…',
+            cancellable: true,
+        },
+        (progress, token) =>
+            convertBlocks(doc, lines, chosen, map, cache, deps, token, (done, total) =>
+                progress.report({ message: `${done}/${total}` }),
+            ),
+    );
+    if (converted.cancelled) {
+        logger.info(`${COMMANDS.sendAllMarkdownTasks}: cancelled — nothing applied.`);
+        return;
+    }
+    warnPassedThrough(converted.passedThrough);
+
+    const edit = new vscode.WorkspaceEdit();
+    const combined: string[] = [];
+    let sent = 0;
+    let skipped = 0;
+    for (const block of chosen) {
+        const prepared = converted.prepared.get(block.start) as readonly string[];
+        const top = parseLine(prepared[0] as string);
+        if (!top?.metadata.get('id')) {
+            skipped++; // e.g. an id-less [!]-style line tsk parses but nothing converted
+            continue;
+        }
+        edit.replace(
+            doc.uri,
+            new vscode.Range(block.start, 0, block.end, doc.lineAt(block.end).text.length),
+            buildMoveStub(top, deps.generateId(), deps.now()),
+        );
+        if (combined.length > 0) combined.push('');
+        combined.push(...dedentBlock(prepared, top.indent));
+        sent++;
+    }
+    if (sent === 0) {
+        void vscode.window.showInformationMessage('Tsk: nothing sendable here (no task ids).');
+        return;
+    }
+    await appendBlockToTarget(edit, target, combined, eolOf(doc));
+    if (!(await vscode.workspace.applyEdit(edit))) {
+        void vscode.window.showWarningMessage('Tsk: the send could not be applied.');
+        return;
+    }
+    await revealMovedTask(target.uri, combined.length);
+
+    const parts = [`sent ${sent} task block${sent === 1 ? '' : 's'} (${combined.length} lines)`];
+    if (converted.fallbacks > 0) parts.push(`${converted.fallbacks} stamped now (no git history)`);
+    if (converted.passedThrough > 0) parts.push(`${converted.passedThrough} unconverted line(s)`);
+    if (skipped > 0) parts.push(`${skipped} block(s) skipped (no id)`);
+    void vscode.window.showInformationMessage(`Tsk: ${parts.join(' · ')}.`);
+    logger.info(`${COMMANDS.sendAllMarkdownTasks}: ${parts.join(', ')} → ${target.uri.fsPath}`);
 }

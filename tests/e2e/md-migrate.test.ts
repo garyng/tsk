@@ -84,6 +84,30 @@ suite('migrate markdown tasks', () => {
         );
         git(['add', 'move.md']);
         commit('add move fixture', T1);
+
+        // send.md: a RAW (id-less) top with a raw child — the one-shot must
+        // convert the whole block (top included) and relocate it (M5).
+        writeRepoFile(
+            'send.md',
+            ['- [/] send me', '    - [x] dropped child', '- [ ] left behind', ''].join('\n'),
+        );
+        git(['add', 'send.md']);
+        commit('add send fixture', T1);
+
+        // bulk.md: two top-level blocks (one pre-migrated, one raw) + prose.
+        writeRepoFile(
+            'bulk.md',
+            [
+                '# bulk',
+                `- [x] block one <!-- @id:blk1 @created:${T1} @completed:${T1} -->`,
+                '    - [/] one child',
+                '- [>>] block two',
+                'plain prose between',
+                '',
+            ].join('\n'),
+        );
+        git(['add', 'bulk.md']);
+        commit('add bulk fixture', T1);
     });
 
     suiteTeardown(async () => {
@@ -301,5 +325,121 @@ suite('migrate markdown tasks', () => {
             'the raw [>>] child became tsk [>] with @moved',
         );
         assert.ok(dstText.includes('    - loose note'), 'a bare bullet rides along untouched');
+    });
+
+    // ── M5: "Send to tsk file" — the migrate+move one-shot ─────────────────
+
+    /** Stub the destination QuickPick at `dstName` (created on disk) around `run`. */
+    const withPickedTarget = async (
+        dstName: string,
+        run: () => Thenable<unknown>,
+    ): Promise<vscode.Uri> => {
+        const dst = vscode.Uri.file(join(repo, dstName));
+        writeRepoFile(dstName, '# destination\n');
+        const win = vscode.window as unknown as { showQuickPick: unknown };
+        const orig = win.showQuickPick;
+        win.showQuickPick = async () => ({ label: dstName, uri: dst });
+        try {
+            await run();
+        } finally {
+            win.showQuickPick = orig;
+        }
+        return dst;
+    };
+
+    test('send: converts the whole block (top included) and relocates it in one shot', async () => {
+        const doc = await open('send.md');
+        const dst = await withPickedTarget('send-dst.tsk', () =>
+            vscode.commands.executeCommand('tsk.sendMarkdownTaskToFile', doc.uri, 0),
+        );
+
+        const srcLines = doc.getText().split('\n');
+        const crumb = srcLines[0] as string;
+        assert.match(
+            crumb,
+            /^- \[>\] send me <!-- @id:[a-z0-9]+ @movedTo:[a-z0-9]+ @moved:[\d\-T:+]+ -->$/,
+            'the md keeps a breadcrumb; the sent task got a fresh id the crumb points at',
+        );
+        assert.strictEqual(srcLines[1], '- [ ] left behind', 'the sibling stays');
+        assert.ok(!doc.getText().includes('dropped child'), 'the child left the md');
+
+        const dstText = (await vscode.workspace.openTextDocument(dst)).getText();
+        const movedTo = /@movedTo:([a-z0-9]+)/.exec(crumb)?.[1];
+        assert.ok(movedTo);
+        assert.match(
+            dstText,
+            new RegExp(
+                `^- \\[x\\] send me <!-- @id:${movedTo} @created:${esc(T1)} @completed:${esc(T1)} -->$`,
+                'm',
+            ),
+            'the md-done [/] top converted to tsk [x] with git stamps; the breadcrumb id matches',
+        );
+        assert.match(
+            dstText,
+            new RegExp(
+                `^    - \\[!\\] dropped child <!-- @id:[a-z0-9]+ @created:${esc(T1)} @cancelled:${esc(T1)} -->$`,
+                'm',
+            ),
+            'the raw [x]=cancelled child converted too',
+        );
+    });
+
+    test('send all: every top-level block (pre-migrated or raw) evacuates to one target', async () => {
+        const doc = await open('bulk.md');
+        const dst = await withPickedTarget('bulk-dst.tsk', () =>
+            vscode.commands.executeCommand('tsk.sendAllMarkdownTasks', doc.uri),
+        );
+
+        const srcText = doc.getText();
+        assert.strictEqual(srcText.split('\n')[0], '# bulk', 'heading untouched');
+        assert.ok(srcText.includes('plain prose between'), 'prose untouched');
+        assert.match(
+            srcText,
+            /- \[>\] block one <!-- @id:[a-z0-9]+ @movedTo:blk1 @moved:/,
+            'a pre-migrated block leaves a crumb pointing at its EXISTING id',
+        );
+        assert.match(
+            srcText,
+            /- \[>\] block two <!-- @id:[a-z0-9]+ @movedTo:[a-z0-9]+ @moved:/,
+            'a raw block leaves a crumb pointing at its freshly assigned id',
+        );
+        assert.ok(!srcText.includes('one child'), 'children left the md');
+
+        const dstText = (await vscode.workspace.openTextDocument(dst)).getText();
+        assert.ok(
+            dstText.includes(`- [x] block one <!-- @id:blk1 @created:${T1} @completed:${T1} -->`),
+            'the pre-migrated top moved verbatim',
+        );
+        assert.match(
+            dstText,
+            new RegExp(
+                `^    - \\[x\\] one child <!-- @id:[a-z0-9]+ @created:${esc(T1)} @completed:${esc(T1)} -->$`,
+                'm',
+            ),
+            'its raw child converted with git stamps',
+        );
+        assert.match(
+            dstText,
+            new RegExp(
+                `^- \\[>\\] block two <!-- @id:[a-z0-9]+ @created:${esc(T1)} @moved:${esc(T1)} -->$`,
+                'm',
+            ),
+            'the raw [>>] top converted',
+        );
+        const idxOne = dstText.indexOf('block one');
+        const idxTwo = dstText.indexOf('block two');
+        assert.ok(idxOne >= 0 && idxTwo > idxOne, 'source order preserved in the destination');
+    });
+
+    test('the Send action joins Migrate on id-less md task lines', async () => {
+        const doc = await open('single.md');
+        assert.ok(
+            await queryActions(
+                doc.uri,
+                new vscode.Range(1, 0, 1, 0), // "- [ ] not this one" — still raw
+                'Send task to tsk file…',
+            ),
+            'an id-less md task offers Send',
+        );
     });
 });

@@ -122,12 +122,22 @@ export function registerMdMigrateCommands(
         vscode.languages.registerCodeActionsProvider(
             { language: MARKDOWN_LANGUAGE_ID },
             { provideCodeActions: (document, range) => provideMigrateAction(document, range) },
-            { providedCodeActionKinds: [vscode.CodeActionKind.RefactorRewrite] },
+            {
+                providedCodeActionKinds: [
+                    vscode.CodeActionKind.RefactorRewrite,
+                    vscode.CodeActionKind.RefactorMove,
+                ],
+            },
         ),
     );
 }
 
-/** Offer "Migrate task to tsk format" on an id-less Markdown task line. */
+/**
+ * Offer the two id-less-md-task actions: "Migrate task to tsk format"
+ * (convert in place) and "Send task to tsk file…" (convert + relocate in one
+ * step). Id-carrying lines get neither — those offer the plain Move (from
+ * `move-task-commands.ts`'s provider) instead.
+ */
 function provideMigrateAction(
     document: vscode.TextDocument,
     range: vscode.Range | vscode.Selection,
@@ -138,16 +148,25 @@ function provideMigrateAction(
     const map = readMigrateMarkerMap();
     if (!matchMdTask(line, map)) return undefined;
     if (extractMetadata(line).metadata.has('id')) return undefined;
-    const action = new vscode.CodeAction(
+    const migrate = new vscode.CodeAction(
         'Migrate task to tsk format',
         vscode.CodeActionKind.RefactorRewrite,
     );
-    action.command = {
+    migrate.command = {
         command: COMMANDS.migrateMarkdownTasks,
-        title: action.title,
+        title: migrate.title,
         arguments: [document.uri, lineNumber],
     };
-    return [action];
+    const send = new vscode.CodeAction(
+        'Send task to tsk file…',
+        vscode.CodeActionKind.RefactorMove,
+    );
+    send.command = {
+        command: COMMANDS.sendMarkdownTaskToFile,
+        title: send.title,
+        arguments: [document.uri, lineNumber],
+    };
+    return [migrate, send];
 }
 
 async function migrateMarkdownTasks(

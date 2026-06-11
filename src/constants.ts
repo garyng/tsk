@@ -188,6 +188,8 @@ export const COMMANDS = {
     duplicateLineUp: 'tsk.duplicateLineUp',
     moveTaskToFile: 'tsk.moveTaskToFile',
     migrateMarkdownTasks: 'tsk.migrateMarkdownTasks',
+    sendMarkdownTaskToFile: 'tsk.sendMarkdownTaskToFile',
+    sendAllMarkdownTasks: 'tsk.sendAllMarkdownTasks',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
     markNow: 'tsk.markNow',
     openNowStack: 'tsk.now.openStack',

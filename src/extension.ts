@@ -35,7 +35,7 @@ import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './li
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
 import { registerMdMigrateCommands } from './md-migrate-commands';
-import { registerMoveTaskCommand } from './move-task-commands';
+import { registerMoveTaskCommand, registerSendMarkdownCommands } from './move-task-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerNowCommands } from './now-commands';
 import { NowDecoration } from './now-decoration';
@@ -391,6 +391,7 @@ function registerAllCommands(
     registerListEditCommands(context, logger);
     registerDuplicateCommands(context, logger);
     registerMoveTaskCommand(context, logger, cache);
+    registerSendMarkdownCommands(context, logger, cache);
     registerMdMigrateCommands(context, cache, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
