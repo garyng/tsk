@@ -390,7 +390,7 @@ function registerAllCommands(
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
     registerDuplicateCommands(context, logger);
-    registerMoveTaskCommand(context, logger);
+    registerMoveTaskCommand(context, logger, cache);
     registerMdMigrateCommands(context, cache, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);

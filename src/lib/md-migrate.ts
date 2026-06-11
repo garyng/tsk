@@ -17,6 +17,7 @@
 
 import { GLYPH, MARKERS, type Marker } from './markers';
 import { extractMetadata, serializeMetadata } from './metadata';
+import { parseLine } from './parser';
 import { STATE_TIMESTAMP_KEY } from './toggle-mutators';
 
 /**
@@ -161,4 +162,58 @@ export function migrateMdLine(
     // shape (`- [x]  <!-- … -->`) the toggle mutators also write.
     const contentPart = task.content === '' ? ' ' : ` ${task.content}`;
     return `${task.indent}${task.bullet}[${GLYPH[marker]}]${contentPart} ${serializeMetadata(metadata)}`;
+}
+
+/**
+ * A loose "looks like a bracketed task" probe — any glyph, used only to COUNT
+ * pass-through lines a relocation would leave semantically dark, never to
+ * convert. Same whitespace-after-`]` rule as {@link matchMdTask}.
+ */
+const BRACKET_PROBE_RE = /^\s*[-*+]\s+\[[^\]]*\](?:\s|$)/;
+
+/** The result of preparing one block of md lines for life in a `.tsk` file. */
+export interface PreparedBlock {
+    /** The block with every id-less md-task line converted to tsk format. */
+    lines: string[];
+    /** Block-relative indices this call converted. */
+    converted: number[];
+    /**
+     * Block-relative indices that look like bracketed tasks but were left
+     * untouched AND won't parse as tsk either (glyph in neither vocabulary) —
+     * surfaced so callers can report them instead of silently shipping them.
+     */
+    passedThrough: number[];
+}
+
+/**
+ * Convert every **id-less md-task line** in a block via {@link migrateMdLine};
+ * id-carrying (already-tsk) and non-task lines pass through verbatim. This is
+ * the shared primitive under every md→tsk relocation (move / send): without
+ * it, an id-less `[/]`/`[x]` descendant would land in a `.tsk` file
+ * un-remapped and be MISREAD by the glyph collision (md-done `[/]` → tsk
+ * in-progress). `stampsFor`/`nextId` are caller-supplied (git derivation +
+ * guarded id generation), invoked only for lines actually converted.
+ */
+export function prepareMdBlockForTsk(
+    blockLines: readonly string[],
+    map: ReadonlyMap<string, Marker>,
+    stampsFor: (blockIndex: number) => MdStamps,
+    nextId: () => string,
+): PreparedBlock {
+    const lines: string[] = [];
+    const converted: number[] = [];
+    const passedThrough: number[] = [];
+    blockLines.forEach((line, i) => {
+        const isCandidate =
+            matchMdTask(line, map) !== null && !extractMetadata(line).metadata.has('id');
+        if (isCandidate) {
+            // A pre-filtered candidate can't migrate to null.
+            lines.push(migrateMdLine(line, map, stampsFor(i), nextId()) as string);
+            converted.push(i);
+            return;
+        }
+        if (BRACKET_PROBE_RE.test(line) && parseLine(line) === null) passedThrough.push(i);
+        lines.push(line);
+    });
+    return { lines, converted, passedThrough };
 }

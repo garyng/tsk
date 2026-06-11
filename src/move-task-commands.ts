@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import { COMMANDS, TSK_LANGUAGE_ID } from './constants';
 import { isTskDocument } from './editor-guards';
+import type { CacheService } from './lib/cache';
 import { generateId } from './lib/ids';
 import type { Logger } from './lib/logger';
+import { type MdStamps, matchMdTask, prepareMdBlockForTsk } from './lib/md-migrate';
+import { extractMetadata } from './lib/metadata';
 import {
     buildAppendText,
     buildMoveStub,
@@ -11,6 +14,12 @@ import {
 } from './lib/move-task-logic';
 import { parseLine } from './lib/parser';
 import { localTimestamp } from './lib/time';
+import {
+    deriveStampsForDocLines,
+    MARKDOWN_LANGUAGE_ID,
+    makeGuardedIdFactory,
+    readMigrateMarkerMap,
+} from './md-migrate-commands';
 
 /**
  * `tsk.moveTaskToFile` — relocate the task under the cursor, together with its
@@ -39,15 +48,18 @@ interface TargetItem extends vscode.QuickPickItem {
 export function registerMoveTaskCommand(
     context: vscode.ExtensionContext,
     logger: Logger,
+    cache: CacheService,
     deps: MoveDeps = defaultMoveDeps,
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand(
             COMMANDS.moveTaskToFile,
-            (uri?: vscode.Uri, line?: number) => moveTaskToFile(deps, logger, uri, line),
+            (uri?: vscode.Uri, line?: number) => moveTaskToFile(deps, cache, logger, uri, line),
         ),
+        // Markdown too: an id-carrying (already-migrated) md task moves the
+        // same way — its raw md descendants are auto-converted on the way out.
         vscode.languages.registerCodeActionsProvider(
-            { language: TSK_LANGUAGE_ID },
+            [{ language: TSK_LANGUAGE_ID }, { language: MARKDOWN_LANGUAGE_ID }],
             { provideCodeActions: provideMoveAction },
             { providedCodeActionKinds: [vscode.CodeActionKind.RefactorMove] },
         ),
@@ -73,6 +85,7 @@ function provideMoveAction(
 
 async function moveTaskToFile(
     deps: MoveDeps,
+    cache: CacheService,
     logger: Logger,
     uriArg?: vscode.Uri,
     lineArg?: number,
@@ -84,7 +97,10 @@ async function moveTaskToFile(
     if (uriArg && lineArg !== undefined) {
         doc = await vscode.workspace.openTextDocument(uriArg);
         taskLine = lineArg;
-    } else if (editor && isTskDocument(editor.document)) {
+    } else if (
+        editor &&
+        (isTskDocument(editor.document) || editor.document.languageId === MARKDOWN_LANGUAGE_ID)
+    ) {
         doc = editor.document;
         taskLine = editor.selection.active.line;
     } else {
@@ -106,7 +122,38 @@ async function moveTaskToFile(
     // The task's block (task line + its indented sub-items).
     const lines = doc.getText().split(/\r?\n/);
     const { start, end } = computeTaskBlockRange(lines, taskLine, resolveTabSize());
-    const destLines = dedentBlock(lines.slice(start, end + 1), task.indent);
+    let blockLines: readonly string[] = lines.slice(start, end + 1);
+
+    // Markdown source: convert the block's id-less md-task descendants to tsk
+    // BEFORE they travel — an un-remapped md [/]/[x] line landing in a .tsk
+    // file would be misread by the glyph collision (md-done [/] = tsk
+    // in-progress). Stamps derive from git like the migrate command's.
+    if (doc.languageId === MARKDOWN_LANGUAGE_ID) {
+        const map = readMigrateMarkerMap(logger);
+        const candidates: number[] = [];
+        blockLines.forEach((line, i) => {
+            if (matchMdTask(line, map) && !extractMetadata(line).metadata.has('id')) {
+                candidates.push(start + i);
+            }
+        });
+        if (candidates.length > 0) {
+            const { stamps } = await deriveStampsForDocLines(doc, lines, candidates, map, deps.now);
+            const prepared = prepareMdBlockForTsk(
+                blockLines,
+                map,
+                (i) => stamps.get(start + i) as MdStamps,
+                makeGuardedIdFactory(cache, deps.generateId),
+            );
+            blockLines = prepared.lines;
+            if (prepared.passedThrough.length > 0) {
+                void vscode.window.showWarningMessage(
+                    `Tsk: ${prepared.passedThrough.length} bracketed line(s) in the moved block match neither the markdown marker map nor tsk — moved as-is.`,
+                );
+            }
+        }
+    }
+
+    const destLines = dedentBlock(blockLines, task.indent);
     const stub = buildMoveStub(task, deps.generateId(), deps.now());
 
     const target = await pickTarget(doc.uri);

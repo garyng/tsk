@@ -7,6 +7,7 @@ import {
     type MdStamps,
     matchMdTask,
     migrateMdLine,
+    prepareMdBlockForTsk,
     stampKeyForMarker,
     validateMarkerMap,
 } from './md-migrate';
@@ -222,5 +223,48 @@ describe('migrateMdLine', () => {
             expect(parsed?.marker).toBe(marker);
             expect(parsed?.metadata.get('id')).toBe('rt');
         }
+    });
+});
+
+describe('prepareMdBlockForTsk', () => {
+    const stampsFor = (i: number): MdStamps => ({ created: `c${i}`, status: `s${i}` });
+    const counterIds = (): (() => string) => {
+        let n = 0;
+        return () => `id${++n}`;
+    };
+
+    it('converts only id-less md-task lines; id-carrying + non-task lines pass through', () => {
+        const block = [
+            '- [x] top, already tsk <!-- @id:top1 @created:c -->',
+            '    - [/] raw done child',
+            '    - a bare note',
+            '    - [>>] raw moved child',
+        ];
+        const out = prepareMdBlockForTsk(block, MAP, stampsFor, counterIds());
+        expect(out.lines).toEqual([
+            '- [x] top, already tsk <!-- @id:top1 @created:c -->',
+            '    - [x] raw done child <!-- @id:id1 @created:c1 @completed:s1 -->',
+            '    - a bare note',
+            '    - [>] raw moved child <!-- @id:id2 @created:c3 @moved:s3 -->',
+        ]);
+        expect(out.converted).toEqual([1, 3]);
+        expect(out.passedThrough).toEqual([]);
+    });
+
+    it('counts bracketed lines in NEITHER vocabulary as passedThrough (never silently)', () => {
+        const block = ['- [?] glyph nobody knows', '- [!] valid tsk, just id-less'];
+        const out = prepareMdBlockForTsk(block, MAP, stampsFor, counterIds());
+        expect(out.lines).toEqual(block); // both untouched ([!] is not in the md map)
+        expect(out.passedThrough).toEqual([0]); // [!] parses as tsk → fine, not counted
+        expect(out.converted).toEqual([]);
+    });
+
+    it('invokes stampsFor/nextId only for lines it actually converts', () => {
+        const stamps = vi.fn(stampsFor);
+        const ids = vi.fn(counterIds());
+        prepareMdBlockForTsk(['- prose bullet', '- [/] one task'], MAP, stamps, ids);
+        expect(stamps).toHaveBeenCalledTimes(1);
+        expect(stamps).toHaveBeenCalledWith(1);
+        expect(ids).toHaveBeenCalledTimes(1);
     });
 });

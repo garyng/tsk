@@ -4,6 +4,7 @@ import { COMMANDS, MIGRATE_MARKERS_KEY } from './constants';
 import type { CacheService } from './lib/cache';
 import { generateId } from './lib/ids';
 import type { Logger } from './lib/logger';
+import type { Marker } from './lib/markers';
 import { deriveStamps, gitLineHistory, gitShowHead, mapDocLinesToHead } from './lib/md-git-history';
 import {
     DEFAULT_MD_MARKER_MAP,
@@ -38,7 +39,73 @@ interface MigrateDeps {
 }
 const defaultMigrateDeps: MigrateDeps = { generateId, now: localTimestamp };
 
-const MARKDOWN_LANGUAGE_ID = 'markdown';
+export const MARKDOWN_LANGUAGE_ID = 'markdown';
+
+/** Read + validate the `tsk.migrate.markers` vocabulary (package.json default as fallback). */
+export function readMigrateMarkerMap(logger?: Logger) {
+    const raw = vscode.workspace
+        .getConfiguration('tsk')
+        .get<Record<string, string>>(MIGRATE_MARKERS_KEY, { ...DEFAULT_MD_MARKER_MAP });
+    return validateMarkerMap(raw, logger ? (message) => logger.warn(message) : undefined);
+}
+
+/** Fresh-id factory re-rolling against the cache and everything it already handed out. */
+export function makeGuardedIdFactory(cache: CacheService, generate: () => string): () => string {
+    const used = new Set<string>();
+    return () => {
+        let id = generate();
+        while (used.has(id) || cache.lookupById(id) !== undefined) id = generate();
+        used.add(id);
+        return id;
+    };
+}
+
+/**
+ * Derive {@link MdStamps} for the given doc lines from git history — the
+ * shared derivation under migrate, move-from-md, and send. Maps the (possibly
+ * dirty) doc to HEAD line numbers first (`-L` addresses HEAD), then replays
+ * each line's history; unmatched lines and git failures stamp
+ * `created = status = now` (a `[x]` without `@completed` would defy tsk's own
+ * toggles) and count as `fallbacks`. Honors an optional cancellation token —
+ * when it fires, `cancelled: true` returns and the caller applies nothing.
+ */
+export async function deriveStampsForDocLines(
+    doc: vscode.TextDocument,
+    docLines: readonly string[],
+    lineNos: readonly number[],
+    map: ReadonlyMap<string, Marker>,
+    now: () => string,
+    token?: vscode.CancellationToken,
+    onProgress?: (done: number, total: number) => void,
+): Promise<{ stamps: Map<number, MdStamps>; fallbacks: number; cancelled: boolean }> {
+    const fileDir = doc.uri.scheme === 'file' ? dirname(doc.uri.fsPath) : undefined;
+    const fileName = fileDir ? basename(doc.uri.fsPath) : undefined;
+    const stamps = new Map<number, MdStamps>();
+    let fallbacks = 0;
+
+    const headLines = fileDir && fileName ? await gitShowHead(fileDir, fileName) : null;
+    const headMap = headLines ? mapDocLinesToHead(docLines, headLines) : null;
+    let done = 0;
+    for (const lineNo of lineNos) {
+        if (token?.isCancellationRequested) return { stamps, fallbacks, cancelled: true };
+        const headLine = headMap?.[lineNo];
+        const entries =
+            headLine !== null && headLine !== undefined && fileDir && fileName
+                ? await gitLineHistory(fileDir, fileName, headLine + 1)
+                : null;
+        const derived = entries && entries.length > 0 ? deriveStamps(entries, map) : undefined;
+        if (derived) {
+            stamps.set(lineNo, derived);
+        } else {
+            const ts = now();
+            stamps.set(lineNo, { created: ts, status: ts });
+            fallbacks++;
+        }
+        done++;
+        onProgress?.(done, lineNos.length);
+    }
+    return { stamps, fallbacks, cancelled: false };
+}
 
 export function registerMdMigrateCommands(
     context: vscode.ExtensionContext,
@@ -60,14 +127,6 @@ export function registerMdMigrateCommands(
     );
 }
 
-/** Read + validate the `tsk.migrate.markers` vocabulary (package.json default as fallback). */
-function readMarkerMap(logger: Logger) {
-    const raw = vscode.workspace
-        .getConfiguration('tsk')
-        .get<Record<string, string>>(MIGRATE_MARKERS_KEY, { ...DEFAULT_MD_MARKER_MAP });
-    return validateMarkerMap(raw, (message) => logger.warn(message));
-}
-
 /** Offer "Migrate task to tsk format" on an id-less Markdown task line. */
 function provideMigrateAction(
     document: vscode.TextDocument,
@@ -75,12 +134,8 @@ function provideMigrateAction(
 ): vscode.CodeAction[] | undefined {
     const lineNumber = range.start.line;
     const line = document.lineAt(lineNumber).text;
-    // A silent matcher here — config problems surface when the command runs.
-    const map = validateMarkerMap(
-        vscode.workspace
-            .getConfiguration('tsk')
-            .get<Record<string, string>>(MIGRATE_MARKERS_KEY, { ...DEFAULT_MD_MARKER_MAP }),
-    );
+    // A silent map read — config problems surface when the command runs.
+    const map = readMigrateMarkerMap();
     if (!matchMdTask(line, map)) return undefined;
     if (extractMetadata(line).metadata.has('id')) return undefined;
     const action = new vscode.CodeAction(
@@ -121,7 +176,7 @@ async function migrateMarkdownTasks(
         lastLine = editor.selection.end.line;
     }
 
-    const map = readMarkerMap(logger);
+    const map = readMigrateMarkerMap(logger);
     const docLines = doc.getText().split(/\r?\n/);
 
     // Candidates = md-task lines in scope without an @id; matched-but-id'd
@@ -142,69 +197,38 @@ async function migrateMarkdownTasks(
         return;
     }
 
-    // Derive stamps against the PRE-edit doc. -L addresses HEAD line numbers,
-    // so map doc lines to HEAD by content first; unmatched (uncommitted /
-    // edited) lines and every git failure fall back to `now`.
-    const fileDir = doc.uri.scheme === 'file' ? dirname(doc.uri.fsPath) : undefined;
-    const fileName = fileDir ? basename(doc.uri.fsPath) : undefined;
-    const stampsByLine = new Map<number, MdStamps>();
-    let fallbacks = 0;
-
-    const cancelled = await vscode.window.withProgress(
+    // Derive stamps against the PRE-edit doc (one edit at the end keeps -L
+    // line numbers valid, makes cancel-applies-nothing true, and one undo).
+    const derived = await vscode.window.withProgress(
         {
             location: vscode.ProgressLocation.Notification,
             title: 'Tsk: deriving task history from git…',
             cancellable: true,
         },
-        async (progress, token) => {
-            const headLines = fileDir && fileName ? await gitShowHead(fileDir, fileName) : null;
-            const headMap = headLines ? mapDocLinesToHead(docLines, headLines) : null;
-            let done = 0;
-            for (const lineNo of candidates) {
-                if (token.isCancellationRequested) return true;
-                const headLine = headMap?.[lineNo];
-                const entries =
-                    headLine !== null && headLine !== undefined && fileDir && fileName
-                        ? await gitLineHistory(fileDir, fileName, headLine + 1)
-                        : null;
-                const stamps =
-                    entries && entries.length > 0 ? deriveStamps(entries, map) : undefined;
-                if (stamps) {
-                    stampsByLine.set(lineNo, stamps);
-                } else {
-                    // No git answer → stamp now, for the status too — a [x]
-                    // without @completed would defy tsk's own toggles, which
-                    // always timestamp a transition.
-                    const now = deps.now();
-                    stampsByLine.set(lineNo, { created: now, status: now });
-                    fallbacks++;
-                }
-                done++;
-                progress.report({ message: `${done}/${candidates.length}` });
-            }
-            return false;
-        },
+        (progress, token) =>
+            deriveStampsForDocLines(
+                doc,
+                docLines,
+                candidates,
+                map,
+                deps.now,
+                token,
+                (done, total) => progress.report({ message: `${done}/${total}` }),
+            ),
     );
-    if (cancelled) {
+    if (derived.cancelled) {
         logger.info(`${COMMANDS.migrateMarkdownTasks}: cancelled — nothing applied.`);
         return;
     }
+    const fallbacks = derived.fallbacks;
 
-    // Fresh ids, guarded against the cache and this run's own batch.
-    const used = new Set<string>();
-    const freshId = (): string => {
-        let id = deps.generateId();
-        while (used.has(id) || cache.lookupById(id) !== undefined) id = deps.generateId();
-        used.add(id);
-        return id;
-    };
-
+    const freshId = makeGuardedIdFactory(cache, deps.generateId);
     const edit = new vscode.WorkspaceEdit();
     for (const lineNo of candidates) {
         const migrated = migrateMdLine(
             docLines[lineNo] as string,
             map,
-            stampsByLine.get(lineNo) as MdStamps,
+            derived.stamps.get(lineNo) as MdStamps,
             freshId(),
         );
         if (migrated === null) continue; // unreachable for a pre-filtered candidate
