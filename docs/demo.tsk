@@ -114,6 +114,8 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 - [ ] relocate me to another file <!-- @id:movefile-demo -->
     - [ ] my child rides along <!-- @id:movefile-child @parent:movefile-demo -->
 
+Coming **from Markdown**? **Tsk: Send All Markdown Tasks to Tsk File…** evacuates an `.md` checklist into tsk — markers remapped, timestamps recovered from git history. Try it on `migrate-sample.md` in this folder; details in the README's *Migrating from Markdown*.
+
 ## 9. Copy id
 
 `` Alt+` `` copies the task's `@id`.

@@ -73,6 +73,15 @@ The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via 
 
 Every list-edit keybinding carries `when: editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`, so `Enter` accepts an IntelliSense suggestion when one is visible and `Tab` advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
+## Migrating from Markdown
+
+Bring existing Markdown checklists into tsk. Markdown task lists speak their own marker vocabulary and carry no inline metadata, so the migration commands do two things: **remap the markers** (per the `tsk.migrate.markers` glyph→status map) and **derive the metadata from git history** — `@created` from the commit that added the line, `@completed` / `@cancelled` / `@moved` from the commit of the most recent switch *into* the current marker (a task done → reopened → done again stamps the second done; file renames are followed). Every migrated line gains a fresh `@id`. Lines git can't answer for (uncommitted, untracked, not a repo) are stamped with the current time and counted in the summary toast.
+
+- **Tsk: Send All Markdown Tasks to Tsk File…** — the one-shot evacuation: every top-level task block in the `.md` file (or just the blocks your selection touches) is converted and appended, in order, to one `.tsk` file you pick (or a new one via the save dialog), leaving a `[>]` breadcrumb per block. One atomic edit, one undo. Per-task: `Ctrl+.` → *Send task to tsk file…* on any unmigrated task line.
+- **Tsk: Migrate Markdown Tasks** — the staged alternative: convert in place (whole file, selection, or `Ctrl+.` → *Migrate task to tsk format* per line). Converted tasks keep living in the `.md` file — the metadata comment is invisible in rendered Markdown — until you relocate them with *Move task to file…*, which auto-converts any still-raw children riding along in the block.
+
+The default vocabulary reads `[ ]` todo, `[/]` **done**, `[>>]` moved, `[x]` **cancelled**, `[n]` note — `[/]` and `[x]` mean different things in tsk, so the remap is semantic, not textual (`[/]` → `[x]` + `@completed`; `[x]` → `[!]` + `@cancelled`). GFM-style lists should override the map, e.g. `{" ": "todo", "x": "completed", "/": "inprogress"}`. Migration only ever touches lines without an `@id` (re-running is harmless), and `- [text](url)` links are never mistaken for tasks. Try it hands-on with `docs/migrate-sample.md`.
+
 ## Tags & search
 
 Tags use `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files. Two surfaces sit on top:
@@ -229,6 +238,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.state.path` | `${workspaceFolder}/.vscode/tsk/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
 | `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]` and stamp `@started` (like `Alt+S`). Turn off to leave the marker unchanged. |
 | `tsk.autolinks` | `[]` | Regex→URL rules; text matching a rule becomes a `Ctrl`/`Cmd`+clickable link in `.tsk` editors. See *Autolinks*. |
+| `tsk.migrate.markers` | `[/]`=done, `[x]`=cancelled, … | Markdown glyph → tsk status map used by the migration commands (multi-char glyphs like `>>` allowed). See *Migrating from Markdown*. |
 
 Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. The marker and metadata colors drive the **Search Editor result rows** (which can't carry semantic tokens); `tsk.navigation.highlight` and `tsk.now.highlight` are in-editor line decorations (the navigate-flash and the now-task border). In `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 
