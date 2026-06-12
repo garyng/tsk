@@ -477,7 +477,7 @@
                         "x": "cancelled",
                         "n": "notes"
                     },
-                    "markdownDescription": "Marker vocabulary used by `Tsk: Migrate Markdown Tasks` to read task glyphs in Markdown files: each key is the text between `[` and `]` (multi-character glyphs like `>>` allowed), each value the tsk status it migrates to. The default reads `[/]` as *done* and `[x]` as *cancelled*; GFM-style lists want e.g. `{\" \": \"todo\", \"x\": \"completed\", \"/\": \"inprogress\"}`. Migrated lines get the matching tsk marker plus `@id`/`@created` (and the status timestamp) derived from git history."
+                    "markdownDescription": "Marker vocabulary the Markdown migration commands (migrate / send / move-from-markdown) use to read task glyphs in Markdown files: each key is the text between `[` and `]` (multi-character glyphs like `>>` allowed), each value the tsk status it migrates to. The default reads `[/]` as *done* and `[x]` as *cancelled*; GFM-style lists want e.g. `{\" \": \"todo\", \"x\": \"completed\", \"/\": \"inprogress\"}`. Migrated lines get the matching tsk marker plus `@id`/`@created` (and the status timestamp) derived from git history."
                 },
                 "tsk.tags.path": {
                     "type": "string",

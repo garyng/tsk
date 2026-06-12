@@ -16,7 +16,7 @@ import { DEFAULT_MD_MARKER_MAP, validateMarkerMap } from './md-migrate';
 const MAP = validateMarkerMap(DEFAULT_MD_MARKER_MAP);
 
 /**
- * Captured verbatim from the M2 spike repo (see the plan): `git log --reverse
+ * Captured verbatim from a throwaway scripted repo: `git log --reverse
  * -L3,3:notes.md --format='COMMIT %H %aI'` on a line that went todo → done →
  * reopened → done again, across a file rename (tasks.md → notes.md — note the
  * rename commit itself does not appear; -L follows it silently).

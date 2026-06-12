@@ -29,8 +29,9 @@ import { localTimestamp } from './lib/time';
  * `WorkspaceEdit` applies every line — a single undo step. Cancelling the
  * progress notification applies nothing.
  *
- * Also contributes the "Migrate task to tsk format" rewrite action on
- * id-less Markdown task lines. Already-migrated lines (carrying `@id`) are
+ * Also contributes the id-less-line code actions — "Migrate task to tsk
+ * format" (rewrite) and "Send task to tsk file…" (move, handled in
+ * `move-task-commands.ts`). Already-migrated lines (carrying `@id`) are
  * skipped everywhere — the idempotency rule.
  */
 interface MigrateDeps {

@@ -356,8 +356,10 @@ async function convertBlocks(
 
 function warnPassedThrough(count: number): void {
     if (count === 0) return;
+    // Worded prospectively — this fires before the target pick / applyEdit,
+    // either of which the user can still cancel.
     void vscode.window.showWarningMessage(
-        `Tsk: ${count} bracketed line(s) match neither the markdown marker map nor tsk — moved as-is.`,
+        `Tsk: ${count} bracketed line(s) match neither the markdown marker map nor tsk — they move as-is.`,
     );
 }
 

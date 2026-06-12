@@ -7,8 +7,8 @@
  * Why `-L`, not blame: blame gives only the LAST touch — right for a flipped
  * task's status stamp, wrong for `@created` once a line was ever reworded or
  * flipped. `-L` range-tracking replays the line's whole history (it even
- * follows file renames; the spike showed pure-rename commits don't appear at
- * all — only commits that touched the line do).
+ * follows file renames — a pure-rename commit doesn't appear in the output at
+ * all; only commits that touched the line do).
  *
  * Split: pure parsing/derivation (unit-tested on captured `git log` output)
  * + a thin `execFile` runner at the bottom (node-only, no vscode — exercised
@@ -69,7 +69,9 @@ export function parseGitLogL(output: string): GitLineEntry[] {
  * into the final glyph** (done → reopened → done stamps the second done). A
  * line born with its current marker stamps `status = created`. Returns
  * `undefined` for an empty history (caller falls back to `now`). The status
- * value is always derived; `migrateMdLine` ignores it for `todo`/`notes`.
+ * value is derived even for `todo`/`notes` glyphs (`migrateMdLine` ignores it
+ * there); a final line that no longer matches the md vocabulary yields
+ * `created` only.
  */
 export function deriveStamps(
     entries: readonly GitLineEntry[],
@@ -126,8 +128,8 @@ export function mapDocLinesToHead(
 /**
  * HEAD's version of the file as lines, or `null` when git/repo/file isn't
  * available (untracked file, not a repo, git missing — every fallback case).
- * `HEAD:./<name>` keeps the path cwd-relative under `-C` (a bare
- * `HEAD:<name>` would resolve from the repo root).
+ * `HEAD:./<name>` keeps the path relative to the subprocess working directory
+ * (`fileDir`); a bare `HEAD:<name>` would resolve from the repo root.
  */
 export async function gitShowHead(fileDir: string, fileName: string): Promise<string[] | null> {
     const out = await runGit(fileDir, ['show', `HEAD:./${fileName}`]);
