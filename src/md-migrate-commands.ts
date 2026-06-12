@@ -113,6 +113,10 @@ export async function deriveStampsForDocLines(
         if (run?.cancelled) return { stamps, fallbacks, cancelled: true };
         derived = run?.stamps;
     }
+    // A cancel that lands outside the git pass (while `gitShowHead` awaited,
+    // or on the no-git path) must also apply nothing — without this check the
+    // fallback loop below would stamp everything `now` despite the cancel.
+    if (token?.isCancellationRequested) return { stamps, fallbacks, cancelled: true };
 
     for (const lineNo of lineNos) {
         const headLine = docToHead.get(lineNo);
@@ -237,8 +241,9 @@ async function migrateMarkdownTasks(
         return;
     }
 
-    // Derive stamps against the PRE-edit doc (one edit at the end keeps -L
-    // line numbers valid, makes cancel-applies-nothing true, and one undo).
+    // Derive stamps against the PRE-edit doc (one edit at the end keeps the
+    // doc→HEAD line mapping valid, makes cancel-applies-nothing true, and one
+    // undo step).
     const derived = await vscode.window.withProgress(
         {
             location: vscode.ProgressLocation.Notification,
