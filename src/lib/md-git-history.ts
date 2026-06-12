@@ -248,9 +248,10 @@ export class LineHistoryTracker {
 }
 
 /**
- * Map each doc line to its line number in HEAD's version of the file, by
- * exact-content greedy MONOTONIC matching (each head line consumed once, in
- * order — so duplicate content resolves positionally). `null` = no match
+ * Map each doc line to its 0-BASED index into `headLines`, by exact-content
+ * greedy MONOTONIC matching (each head line consumed once, in order — so
+ * duplicate content resolves positionally); callers add 1 for the 1-based
+ * HEAD line numbers the tracker speaks. `null` = no match
  * (a new/edited-since-HEAD line → the caller stamps `now` instead of asking
  * git about a line number that means something else). Needed because the
  * patch replay tracks HEAD's line numbers, not the (possibly dirty) editor
