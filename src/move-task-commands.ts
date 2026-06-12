@@ -309,7 +309,7 @@ async function convertBlocks(
     cache: CacheService,
     deps: MoveDeps,
     token?: vscode.CancellationToken,
-    onProgress?: (done: number, total: number) => void,
+    onProgress?: (message: string) => void,
 ): Promise<{
     prepared: Map<number, readonly string[]>;
     fallbacks: number;
@@ -479,8 +479,8 @@ async function sendAllMarkdownTasks(
             cancellable: true,
         },
         (progress, token) =>
-            convertBlocks(doc, lines, chosen, map, cache, deps, token, (done, total) =>
-                progress.report({ message: `${done}/${total}` }),
+            convertBlocks(doc, lines, chosen, map, cache, deps, token, (message) =>
+                progress.report({ message }),
             ),
     );
     if (converted.cancelled) {

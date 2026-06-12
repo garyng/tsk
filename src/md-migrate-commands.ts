@@ -5,7 +5,7 @@ import type { CacheService } from './lib/cache';
 import { generateId } from './lib/ids';
 import type { Logger } from './lib/logger';
 import type { Marker } from './lib/markers';
-import { deriveStamps, gitLineHistory, gitShowHead, mapDocLinesToHead } from './lib/md-git-history';
+import { gitFileLineStamps, gitShowHead, mapDocLinesToHead } from './lib/md-git-history';
 import {
     DEFAULT_MD_MARKER_MAP,
     type MdStamps,
@@ -64,8 +64,10 @@ export function makeGuardedIdFactory(cache: CacheService, generate: () => string
 /**
  * Derive {@link MdStamps} for the given doc lines from git history — the
  * shared derivation under migrate, move-from-md, and send. Maps the (possibly
- * dirty) doc to HEAD line numbers first (`-L` addresses HEAD), then replays
- * each line's history; unmatched lines and git failures stamp
+ * dirty) doc to HEAD line numbers first (the patch replay tracks HEAD's line
+ * numbers), then makes ONE streamed `git log -p` pass for the whole file
+ * ({@link gitFileLineStamps} — killed early once every line resolves).
+ * Unmatched lines and anything git can't answer stamp
  * `created = status = now` (a `[x]` without `@completed` would defy tsk's own
  * toggles) and count as `fallbacks`. Honors an optional cancellation token —
  * when it fires, `cancelled: true` returns and the caller applies nothing.
@@ -77,7 +79,7 @@ export async function deriveStampsForDocLines(
     map: ReadonlyMap<string, Marker>,
     now: () => string,
     token?: vscode.CancellationToken,
-    onProgress?: (done: number, total: number) => void,
+    onProgress?: (message: string) => void,
 ): Promise<{ stamps: Map<number, MdStamps>; fallbacks: number; cancelled: boolean }> {
     const fileDir = doc.uri.scheme === 'file' ? dirname(doc.uri.fsPath) : undefined;
     const fileName = fileDir ? basename(doc.uri.fsPath) : undefined;
@@ -86,24 +88,42 @@ export async function deriveStampsForDocLines(
 
     const headLines = fileDir && fileName ? await gitShowHead(fileDir, fileName) : null;
     const headMap = headLines ? mapDocLinesToHead(docLines, headLines) : null;
-    let done = 0;
+
+    // Doc line → 1-based HEAD line, for the lines that map (the rest fall back).
+    const docToHead = new Map<number, number>();
     for (const lineNo of lineNos) {
-        if (token?.isCancellationRequested) return { stamps, fallbacks, cancelled: true };
         const headLine = headMap?.[lineNo];
-        const entries =
-            headLine !== null && headLine !== undefined && fileDir && fileName
-                ? await gitLineHistory(fileDir, fileName, headLine + 1)
-                : null;
-        const derived = entries && entries.length > 0 ? deriveStamps(entries, map) : undefined;
-        if (derived) {
-            stamps.set(lineNo, derived);
+        if (headLine !== null && headLine !== undefined) docToHead.set(lineNo, headLine + 1);
+    }
+
+    let derived: Map<number, MdStamps> | undefined;
+    if (headLines && fileDir && fileName && docToHead.size > 0) {
+        const run = await gitFileLineStamps(
+            fileDir,
+            fileName,
+            headLines,
+            [...docToHead.values()],
+            map,
+            {
+                isCancelled: () => token?.isCancellationRequested ?? false,
+                onProgress: (resolved, total, commits) =>
+                    onProgress?.(`${resolved}/${total} · ${commits} commits scanned`),
+            },
+        );
+        if (run?.cancelled) return { stamps, fallbacks, cancelled: true };
+        derived = run?.stamps;
+    }
+
+    for (const lineNo of lineNos) {
+        const headLine = docToHead.get(lineNo);
+        const lineStamps = headLine !== undefined ? derived?.get(headLine) : undefined;
+        if (lineStamps) {
+            stamps.set(lineNo, lineStamps);
         } else {
             const ts = now();
             stamps.set(lineNo, { created: ts, status: ts });
             fallbacks++;
         }
-        done++;
-        onProgress?.(done, lineNos.length);
     }
     return { stamps, fallbacks, cancelled: false };
 }
@@ -226,14 +246,8 @@ async function migrateMarkdownTasks(
             cancellable: true,
         },
         (progress, token) =>
-            deriveStampsForDocLines(
-                doc,
-                docLines,
-                candidates,
-                map,
-                deps.now,
-                token,
-                (done, total) => progress.report({ message: `${done}/${total}` }),
+            deriveStampsForDocLines(doc, docLines, candidates, map, deps.now, token, (message) =>
+                progress.report({ message }),
             ),
     );
     if (derived.cancelled) {

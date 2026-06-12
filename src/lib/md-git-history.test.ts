@@ -4,146 +4,181 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
-    deriveStamps,
-    type GitLineEntry,
-    gitLineHistory,
+    type CommitPatch,
+    gitFileLineStamps,
     gitShowHead,
+    LineHistoryTracker,
     mapDocLinesToHead,
-    parseGitLogL,
+    PatchStreamParser,
 } from './md-git-history';
 import { DEFAULT_MD_MARKER_MAP, validateMarkerMap } from './md-migrate';
 
 const MAP = validateMarkerMap(DEFAULT_MD_MARKER_MAP);
 
-/**
- * Captured verbatim from a throwaway scripted repo: `git log --reverse
- * -L3,3:notes.md --format='COMMIT %H %aI'` on a line that went todo → done →
- * reopened → done again, across a file rename (tasks.md → notes.md — note the
- * rename commit itself does not appear; -L follows it silently).
- */
-const BETA_FLIP_REFLIP = `COMMIT 185440dd55351b9f7b91781940234f449e66ef20 2026-01-01T10:00:00+08:00
+/** Format one commit block the way our `git log -p -U0 --format` emits it (newest first). */
+const fmtCommit = (iso: string, hunkText: string): string =>
+    `\x01COMMIT abcdef1234567890 ${iso}\n\ndiff --git a/t.md b/t.md\nindex 1111111..2222222 100644\n--- a/t.md\n+++ b/t.md\n${hunkText}`;
 
-diff --git a/tasks.md b/tasks.md
-new file mode 100644
-index 0000000..9c26177
---- /dev/null
-+++ b/tasks.md
-@@ -0,0 +3,1 @@
-+- [ ] beta
-COMMIT 6857c7f823aa828b4c1f025c05b053485feb0ba9 2026-02-01T11:00:00+08:00
+/** Parse a whole fixture in one push (+ end flush). */
+const parseAll = (text: string): CommitPatch[] => {
+    const parser = new PatchStreamParser();
+    return [...parser.push(text), ...parser.end()];
+};
 
-diff --git a/tasks.md b/tasks.md
-index 9c26177..abd8b6e 100644
---- a/tasks.md
-+++ b/tasks.md
-@@ -3,1 +3,1 @@
--- [ ] beta
-+- [/] beta
-COMMIT 17d78b92de558871dd54a4d4711a344eadc2c9fd 2026-04-01T13:00:00+08:00
+// The flip-reflip history (newest→oldest): beta created [ ] at T1, done at T2,
+// reopened at T3, done again at T4. HEAD: beta is line 3, currently [/].
+const T1 = '2026-01-01T10:00:00+08:00';
+const T2 = '2026-02-01T11:00:00+08:00';
+const T3 = '2026-04-01T13:00:00+08:00';
+const T4 = '2026-05-01T14:00:00+08:00';
+const HEAD_LINES = ['# list', '- [ ] alpha', '- [/] beta', '- [ ] gamma', ''];
+const FLIP_REFLIP = [
+    fmtCommit(T4, '@@ -3,1 +3,1 @@\n-- [ ] beta\n+- [/] beta\n'),
+    fmtCommit(T3, '@@ -3,1 +3,1 @@\n-- [/] beta\n+- [ ] beta\n'),
+    fmtCommit(T2, '@@ -3,1 +3,1 @@\n-- [ ] beta\n+- [/] beta\n'),
+    fmtCommit(T1, '@@ -0,0 +1,4 @@\n+# list\n+- [ ] alpha\n+- [ ] beta\n+- [ ] gamma\n'),
+].join('');
 
-diff --git a/tasks.md b/tasks.md
-index fd1f9aa..90437a0 100644
---- a/tasks.md
-+++ b/tasks.md
-@@ -3,1 +3,1 @@
--- [/] beta
-+- [ ] beta
-COMMIT 2eace1cc64d72dd45fa9c9568be79746d16b0877 2026-05-01T14:00:00+08:00
-
-diff --git a/tasks.md b/tasks.md
-index 90437a0..87217eb 100644
---- a/tasks.md
-+++ b/tasks.md
-@@ -3,1 +3,1 @@
--- [ ] beta
-+- [/] beta
-`;
-
-/** Same capture for a line that was only reworded (todo throughout). */
-const GAMMA_REWORD = `COMMIT 185440dd55351b9f7b91781940234f449e66ef20 2026-01-01T10:00:00+08:00
-
-diff --git a/tasks.md b/tasks.md
-new file mode 100644
-index 0000000..9c26177
---- /dev/null
-+++ b/tasks.md
-@@ -0,0 +4,1 @@
-+- [ ] gamma
-COMMIT 6b3379b368b319e48b639408db1b6b72a1a2a6fb 2026-03-01T12:00:00+08:00
-
-diff --git a/tasks.md b/tasks.md
-index abd8b6e..fd1f9aa 100644
---- a/tasks.md
-+++ b/tasks.md
-@@ -4,1 +4,1 @@
--- [ ] gamma
-+- [ ] gamma rewritten
-`;
-
-describe('parseGitLogL', () => {
-    it('parses the flip-reflip capture into oldest-first post-image entries', () => {
-        const entries = parseGitLogL(BETA_FLIP_REFLIP);
-        expect(entries.map((e) => [e.iso, e.line])).toEqual([
-            ['2026-01-01T10:00:00+08:00', '- [ ] beta'],
-            ['2026-02-01T11:00:00+08:00', '- [/] beta'],
-            ['2026-04-01T13:00:00+08:00', '- [ ] beta'],
-            ['2026-05-01T14:00:00+08:00', '- [/] beta'],
+describe('PatchStreamParser', () => {
+    it('parses commits with hunks, newest first', () => {
+        const commits = parseAll(FLIP_REFLIP);
+        expect(commits.map((c) => c.iso)).toEqual([T4, T3, T2, T1]);
+        expect(commits[0]?.hunks).toEqual([
+            {
+                oldStart: 3,
+                oldCount: 1,
+                newStart: 3,
+                newCount: 1,
+                removed: ['- [ ] beta'],
+                added: ['- [/] beta'],
+            },
         ]);
-        expect(entries[0]?.hash).toBe('185440dd55351b9f7b91781940234f449e66ef20');
+        expect(commits[3]?.hunks[0]).toMatchObject({ oldStart: 0, oldCount: 0, newCount: 4 });
     });
 
-    it('parses the reword capture and never mistakes a "+++" file header for content', () => {
-        const entries = parseGitLogL(GAMMA_REWORD);
-        expect(entries.map((e) => e.line)).toEqual(['- [ ] gamma', '- [ ] gamma rewritten']);
-        expect(entries.some((e) => e.line.startsWith('++'))).toBe(false);
+    it('is chunk-safe — feeding 5 bytes at a time parses identically', () => {
+        const parser = new PatchStreamParser();
+        const commits: CommitPatch[] = [];
+        for (let i = 0; i < FLIP_REFLIP.length; i += 5) {
+            commits.push(...parser.push(FLIP_REFLIP.slice(i, i + 5)));
+        }
+        commits.push(...parser.end());
+        expect(commits).toEqual(parseAll(FLIP_REFLIP));
     });
 
-    it('returns [] for empty output', () => {
-        expect(parseGitLogL('')).toEqual([]);
+    it('defaults omitted hunk counts to 1', () => {
+        const commits = parseAll(fmtCommit(T1, '@@ -3 +3 @@\n-old\n+new\n'));
+        expect(commits[0]?.hunks[0]).toMatchObject({ oldCount: 1, newCount: 1 });
+    });
+
+    it('treats "---" as content inside a hunk but as a header outside one', () => {
+        const commits = parseAll(fmtCommit(T1, '@@ -1,1 +1,1 @@\n---\n+- [ ] x\n'));
+        expect(commits[0]?.hunks[0]?.removed).toEqual(['--']);
+        expect(commits[0]?.hunks[0]?.added).toEqual(['- [ ] x']);
+    });
+
+    it('ignores "\\ No newline" markers and tolerates header-only commits', () => {
+        const text =
+            fmtCommit(T2, '@@ -1,1 +1,1 @@\n-a\n+b\n\\ No newline at end of file\n') +
+            `\x01COMMIT 999 ${T1}\n\n`;
+        const commits = parseAll(text);
+        expect(commits).toHaveLength(2);
+        expect(commits[0]?.hunks[0]?.added).toEqual(['b']);
+        expect(commits[1]?.hunks).toEqual([]);
     });
 });
 
-describe('deriveStamps', () => {
-    const entry = (iso: string, line: string): GitLineEntry => ({ hash: 'h', iso, line });
+describe('LineHistoryTracker', () => {
+    const replay = (
+        headLines: readonly string[],
+        queried: number[],
+        fixture: string,
+    ): LineHistoryTracker => {
+        const tracker = new LineHistoryTracker(headLines, queried, MAP);
+        for (const commit of parseAll(fixture)) tracker.apply(commit);
+        return tracker;
+    };
 
-    it('flip-reflip: created = first commit, status = the LATEST transition into the current glyph', () => {
-        expect(deriveStamps(parseGitLogL(BETA_FLIP_REFLIP), MAP)).toEqual({
-            created: '2026-01-01T10:00:00+08:00',
-            status: '2026-05-01T14:00:00+08:00',
-        });
+    it('flip-reflip: created = the intro commit, status = the LATEST transition into the glyph', () => {
+        const tracker = replay(HEAD_LINES, [3], FLIP_REFLIP);
+        expect(tracker.results().get(3)).toEqual({ created: T1, status: T4 });
+        expect(tracker.done).toBe(true);
     });
 
-    it('reword without a flip: status stays at creation (no transition happened)', () => {
-        expect(deriveStamps(parseGitLogL(GAMMA_REWORD), MAP)).toEqual({
-            created: '2026-01-01T10:00:00+08:00',
-            status: '2026-01-01T10:00:00+08:00',
-        });
+    it('a task born with its marker stamps status = created', () => {
+        const tracker = replay(HEAD_LINES, [2], FLIP_REFLIP); // alpha, untouched since T1
+        expect(tracker.results().get(2)).toEqual({ created: T1, status: T1 });
     });
 
-    it('a task born with its current marker stamps status = created', () => {
-        expect(deriveStamps([entry('t1', '- [x] born cancelled')], MAP)).toEqual({
-            created: 't1',
-            status: 't1',
-        });
+    it('a reword that keeps the glyph does not move the status (the run continues)', () => {
+        const head = ['- [/] renamed task', ''];
+        const fixture = [
+            fmtCommit(T3, '@@ -1,1 +1,1 @@\n-- [/] old name\n+- [/] renamed task\n'),
+            fmtCommit(T2, '@@ -1,1 +1,1 @@\n-- [ ] old name\n+- [/] old name\n'),
+            fmtCommit(T1, '@@ -0,0 +1,1 @@\n+- [ ] old name\n'),
+        ].join('');
+        expect(replay(head, [1], fixture).results().get(1)).toEqual({ created: T1, status: T2 });
     });
 
-    it('a line that became a task later: created = line birth, status = when it became the task', () => {
-        const entries = [
-            entry('t1', 'just prose'),
-            entry('t2', '- [/] now a done task'),
-            entry('t3', '- [/] now a done task, reworded'),
-        ];
-        expect(deriveStamps(entries, MAP)).toEqual({ created: 't1', status: 't2' });
+    it('a line that became a task later: created = line birth, status = task-ification', () => {
+        const head = ['- [/] now a task', ''];
+        const fixture = [
+            fmtCommit(T2, '@@ -1,1 +1,1 @@\n-just prose\n+- [/] now a task\n'),
+            fmtCommit(T1, '@@ -0,0 +1,1 @@\n+just prose\n'),
+        ].join('');
+        expect(replay(head, [1], fixture).results().get(1)).toEqual({ created: T1, status: T2 });
     });
 
-    it('a final line that is not a task yields created only', () => {
-        expect(deriveStamps([entry('t1', 'prose then'), entry('t2', 'prose now')], MAP)).toEqual({
-            created: 't1',
-        });
+    it('shifts untouched lines past insertions and zero-count deletions above them', () => {
+        // Insertion above: 2 lines added at the top in the newest commit.
+        const headA = ['new1', 'new2', '- [/] task', ''];
+        const fixtureA = [
+            fmtCommit(T2, '@@ -0,0 +1,2 @@\n+new1\n+new2\n'),
+            fmtCommit(T1, '@@ -0,0 +1,1 @@\n+- [/] task\n'),
+        ].join('');
+        expect(replay(headA, [3], fixtureA).results().get(3)).toEqual({ created: T1, status: T1 });
+
+        // Deletion above: 2 lines that sat above were removed (zero-newCount hunk).
+        const headB = ['- [/] keep', ''];
+        const fixtureB = [
+            fmtCommit(T2, '@@ -1,2 +0,0 @@\n-a\n-b\n'),
+            fmtCommit(T1, '@@ -0,0 +1,3 @@\n+a\n+b\n+- [/] keep\n'),
+        ].join('');
+        expect(replay(headB, [1], fixtureB).results().get(1)).toEqual({ created: T1, status: T1 });
     });
 
-    it('returns undefined for an empty history', () => {
-        expect(deriveStamps([], MAP)).toBeUndefined();
+    it('pairs lines positionally inside a multi-line hunk', () => {
+        const head = ['- [x] A2', '- [/] B2', '- [ ] C2', ''];
+        const fixture = [
+            fmtCommit(
+                T2,
+                '@@ -1,3 +1,3 @@\n-- [x] A\n-- [ ] B\n-- [ ] C\n+- [x] A2\n+- [/] B2\n+- [ ] C2\n',
+            ),
+            fmtCommit(T1, '@@ -0,0 +1,3 @@\n+- [x] A\n+- [ ] B\n+- [ ] C\n'),
+        ].join('');
+        // B2 (line 2): the rewrite flipped its glyph ' '→'/' → status = T2.
+        expect(replay(head, [2], fixture).results().get(2)).toEqual({ created: T1, status: T2 });
+    });
+
+    it('a queried non-task line yields created only (no status)', () => {
+        const head = ['plain prose', ''];
+        const fixture = fmtCommit(T1, '@@ -0,0 +1,1 @@\n+plain prose\n');
+        expect(replay(head, [1], fixture).results().get(1)).toEqual({ created: T1 });
+    });
+
+    it('leaves a line unresolved (absent from results) when history never introduces it', () => {
+        const tracker = replay(HEAD_LINES, [3], fmtCommit(T4, '@@ -3,1 +3,1 @@\n-x\n+y\n'));
+        expect(tracker.done).toBe(false);
+        expect(tracker.results().size).toBe(0);
+    });
+
+    it('flips done as soon as every queried line is resolved (the early-exit signal)', () => {
+        const tracker = new LineHistoryTracker(HEAD_LINES, [2], MAP);
+        const [newest, ...rest] = parseAll(FLIP_REFLIP);
+        tracker.apply(newest as CommitPatch);
+        expect(tracker.done).toBe(false); // alpha not introduced yet
+        for (const commit of rest) tracker.apply(commit);
+        expect(tracker.done).toBe(true);
     });
 });
 
@@ -188,10 +223,12 @@ describe('git runner (real scripted repo)', () => {
         git(['config', 'user.email', 'test@test.local']);
         writeFileSync(join(repo, 'tasks.md'), '# list\n- [ ] alpha\n- [ ] beta\n');
         git(['add', 'tasks.md']);
-        commit('add', '2026-01-01T10:00:00+08:00');
+        commit('add', T1);
         writeFileSync(join(repo, 'tasks.md'), '# list\n- [ ] alpha\n- [/] beta\n');
         git(['add', 'tasks.md']);
-        commit('beta done', '2026-02-01T11:00:00+08:00');
+        commit('beta done', T2);
+        git(['mv', 'tasks.md', 'notes.md']);
+        commit('rename to notes', T3);
         writeFileSync(join(repo, 'untracked.md'), '- [ ] never committed\n');
     });
 
@@ -199,24 +236,30 @@ describe('git runner (real scripted repo)', () => {
         rmSync(repo, { recursive: true, force: true });
     });
 
-    it('gitShowHead returns HEAD lines; gitLineHistory replays a flip with %aI dates', async () => {
-        const head = await gitShowHead(repo, 'tasks.md');
+    it('derives created + flip status in ONE pass, following the rename', async () => {
+        const head = await gitShowHead(repo, 'notes.md');
         expect(head?.[2]).toBe('- [/] beta');
 
-        const entries = await gitLineHistory(repo, 'tasks.md', 3);
-        expect(entries?.map((e) => [e.iso, e.line])).toEqual([
-            ['2026-01-01T10:00:00+08:00', '- [ ] beta'],
-            ['2026-02-01T11:00:00+08:00', '- [/] beta'],
-        ]);
-        expect(deriveStamps(entries ?? [], MAP)).toEqual({
-            created: '2026-01-01T10:00:00+08:00',
-            status: '2026-02-01T11:00:00+08:00',
-        });
+        const run = await gitFileLineStamps(repo, 'notes.md', head as string[], [2, 3], MAP);
+        expect(run?.cancelled).toBe(false);
+        expect(run?.stamps.get(3)).toEqual({ created: T1, status: T2 }); // beta, through the rename
+        expect(run?.stamps.get(2)).toEqual({ created: T1, status: T1 }); // alpha, born [ ]
     });
 
-    it('returns null for an untracked file and outside a repo', async () => {
+    it('honors cancellation and short-circuits empty queries', async () => {
+        const head = (await gitShowHead(repo, 'notes.md')) as string[];
+        const cancelled = await gitFileLineStamps(repo, 'notes.md', head, [3], MAP, {
+            isCancelled: () => true,
+        });
+        expect(cancelled?.cancelled).toBe(true);
+        expect(cancelled?.stamps.size).toBe(0);
+
+        const empty = await gitFileLineStamps(repo, 'notes.md', head, [], MAP);
+        expect(empty).toEqual({ stamps: new Map(), cancelled: false });
+    });
+
+    it('gitShowHead returns null for an untracked file and outside a repo', async () => {
         expect(await gitShowHead(repo, 'untracked.md')).toBeNull();
-        expect(await gitLineHistory(repo, 'untracked.md', 1)).toBeNull();
         expect(await gitShowHead(tmpdir(), 'nope.md')).toBeNull();
     });
 });
