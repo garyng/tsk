@@ -14,8 +14,7 @@ import { computeSemanticTokens, type TskTokenType } from './lib/semantic-tokens'
  * `package.json#contributes.configurationDefaults`).
  *
  * Two token types: `taskMarker` (status as its single modifier, so rules target
- * `taskMarker.completed`, `taskMarker.cancelled`, …) and `taskMetadata`. `todo`
- * markers ship no color rule → editor default.
+ * `taskMarker.completed`, `taskMarker.cancelled`, …) and `taskMetadata`.
  */
 const TOKEN_TYPES: readonly TskTokenType[] = ['taskMarker', 'taskMetadata'];
 const TOKEN_MODIFIERS: readonly Marker[] = MARKERS.map((m) => m.name);

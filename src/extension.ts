@@ -34,7 +34,8 @@ import type { NowTreeState } from './lib/now-tree';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
-import { registerMoveTaskCommand } from './move-task-commands';
+import { registerMdMigrateCommands } from './md-migrate-commands';
+import { registerMoveTaskCommand, registerSendMarkdownCommands } from './move-task-commands';
 import { NavigationHighlight } from './navigation-highlight';
 import { registerNowCommands } from './now-commands';
 import { NowDecoration } from './now-decoration';
@@ -319,7 +320,7 @@ function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Wire the four document / editor lifecycle listeners. Save triggers a
+ * Wire the document / editor lifecycle listeners. Save triggers a
  * synchronous rescan; change triggers a debounced rescan + decorate.
  * Editor visibility events (active / visible-list changed) trigger
  * decoration only — the cache state is unaffected by which editor is
@@ -369,11 +370,12 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
 
 /**
  * Register the contributed command + provider families: the toggle set,
- * copy-id, the relationship pickers, list-edit, duplicate-line, the tags
- * completion provider, find-by-tag, find-by-status, code actions, hover,
- * and the now + now-tree commands, plus the `tsk.rebuildCache` palette
- * entry. (Codelens, semantic-token, autolinks, clipboard-bridge and
- * paste-image providers are registered separately in `activate()`.)
+ * copy-id, the relationship pickers, list-edit, duplicate-line, move-task,
+ * the markdown migrate/send set, the tags completion provider, find-by-tag,
+ * find-by-status, code actions, hover, and the now + now-tree commands, plus
+ * the `tsk.rebuildCache` palette entry. (Codelens, semantic-token, autolinks,
+ * clipboard-bridge and paste-image providers are registered separately in
+ * `activate()`.)
  */
 function registerAllCommands(
     context: vscode.ExtensionContext,
@@ -389,7 +391,9 @@ function registerAllCommands(
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
     registerDuplicateCommands(context, logger);
-    registerMoveTaskCommand(context, logger);
+    registerMoveTaskCommand(context, logger, cache);
+    registerSendMarkdownCommands(context, logger, cache);
+    registerMdMigrateCommands(context, cache, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
     registerFindAllTasksByStatusCommand(context, cache, logger);

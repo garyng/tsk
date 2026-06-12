@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -242,6 +242,21 @@
                 "command": "tsk.moveTaskToFile",
                 "title": "Move Task to File…",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.migrateMarkdownTasks",
+                "title": "Migrate Markdown Tasks",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.sendMarkdownTaskToFile",
+                "title": "Send Markdown Task to Tsk File…",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.sendAllMarkdownTasks",
+                "title": "Send All Markdown Tasks to Tsk File…",
+                "category": "Tsk"
             }
         ],
         "menus": {
@@ -441,6 +456,28 @@
                     "type": "string",
                     "default": "${workspaceFolder}/.vscode/tsk/cache.db",
                     "description": "Path to the on-disk SQLite cache. Supports ${workspaceFolder} substitution. When no workspace folder is open, falls back to in-memory."
+                },
+                "tsk.migrate.markers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                            "todo",
+                            "inprogress",
+                            "completed",
+                            "moved",
+                            "cancelled",
+                            "notes"
+                        ]
+                    },
+                    "default": {
+                        " ": "todo",
+                        "/": "completed",
+                        ">>": "moved",
+                        "x": "cancelled",
+                        "n": "notes"
+                    },
+                    "markdownDescription": "Marker vocabulary the Markdown migration commands (migrate / send / move-from-markdown) use to read task glyphs in Markdown files: each key is the text between `[` and `]` (multi-character glyphs like `>>` allowed), each value the tsk status it migrates to. The default reads `[/]` as *done* and `[x]` as *cancelled*; GFM-style lists want e.g. `{\" \": \"todo\", \"x\": \"completed\", \"/\": \"inprogress\"}`. Migrated lines get the matching tsk marker plus `@id`/`@created` (and the status timestamp) derived from git history."
                 },
                 "tsk.tags.path": {
                     "type": "string",

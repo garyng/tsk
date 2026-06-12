@@ -108,6 +108,9 @@ export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
 export const AUTOLINKS_SETTING = 'tsk.autolinks';
 export const AUTOLINKS_KEY = 'autolinks';
 
+export const MIGRATE_MARKERS_SETTING = 'tsk.migrate.markers';
+export const MIGRATE_MARKERS_KEY = 'migrate.markers';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every
@@ -118,6 +121,9 @@ export const AUTOLINKS_KEY = 'autolinks';
 // it only guards the (impossible-for-a-contributed-setting) case of a missing
 // manifest entry, and degrades sanely there (empty path → inactive, etc.).
 // Keeping defaults in one place means there's no code/manifest mirror to drift.
+// One exception: `tsk.migrate.markers` also lives in code as
+// `DEFAULT_MD_MARKER_MAP` (`lib/md-migrate.ts` is vscode-free and can't read
+// config); `md-migrate.test.ts` pins that mirror to the manifest.
 
 // ── Theme color ids ─────────────────────────────────────────────────────────
 
@@ -184,6 +190,9 @@ export const COMMANDS = {
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
     moveTaskToFile: 'tsk.moveTaskToFile',
+    migrateMarkdownTasks: 'tsk.migrateMarkdownTasks',
+    sendMarkdownTaskToFile: 'tsk.sendMarkdownTaskToFile',
+    sendAllMarkdownTasks: 'tsk.sendAllMarkdownTasks',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
     markNow: 'tsk.markNow',
     openNowStack: 'tsk.now.openStack',
