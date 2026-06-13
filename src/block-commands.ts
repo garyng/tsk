@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
-import { COMMANDS, DOUBLE_CLICK_SELECTS_BLOCK_KEY } from './constants';
+import {
+    COMMANDS,
+    COPY_BLOCK_TRAILING_NEWLINE_KEY,
+    DOUBLE_CLICK_SELECTS_BLOCK_KEY,
+} from './constants';
 import { isTskDocument, requireTskEditor } from './editor-guards';
 import { mouseSelectionInPrefix } from './lib/block-select';
 import type { Logger } from './lib/logger';
@@ -38,6 +42,13 @@ function tabSizeOf(editor: vscode.TextEditor): number {
 /** The document's line terminator, so clipboard EOLs match the file. */
 function eolOf(doc: vscode.TextDocument): string {
     return doc.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+}
+
+/** Whether block cut/copy appends a trailing newline (so the block pastes as a standalone unit). */
+function blockTrailingNewline(): boolean {
+    return vscode.workspace
+        .getConfiguration('tsk')
+        .get<boolean>(COPY_BLOCK_TRAILING_NEWLINE_KEY, true);
 }
 
 export function registerBlockCommands(context: vscode.ExtensionContext, logger: Logger): void {
@@ -161,7 +172,10 @@ async function clipboardBlock(isCut: boolean, logger: Logger): Promise<void> {
 
     const lines = doc.getText().split(/\r?\n/);
     const { start, end } = computeTaskBlockRange(lines, cursorLine, tabSizeOf(editor));
-    const blockText = lines.slice(start, end + 1).join(eolOf(doc));
+    const eol = eolOf(doc);
+    // The block's literal lines; a trailing newline (default on) makes it paste
+    // as a standalone unit on its own line. Cut's deletion is unaffected.
+    const blockText = lines.slice(start, end + 1).join(eol) + (blockTrailingNewline() ? eol : '');
     await vscode.env.clipboard.writeText(blockText);
 
     if (isCut) {

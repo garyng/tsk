@@ -36,7 +36,7 @@ suite('block commands — copy/cut', () => {
         const editor = await openTsk(PARENT_BLOCK, 1);
         await vscode.commands.executeCommand('tsk.copyTaskBlock');
 
-        assert.strictEqual(await vscode.env.clipboard.readText(), BLOCK_TEXT);
+        assert.strictEqual(await vscode.env.clipboard.readText(), `${BLOCK_TEXT}\n`); // trailing newline on by default
         assert.strictEqual(editor.document.getText(), PARENT_BLOCK, 'copy must not change the doc');
         // The block is left selected — the visual "select the whole block and copy it".
         assert.strictEqual(editor.document.getText(editor.selection), BLOCK_TEXT);
@@ -46,7 +46,7 @@ suite('block commands — copy/cut', () => {
         const editor = await openTsk(PARENT_BLOCK, 1);
         await vscode.commands.executeCommand('tsk.cutTaskBlock');
 
-        assert.strictEqual(await vscode.env.clipboard.readText(), BLOCK_TEXT);
+        assert.strictEqual(await vscode.env.clipboard.readText(), `${BLOCK_TEXT}\n`); // trailing newline on by default
         // Siblings stay adjacent — the block plus exactly one terminator is gone.
         assert.strictEqual(editor.document.getText(), '- [ ] keep1\n- [ ] keep2');
     });
@@ -56,7 +56,7 @@ suite('block commands — copy/cut', () => {
         const editor = await openTsk(eofBlock, 1);
         await vscode.commands.executeCommand('tsk.cutTaskBlock');
 
-        assert.strictEqual(await vscode.env.clipboard.readText(), '- [ ] block\n    - [ ] child');
+        assert.strictEqual(await vscode.env.clipboard.readText(), '- [ ] block\n    - [ ] child\n');
         assert.strictEqual(editor.document.getText(), '- [ ] keep');
     });
 
@@ -83,6 +83,26 @@ suite('block commands — copy/cut', () => {
         await vscode.commands.executeCommand('tsk.copyTaskBlock');
 
         assert.strictEqual(await vscode.env.clipboard.readText(), 'keep1');
+    });
+
+    test('copy: trailing newline is omitted when tsk.copyBlockTrailingNewline is off', async () => {
+        const config = vscode.workspace.getConfiguration('tsk');
+        await config.update(
+            'copyBlockTrailingNewline',
+            false,
+            vscode.ConfigurationTarget.Workspace,
+        );
+        try {
+            await openTsk(PARENT_BLOCK, 1);
+            await vscode.commands.executeCommand('tsk.copyTaskBlock');
+            assert.strictEqual(await vscode.env.clipboard.readText(), BLOCK_TEXT); // no trailing \n
+        } finally {
+            await config.update(
+                'copyBlockTrailingNewline',
+                undefined,
+                vscode.ConfigurationTarget.Workspace,
+            );
+        }
     });
 
     test('select: on a parent task, the whole block is selected', async () => {
@@ -123,6 +143,16 @@ suite('block commands — copy/cut', () => {
             assert.strictEqual(found.mac, exp.mac);
             assert.strictEqual(found.when, when);
         }
+    });
+
+    test('contributes.configuration declares tsk.copyBlockTrailingNewline default true', () => {
+        const ext = vscode.extensions.getExtension(EXTENSION_ID);
+        assert.ok(ext);
+        const setting =
+            ext.packageJSON.contributes.configuration.properties['tsk.copyBlockTrailingNewline'];
+        assert.ok(setting, 'tsk.copyBlockTrailingNewline should be declared');
+        assert.strictEqual(setting.type, 'boolean');
+        assert.strictEqual(setting.default, true);
     });
 });
 

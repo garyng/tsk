@@ -576,6 +576,11 @@
                     "default": true,
                     "description": "Double-click a task's marker, bullet, or indentation in a .tsk editor to select its whole block (the task plus its indented sub-items). Double-clicking the task's text still selects a single word. Turn off to leave double-click as VS Code's default word-select everywhere."
                 },
+                "tsk.copyBlockTrailingNewline": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When copying or cutting a whole task block (Ctrl+C / Ctrl+X with nothing selected), append a trailing newline to the clipboard so the block pastes as a self-contained unit on its own line. Off → the clipboard ends at the block's last character."
+                },
                 "tsk.autolinks": {
                     "type": "array",
                     "default": [],

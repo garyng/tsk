@@ -114,6 +114,9 @@ export const MIGRATE_MARKERS_KEY = 'migrate.markers';
 export const DOUBLE_CLICK_SELECTS_BLOCK_SETTING = 'tsk.doubleClickSelectsBlock';
 export const DOUBLE_CLICK_SELECTS_BLOCK_KEY = 'doubleClickSelectsBlock';
 
+export const COPY_BLOCK_TRAILING_NEWLINE_SETTING = 'tsk.copyBlockTrailingNewline';
+export const COPY_BLOCK_TRAILING_NEWLINE_KEY = 'copyBlockTrailingNewline';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every
