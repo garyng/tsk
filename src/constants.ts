@@ -190,6 +190,7 @@ export const COMMANDS = {
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
     moveTaskToFile: 'tsk.moveTaskToFile',
+    addDiscoveredTags: 'tsk.addDiscoveredTags',
     migrateMarkdownTasks: 'tsk.migrateMarkdownTasks',
     sendMarkdownTaskToFile: 'tsk.sendMarkdownTaskToFile',
     sendAllMarkdownTasks: 'tsk.sendAllMarkdownTasks',

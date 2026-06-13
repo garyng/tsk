@@ -244,6 +244,11 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.addDiscoveredTags",
+                "title": "Add Discovered Tags to tags.yml",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.migrateMarkdownTasks",
                 "title": "Migrate Markdown Tasks",
                 "category": "Tsk"

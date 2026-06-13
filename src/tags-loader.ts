@@ -14,6 +14,13 @@ import { resolveTagsPath } from './lib/tags-path';
 export interface TagsLoader {
     getTags(): ReadonlyMap<string, TagDef>;
     /**
+     * The resolved absolute `tags.yml` path, or `undefined` (no workspace
+     * folder / blank `tsk.tags.path`). Re-resolves live, so callers that
+     * *write* the file (e.g. the add-discovered-tags command) get the same
+     * path the loader reads — no second resolver to drift.
+     */
+    getPath(): string | undefined;
+    /**
      * Re-read the configured `tags.yml` and replace the internal state.
      * Surface in case the activation layer wants to trigger a reload
      * outside of the watcher / setting-change events (e.g. retry after a
@@ -109,6 +116,7 @@ export async function createTagsLoader(
 
     return {
         getTags: () => state,
+        getPath: () => resolvePath(),
         reload,
     };
 }

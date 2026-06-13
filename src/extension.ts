@@ -47,6 +47,7 @@ import { registerSemanticTokens } from './semantic-tokens';
 import { registerStatsPanel } from './stats-panel';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
+import { registerTagsSyncCommand } from './tags-sync-commands';
 import { registerTaskListPanel } from './task-list-panel';
 import {
     registerCopyTaskIdCommand,
@@ -396,6 +397,7 @@ function registerAllCommands(
     registerMdMigrateCommands(context, cache, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
+    registerTagsSyncCommand(context, cache, tagsLoader, logger);
     registerFindAllTasksByStatusCommand(context, cache, logger);
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);
