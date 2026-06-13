@@ -3,13 +3,35 @@ import { countTasksByMarker } from './markers-find-logic';
 import type { TaskCount, TaskListView, TaskRow } from './task-list-protocol';
 
 /** Display basename of a file URI — last path segment, percent-decoded. */
-function basename(fileUri: string): string {
+export function basename(fileUri: string): string {
     const last = fileUri.split('/').pop() || fileUri;
     try {
         return decodeURIComponent(last);
     } catch {
         return last;
     }
+}
+
+/** The active `.tsk` file the "Current file" filter targets: canonical URI + display basename. */
+export interface ActiveFile {
+    uri: string;
+    name: string;
+}
+
+/**
+ * Last-`.tsk`-wins active-file tracking for the "Current file" filter. Given the
+ * previously-tracked file and the newly-active editor (`undefined` when focus
+ * left all editors), return the file to track: a `.tsk` document becomes the new
+ * target; anything else — a non-tsk file, or the task-list panel itself stealing
+ * focus — leaves the prior target in place, so the filter stays stable while you
+ * work in the panel. Pure; the glue adapts a `vscode.TextDocument` to `candidate`.
+ */
+export function pickActiveFile(
+    prev: ActiveFile | undefined,
+    candidate: { uri: string; isTsk: boolean } | undefined,
+): ActiveFile | undefined {
+    if (!candidate || !candidate.isTsk) return prev;
+    return { uri: candidate.uri, name: basename(candidate.uri) };
 }
 
 /** Metadata keys (stored bare — the `@` is display syntax). */
@@ -63,6 +85,7 @@ export function buildTaskListView(
         marker: t.marker,
         content: t.content,
         file: basename(t.fileUri),
+        fileUri: t.fileUri,
         line: t.line,
         tags: tagsByTask.get(t.id) ?? [],
         created: createdByTask.get(t.id),

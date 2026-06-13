@@ -15,6 +15,13 @@ export interface TaskRow {
     marker: Marker;
     content: string;
     file: string;
+    /**
+     * The task's full file URI (canonical `Uri.toString()` form) — the stable
+     * key the "Current file" filter compares against the active editor's
+     * `document.uri.toString()`. Distinct from {@link TaskRow.file}, which is the
+     * (non-unique) display basename.
+     */
+    fileUri: string;
     /** Zero-indexed line, for the `file:line` label (the host re-resolves the jump by `id`). */
     line: number;
     /** The task's resolved `#tags` (sorted), for the tags column + its header filter. */
@@ -45,11 +52,15 @@ export interface TaskListView {
 /**
  * Extension → webview. `render` ships the viewmodel; `dayFilter` (from a stats
  * calendar-day click) narrows the table to a set of task `@id`s, with a `label`
- * for the dismissible banner. An empty `ids` / label clears it.
+ * for the dismissible banner (empty `ids` / label clears it). `activeFile` names
+ * the current `.tsk` editor (its canonical URI + display basename) so the
+ * "Current file" toggle can filter to it and follow editor switches; absent
+ * until some `.tsk` file has been active.
  */
 export type TaskListHostToWebview =
     | { type: 'render'; view: TaskListView }
-    | { type: 'dayFilter'; ids: string[]; label: string };
+    | { type: 'dayFilter'; ids: string[]; label: string }
+    | { type: 'activeFile'; uri: string; name: string };
 
 /** Webview → extension. `ready` triggers the first render; `jump` reveals a task by `@id`. */
 export type TaskListWebviewToHost = { type: 'ready' } | { type: 'jump'; id: string };
