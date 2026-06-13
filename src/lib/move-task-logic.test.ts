@@ -2,10 +2,70 @@ import { describe, expect, it } from 'vitest';
 import {
     buildAppendText,
     buildMoveStub,
+    computeBlockDeletion,
     computeTaskBlockRange,
     dedentBlock,
 } from './move-task-logic';
 import { parseLine } from './parser';
+
+describe('computeBlockDeletion', () => {
+    it('a mid-file block consumes the newline AFTER it', () => {
+        // file: A,B,C,D,E (lineCount 5); delete the B-C block (1..2).
+        expect(computeBlockDeletion(5, 1, 2, 0, 0)).toEqual({
+            startLine: 1,
+            startChar: 0,
+            endLine: 3,
+            endChar: 0,
+        });
+    });
+
+    it('a single-line block mid-file consumes its trailing newline', () => {
+        expect(computeBlockDeletion(5, 2, 2, 0, 0)).toEqual({
+            startLine: 2,
+            startChar: 0,
+            endLine: 3,
+            endChar: 0,
+        });
+    });
+
+    it('a block at EOF consumes the newline BEFORE it (prevLineLen)', () => {
+        // file ends at line 3 (lineCount 4); delete block 2..3, line 1 is 7 chars.
+        expect(computeBlockDeletion(4, 2, 3, 7, 12)).toEqual({
+            startLine: 1,
+            startChar: 7,
+            endLine: 3,
+            endChar: 12,
+        });
+    });
+
+    it('a single-line block at EOF consumes the preceding newline', () => {
+        expect(computeBlockDeletion(4, 3, 3, 5, 9)).toEqual({
+            startLine: 2,
+            startChar: 5,
+            endLine: 3,
+            endChar: 9,
+        });
+    });
+
+    it('a whole-file block empties the document (no preceding newline to take)', () => {
+        expect(computeBlockDeletion(3, 0, 2, 0, 4)).toEqual({
+            startLine: 0,
+            startChar: 0,
+            endLine: 2,
+            endChar: 4,
+        });
+    });
+
+    it('a block ending one line before a file-final blank line stays in the mid-file case', () => {
+        // file: A, task, "" (trailing blank, lineCount 3) → end=1 < 2 → mid-file.
+        expect(computeBlockDeletion(3, 1, 1, 0, 0)).toEqual({
+            startLine: 1,
+            startChar: 0,
+            endLine: 2,
+            endChar: 0,
+        });
+    });
+});
 
 describe('computeTaskBlockRange', () => {
     it('a task with no children is its own block', () => {
