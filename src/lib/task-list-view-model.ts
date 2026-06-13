@@ -24,7 +24,7 @@ export interface ActiveFile {
  * left all editors), return the file to track: a `.tsk` document becomes the new
  * target; anything else — a non-tsk file, or the task-list panel itself stealing
  * focus — leaves the prior target in place, so the filter stays stable while you
- * work in the panel. Pure; the glue adapts a `vscode.TextDocument` to `candidate`.
+ * work in the panel. Pure; the glue adapts a `vscode.TextEditor` to `candidate`.
  */
 export function pickActiveFile(
     prev: ActiveFile | undefined,
