@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { registerAutoLinksProvider } from './autolinks-provider';
+import { registerBlockCommands } from './block-commands';
 import { registerClipboardBridge } from './clipboard-bridge';
 import { registerCodeActionsProvider } from './code-actions';
 import { registerCodelens } from './codelens';
@@ -392,6 +393,7 @@ function registerAllCommands(
     registerRelationshipCommands(context, logger, cache);
     registerListEditCommands(context, logger);
     registerDuplicateCommands(context, logger);
+    registerBlockCommands(context, logger);
     registerMoveTaskCommand(context, logger, cache);
     registerSendMarkdownCommands(context, logger, cache);
     registerMdMigrateCommands(context, cache, logger);

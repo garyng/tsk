@@ -208,6 +208,16 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.copyTaskBlock",
+                "title": "Copy Task Block",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.cutTaskBlock",
+                "title": "Cut Task Block",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.installClipboardBridgeSkill",
                 "title": "Install Clipboard Bridge Skill",
                 "category": "Tsk"
@@ -378,6 +388,18 @@
                 "command": "tsk.duplicateLineUp",
                 "key": "shift+alt+up",
                 "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
+            {
+                "command": "tsk.copyTaskBlock",
+                "key": "ctrl+c",
+                "mac": "cmd+c",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !editorHasSelection"
+            },
+            {
+                "command": "tsk.cutTaskBlock",
+                "key": "ctrl+x",
+                "mac": "cmd+x",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !editorHasSelection"
             },
             {
                 "command": "tsk.markNow",

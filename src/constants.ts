@@ -189,6 +189,8 @@ export const COMMANDS = {
     handleBackspace: 'tsk.handleBackspace',
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
+    copyTaskBlock: 'tsk.copyTaskBlock',
+    cutTaskBlock: 'tsk.cutTaskBlock',
     moveTaskToFile: 'tsk.moveTaskToFile',
     extractTaskToFile: 'tsk.extractTaskToFile',
     addDiscoveredTags: 'tsk.addDiscoveredTags',
