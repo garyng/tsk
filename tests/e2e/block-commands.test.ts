@@ -39,7 +39,7 @@ suite('block commands — copy/cut', () => {
         assert.strictEqual(await vscode.env.clipboard.readText(), `${BLOCK_TEXT}\n`); // trailing newline on by default
         assert.strictEqual(editor.document.getText(), PARENT_BLOCK, 'copy must not change the doc');
         // The block is left selected — the visual "select the whole block and copy it".
-        assert.strictEqual(editor.document.getText(editor.selection), BLOCK_TEXT);
+        assert.strictEqual(editor.document.getText(editor.selection), `${BLOCK_TEXT}\n`); // selection extends through the line break
     });
 
     test('cut: the block goes to the clipboard and is removed with no orphan blank line', async () => {
@@ -85,20 +85,17 @@ suite('block commands — copy/cut', () => {
         assert.strictEqual(await vscode.env.clipboard.readText(), 'keep1');
     });
 
-    test('copy: trailing newline is omitted when tsk.copyBlockTrailingNewline is off', async () => {
+    test('the trailing newline (clipboard + selection) is omitted when tsk.blockTrailingNewline is off', async () => {
         const config = vscode.workspace.getConfiguration('tsk');
-        await config.update(
-            'copyBlockTrailingNewline',
-            false,
-            vscode.ConfigurationTarget.Workspace,
-        );
+        await config.update('blockTrailingNewline', false, vscode.ConfigurationTarget.Workspace);
         try {
-            await openTsk(PARENT_BLOCK, 1);
+            const editor = await openTsk(PARENT_BLOCK, 1);
             await vscode.commands.executeCommand('tsk.copyTaskBlock');
             assert.strictEqual(await vscode.env.clipboard.readText(), BLOCK_TEXT); // no trailing \n
+            assert.strictEqual(editor.document.getText(editor.selection), BLOCK_TEXT); // selection not extended
         } finally {
             await config.update(
-                'copyBlockTrailingNewline',
+                'blockTrailingNewline',
                 undefined,
                 vscode.ConfigurationTarget.Workspace,
             );
@@ -108,13 +105,19 @@ suite('block commands — copy/cut', () => {
     test('select: on a parent task, the whole block is selected', async () => {
         const editor = await openTsk(PARENT_BLOCK, 1);
         await vscode.commands.executeCommand('tsk.selectTaskBlock');
-        assert.strictEqual(editor.document.getText(editor.selection), BLOCK_TEXT);
+        assert.strictEqual(editor.document.getText(editor.selection), `${BLOCK_TEXT}\n`); // selection extends through the line break
     });
 
-    test('select: on a leaf task, just that line is selected', async () => {
+    test('select: on a leaf task, just that line is selected (with trailing newline)', async () => {
         const editor = await openTsk(PARENT_BLOCK, 0); // "- [ ] keep1" — no children
         await vscode.commands.executeCommand('tsk.selectTaskBlock');
-        assert.strictEqual(editor.document.getText(editor.selection), '- [ ] keep1');
+        assert.strictEqual(editor.document.getText(editor.selection), '- [ ] keep1\n');
+    });
+
+    test('select: at EOF the selection ends at the last char (no newline to take)', async () => {
+        const editor = await openTsk('- [ ] alpha\n- [ ] omega', 1); // omega is the last line
+        await vscode.commands.executeCommand('tsk.selectTaskBlock');
+        assert.strictEqual(editor.document.getText(editor.selection), '- [ ] omega');
     });
 
     test('select: on a non-task line it is a no-op (selection stays a bare cursor)', async () => {
@@ -145,12 +148,12 @@ suite('block commands — copy/cut', () => {
         }
     });
 
-    test('contributes.configuration declares tsk.copyBlockTrailingNewline default true', () => {
+    test('contributes.configuration declares tsk.blockTrailingNewline default true', () => {
         const ext = vscode.extensions.getExtension(EXTENSION_ID);
         assert.ok(ext);
         const setting =
-            ext.packageJSON.contributes.configuration.properties['tsk.copyBlockTrailingNewline'];
-        assert.ok(setting, 'tsk.copyBlockTrailingNewline should be declared');
+            ext.packageJSON.contributes.configuration.properties['tsk.blockTrailingNewline'];
+        assert.ok(setting, 'tsk.blockTrailingNewline should be declared');
         assert.strictEqual(setting.type, 'boolean');
         assert.strictEqual(setting.default, true);
     });

@@ -1,9 +1,5 @@
 import * as vscode from 'vscode';
-import {
-    COMMANDS,
-    COPY_BLOCK_TRAILING_NEWLINE_KEY,
-    DOUBLE_CLICK_SELECTS_BLOCK_KEY,
-} from './constants';
+import { BLOCK_TRAILING_NEWLINE_KEY, COMMANDS, DOUBLE_CLICK_SELECTS_BLOCK_KEY } from './constants';
 import { isTskDocument, requireTskEditor } from './editor-guards';
 import { mouseSelectionInPrefix } from './lib/block-select';
 import type { Logger } from './lib/logger';
@@ -44,11 +40,27 @@ function eolOf(doc: vscode.TextDocument): string {
     return doc.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
 }
 
-/** Whether block cut/copy appends a trailing newline (so the block pastes as a standalone unit). */
+/** Whether block operations include the trailing newline (clipboard text + selection extent). */
 function blockTrailingNewline(): boolean {
-    return vscode.workspace
-        .getConfiguration('tsk')
-        .get<boolean>(COPY_BLOCK_TRAILING_NEWLINE_KEY, true);
+    return vscode.workspace.getConfiguration('tsk').get<boolean>(BLOCK_TRAILING_NEWLINE_KEY, true);
+}
+
+/**
+ * The selection covering block `[start, end]`. With the trailing-newline setting
+ * on (default) and a line after the block, it extends through the line break to
+ * `(end+1, 0)` — VS Code's full-line-selection shape — so copying/cutting that
+ * selection includes the newline, matching the no-selection block copy. At EOF
+ * there is no newline to take, so it ends at the block's last character.
+ */
+function blockSelectionRange(
+    doc: vscode.TextDocument,
+    start: number,
+    end: number,
+): vscode.Selection {
+    if (blockTrailingNewline() && end < doc.lineCount - 1) {
+        return new vscode.Selection(start, 0, end + 1, 0);
+    }
+    return new vscode.Selection(start, 0, end, doc.lineAt(end).text.length);
 }
 
 export function registerBlockCommands(context: vscode.ExtensionContext, logger: Logger): void {
@@ -72,7 +84,7 @@ export function registerBlockCommands(context: vscode.ExtensionContext, logger: 
 function selectBlockAt(editor: vscode.TextEditor, line: number): void {
     const lines = editor.document.getText().split(/\r?\n/);
     const { start, end } = computeTaskBlockRange(lines, line, tabSizeOf(editor));
-    const selection = new vscode.Selection(start, 0, end, editor.document.lineAt(end).text.length);
+    const selection = blockSelectionRange(editor.document, start, end);
     editor.selection = selection;
     editor.revealRange(selection);
 }
@@ -193,8 +205,9 @@ async function clipboardBlock(isCut: boolean, logger: Logger): Promise<void> {
         );
         await vscode.workspace.applyEdit(edit);
     } else {
-        // Leave the block selected — the literal "select the whole block and copy it".
-        editor.selection = new vscode.Selection(start, 0, end, doc.lineAt(end).text.length);
+        // Leave the block selected (through the trailing line break when configured),
+        // so the selection matches what landed on the clipboard.
+        editor.selection = blockSelectionRange(doc, start, end);
     }
     logger.debug(`${isCut ? 'cutTaskBlock' : 'copyTaskBlock'}: ${end - start + 1} line(s)`);
 }
