@@ -86,7 +86,7 @@ The default vocabulary reads `[ ]` todo, `[/]` **done**, `[>>]` moved, `[x]` **c
 
 ## Tags & search
 
-Tags use `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files. Two surfaces sit on top:
+Tags use `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files. Several surfaces sit on top:
 
 - **`#`-triggered completion.** Type `#` (or `#partial`) in any `.tsk` editor and a completion list surfaces every known tag. Items merge two sources: tags declared in the workspace `tags.yml` (with descriptions, shown as the item detail) and tags discovered in `.tsk` files via the cache — plus implicit `/`-separated parents, so `#project/tsk` automatically contributes `#project`.
 - **`Alt+T` find-all-tasks-by-tag.** Opens a list of every known tag — each row showing a hierarchical task count (`5 tasks · <description>`), searchable by name, count, *and* description — then opens VS Code's **Search Editor** with `#<tag>` pre-queried, scoped to `*.tsk`. You get Ctrl+Click navigation, regex/case toggles, and result folding for free, and the search opens with **0 context lines** so only the matching task rows show. The Search Editor's own grammar can't highlight tsk rows, so the extension paints tsk **decorations** (marker colors, priority backgrounds, dimmed metadata) onto the match rows itself. The per-tag count is prefix-inclusive (a `#project` row counts its `#project/tsk` tasks too), matching what the substring search returns.
