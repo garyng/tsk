@@ -71,6 +71,8 @@ The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via 
 
 **Moving a task to another file** — **Tsk: Move Task to File…** (Command Palette, or a `Ctrl+.` → *Move task to file…* refactor on any task carrying an `@id`) relocates the task *and its indented sub-block* to a `.tsk` file you pick — or a new one via a save dialog — appending it there. The relocated task **keeps its `@id`**, so every `@parent` / `@dependsOn` / … reference still resolves at the new location (id→location lookup is file-independent), while a `[>]` breadcrumb stays behind with a *fresh* `@id` + `@movedTo:<original>` — reusing the moved-marker lens, so you can click straight to where the task went. It's one atomic edit (single undo). Tasks with no `@id` are rejected (add one first); inline `#tags` are stripped from the breadcrumb so a tag isn't double-counted.
 
+**Extracting** — **Tsk: Extract Task to File…** (or `Ctrl+.` → *Extract task to file…*) is the breadcrumb-less twin: the same relocation (the block, the `@id`, markdown child-conversion, atomic undo, new-file-via-save-dialog), but the original is **deleted outright** — no `[>]` stub stays behind. Reach for it when you're reorganizing where work lives and don't want a forwarding pointer; use *Move* when you do.
+
 Every list-edit keybinding carries `when: editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`, so `Enter` accepts an IntelliSense suggestion when one is visible and `Tab` advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
 ## Migrating from Markdown
