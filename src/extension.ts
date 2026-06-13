@@ -47,6 +47,7 @@ import { registerSemanticTokens } from './semantic-tokens';
 import { registerStatsPanel } from './stats-panel';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
+import { registerTagsSyncCommand } from './tags-sync-commands';
 import { registerTaskListPanel } from './task-list-panel';
 import {
     registerCopyTaskIdCommand,
@@ -370,12 +371,12 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
 
 /**
  * Register the contributed command + provider families: the toggle set,
- * copy-id, the relationship pickers, list-edit, duplicate-line, move-task,
+ * copy-id, the relationship pickers, list-edit, duplicate-line, move/extract-task,
  * the markdown migrate/send set, the tags completion provider, find-by-tag,
- * find-by-status, code actions, hover, and the now + now-tree commands, plus
- * the `tsk.rebuildCache` palette entry. (Codelens, semantic-token, autolinks,
- * clipboard-bridge and paste-image providers are registered separately in
- * `activate()`.)
+ * find-by-status, add-discovered-tags, code actions, hover, and the now +
+ * now-tree commands, plus the `tsk.rebuildCache` palette entry. (Codelens,
+ * semantic-token, autolinks, clipboard-bridge and paste-image providers are
+ * registered separately in `activate()`.)
  */
 function registerAllCommands(
     context: vscode.ExtensionContext,
@@ -396,6 +397,7 @@ function registerAllCommands(
     registerMdMigrateCommands(context, cache, logger);
     registerTagsCompletionProvider(context, cache, tagsLoader);
     registerFindAllTasksByTagCommand(context, cache, tagsLoader, logger);
+    registerTagsSyncCommand(context, cache, tagsLoader, logger);
     registerFindAllTasksByStatusCommand(context, cache, logger);
     registerCodeActionsProvider(context, cache, logger);
     registerHoverProvider(context, cache, graph, tagsLoader);

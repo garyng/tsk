@@ -10,6 +10,7 @@ import { extractMetadata } from './lib/metadata';
 import {
     buildAppendText,
     buildMoveStub,
+    computeBlockDeletion,
     computeTaskBlockRange,
     dedentBlock,
 } from './lib/move-task-logic';
@@ -41,6 +42,19 @@ interface MoveDeps {
 }
 const defaultMoveDeps: MoveDeps = { generateId, now: localTimestamp };
 
+/**
+ * The one axis on which Move and Extract differ: Move leaves a `[>]` breadcrumb
+ * (`@movedTo`) where the task was; Extract deletes the original block outright.
+ * Everything else — block range, dedent, markdown conversion, target pick,
+ * append, reveal — is shared by {@link relocateTaskToFile}.
+ */
+interface RelocateOpts {
+    commandId: string;
+    breadcrumb: boolean;
+}
+const MOVE_OPTS: RelocateOpts = { commandId: COMMANDS.moveTaskToFile, breadcrumb: true };
+const EXTRACT_OPTS: RelocateOpts = { commandId: COMMANDS.extractTaskToFile, breadcrumb: false };
+
 interface TargetItem extends vscode.QuickPickItem {
     uri?: vscode.Uri;
     newFile?: boolean;
@@ -55,39 +69,55 @@ export function registerMoveTaskCommand(
     context.subscriptions.push(
         vscode.commands.registerCommand(
             COMMANDS.moveTaskToFile,
-            (uri?: vscode.Uri, line?: number) => moveTaskToFile(deps, cache, logger, uri, line),
+            (uri?: vscode.Uri, line?: number) =>
+                relocateTaskToFile(deps, cache, logger, MOVE_OPTS, uri, line),
         ),
-        // Markdown too: an id-carrying (already-migrated) md task moves the
+        vscode.commands.registerCommand(
+            COMMANDS.extractTaskToFile,
+            (uri?: vscode.Uri, line?: number) =>
+                relocateTaskToFile(deps, cache, logger, EXTRACT_OPTS, uri, line),
+        ),
+        // Markdown too: an id-carrying (already-migrated) md task relocates the
         // same way — its raw md descendants are auto-converted on the way out.
         vscode.languages.registerCodeActionsProvider(
             [{ language: TSK_LANGUAGE_ID }, { language: MARKDOWN_LANGUAGE_ID }],
-            { provideCodeActions: provideMoveAction },
+            { provideCodeActions: provideRelocateActions },
             { providedCodeActionKinds: [vscode.CodeActionKind.RefactorMove] },
         ),
     );
 }
 
-/** Offer "Move task to file…" on a task line that already carries an `@id`. */
-function provideMoveAction(
+/** Offer "Move task to file…" and "Extract task to file…" on a task line that already carries an `@id`. */
+function provideRelocateActions(
     document: vscode.TextDocument,
     range: vscode.Range | vscode.Selection,
 ): vscode.CodeAction[] | undefined {
     const lineNumber = range.start.line;
     const parsed = parseLine(document.lineAt(lineNumber).text);
     if (!parsed?.metadata.get('id')) return undefined;
-    const action = new vscode.CodeAction('Move task to file…', vscode.CodeActionKind.RefactorMove);
-    action.command = {
-        command: COMMANDS.moveTaskToFile,
-        title: action.title,
-        arguments: [document.uri, lineNumber],
+    const mk = (title: string, command: string): vscode.CodeAction => {
+        const action = new vscode.CodeAction(title, vscode.CodeActionKind.RefactorMove);
+        action.command = { command, title, arguments: [document.uri, lineNumber] };
+        return action;
     };
-    return [action];
+    return [
+        mk('Move task to file…', COMMANDS.moveTaskToFile),
+        mk('Extract task to file…', COMMANDS.extractTaskToFile),
+    ];
 }
 
-async function moveTaskToFile(
+/**
+ * Relocate the task under the cursor (+ its indented sub-block) to another file.
+ * Move (`breadcrumb: true`) leaves a `[>]` `@movedTo` stub behind; Extract
+ * (`breadcrumb: false`) deletes the original block outright. Shared otherwise:
+ * the `@id` precondition, block range, markdown child-conversion, target pick,
+ * append (createFile-with-contents for a new file → atomic undo), and reveal.
+ */
+async function relocateTaskToFile(
     deps: MoveDeps,
     cache: CacheService,
     logger: Logger,
+    opts: RelocateOpts,
     uriArg?: vscode.Uri,
     lineArg?: number,
 ): Promise<void> {
@@ -115,7 +145,7 @@ async function moveTaskToFile(
     }
     if (!task.metadata.get('id')) {
         void vscode.window.showInformationMessage(
-            'Tsk: add an @id to the task first ("Add missing id"), then move it.',
+            'Tsk: add an @id to the task first ("Add missing id"), then relocate it.',
         );
         return;
     }
@@ -143,26 +173,40 @@ async function moveTaskToFile(
     }
 
     const destLines = dedentBlock(blockLines, task.indent);
-    const stub = buildMoveStub(task, deps.generateId(), deps.now());
 
     const target = await pickTarget(doc.uri);
     if (!target) return;
 
     const edit = new vscode.WorkspaceEdit();
-    // Source: collapse the whole block to the single breadcrumb line.
-    edit.replace(doc.uri, new vscode.Range(start, 0, end, doc.lineAt(end).text.length), stub);
+    // Source: Move collapses the block to a [>] breadcrumb; Extract deletes it
+    // outright (whole lines + a terminator, so no blank line is orphaned).
+    if (opts.breadcrumb) {
+        const stub = buildMoveStub(task, deps.generateId(), deps.now());
+        edit.replace(doc.uri, new vscode.Range(start, 0, end, doc.lineAt(end).text.length), stub);
+    } else {
+        const span = computeBlockDeletion(
+            doc.lineCount,
+            start,
+            end,
+            start > 0 ? doc.lineAt(start - 1).text.length : 0,
+            doc.lineAt(end).text.length,
+        );
+        edit.delete(
+            doc.uri,
+            new vscode.Range(span.startLine, span.startChar, span.endLine, span.endChar),
+        );
+    }
     // Destination: create (if new) + append the de-indented block.
     await appendBlockToTarget(edit, target, destLines, eolOf(doc));
 
     if (!(await vscode.workspace.applyEdit(edit))) {
-        void vscode.window.showWarningMessage('Tsk: the move could not be applied.');
+        void vscode.window.showWarningMessage('Tsk: could not relocate the task.');
         return;
     }
 
     await revealMovedTask(target.uri, destLines.length);
-    logger.debug(
-        `${COMMANDS.moveTaskToFile}: moved ${end - start + 1} line(s) to ${target.uri.fsPath}`,
-    );
+    const verb = opts.breadcrumb ? 'moved' : 'extracted';
+    logger.debug(`${opts.commandId}: ${verb} ${end - start + 1} line(s) to ${target.uri.fsPath}`);
 }
 
 /** Ask which `.tsk` file to move into — an existing one, or a new file via save dialog. */
@@ -381,7 +425,7 @@ async function sendMarkdownTaskToFile(
 
     // An id-carrying line is already tsk — send degenerates to the plain move.
     if (parseLine(lineText)?.metadata.get('id')) {
-        return moveTaskToFile(deps, cache, logger, doc.uri, taskLine);
+        return relocateTaskToFile(deps, cache, logger, MOVE_OPTS, doc.uri, taskLine);
     }
     const map = readMigrateMarkerMap(logger);
     if (!matchMdTask(lineText, map) || extractMetadata(lineText).metadata.has('id')) {

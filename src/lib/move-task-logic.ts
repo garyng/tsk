@@ -51,6 +51,45 @@ export function computeTaskBlockRange(
     return { start: taskLine, end };
 }
 
+/** A document range, as raw line/char coordinates — the activation layer maps it to a `vscode.Range`. */
+export interface DeletionSpan {
+    startLine: number;
+    startChar: number;
+    endLine: number;
+    endChar: number;
+}
+
+/**
+ * The range that deletes a task block (lines `[start, end]`) *including* a line
+ * terminator, so no blank line is orphaned where the block used to be. Used by
+ * `Extract Task to File` (Move replaces the block with a breadcrumb instead, so
+ * the surrounding newlines stay put). `prevLineLen` / `lastLineLen` are the
+ * char-lengths of lines `start-1` and `end`; only consulted in the EOF cases.
+ *
+ * - **Block not at EOF** (`end < lineCount-1`) → consume the newline AFTER the
+ *   block: `(start,0) → (end+1,0)`. (A block followed by a file-final blank line
+ *   lands here — the blank stays, the block's own terminator goes.)
+ * - **Block at EOF with a line above it** → consume the newline BEFORE the
+ *   block: `(start-1, prevLineLen) → (end, lastLineLen)`.
+ * - **Block IS the whole file** (`start === 0 && end === lineCount-1`) →
+ *   `(0,0) → (end, lastLineLen)`, emptying the document.
+ */
+export function computeBlockDeletion(
+    lineCount: number,
+    start: number,
+    end: number,
+    prevLineLen: number,
+    lastLineLen: number,
+): DeletionSpan {
+    if (end < lineCount - 1) {
+        return { startLine: start, startChar: 0, endLine: end + 1, endChar: 0 };
+    }
+    if (start > 0) {
+        return { startLine: start - 1, startChar: prevLineLen, endLine: end, endChar: lastLineLen };
+    }
+    return { startLine: 0, startChar: 0, endLine: end, endChar: lastLineLen };
+}
+
 /**
  * Re-base a block to column 0 by stripping the parent's literal indent `prefix`
  * from each line. Children share that prefix (plus more), so they keep their

@@ -71,6 +71,8 @@ The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via 
 
 **Moving a task to another file** — **Tsk: Move Task to File…** (Command Palette, or a `Ctrl+.` → *Move task to file…* refactor on any task carrying an `@id`) relocates the task *and its indented sub-block* to a `.tsk` file you pick — or a new one via a save dialog — appending it there. The relocated task **keeps its `@id`**, so every `@parent` / `@dependsOn` / … reference still resolves at the new location (id→location lookup is file-independent), while a `[>]` breadcrumb stays behind with a *fresh* `@id` + `@movedTo:<original>` — reusing the moved-marker lens, so you can click straight to where the task went. It's one atomic edit (single undo). Tasks with no `@id` are rejected (add one first); inline `#tags` are stripped from the breadcrumb so a tag isn't double-counted.
 
+**Extracting** — **Tsk: Extract Task to File…** (or `Ctrl+.` → *Extract task to file…*) is the breadcrumb-less twin: the same relocation (the block, the `@id`, markdown child-conversion, atomic undo, new-file-via-save-dialog), but the original is **deleted outright** — no `[>]` stub stays behind. Reach for it when you're reorganizing where work lives and don't want a forwarding pointer; use *Move* when you do.
+
 Every list-edit keybinding carries `when: editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`, so `Enter` accepts an IntelliSense suggestion when one is visible and `Tab` advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
 ## Migrating from Markdown
@@ -84,11 +86,12 @@ The default vocabulary reads `[ ]` todo, `[/]` **done**, `[>>]` moved, `[x]` **c
 
 ## Tags & search
 
-Tags use `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files. Two surfaces sit on top:
+Tags use `#tag` and `#tag/sub/leaf` syntax inside `.tsk` files. Several surfaces sit on top:
 
 - **`#`-triggered completion.** Type `#` (or `#partial`) in any `.tsk` editor and a completion list surfaces every known tag. Items merge two sources: tags declared in the workspace `tags.yml` (with descriptions, shown as the item detail) and tags discovered in `.tsk` files via the cache — plus implicit `/`-separated parents, so `#project/tsk` automatically contributes `#project`.
 - **`Alt+T` find-all-tasks-by-tag.** Opens a list of every known tag — each row showing a hierarchical task count (`5 tasks · <description>`), searchable by name, count, *and* description — then opens VS Code's **Search Editor** with `#<tag>` pre-queried, scoped to `*.tsk`. You get Ctrl+Click navigation, regex/case toggles, and result folding for free, and the search opens with **0 context lines** so only the matching task rows show. The Search Editor's own grammar can't highlight tsk rows, so the extension paints tsk **decorations** (marker colors, priority backgrounds, dimmed metadata) onto the match rows itself. The per-tag count is prefix-inclusive (a `#project` row counts its `#project/tsk` tasks too), matching what the substring search returns.
 - **Find all tasks by status** (Command Palette → *Tsk: Find All Tasks by Status*; palette-only, since `Alt+T` is the tag search). Pick a status marker — each row shows its `[glyph]` and a task count — and it opens the same Search Editor with a line-anchored **regex** (`^\s*[-*+] \[<glyph>\]`) scoped to `*.tsk`, listing every task carrying that marker. The anchor keeps `[ ]` (todo) from matching stray empty brackets in prose; the result rows get the same tsk decorations as the tag search.
+- **Populate `tags.yml` from your tags** (Command Palette → *Tsk: Add Discovered Tags to tags.yml*). Appends every tag used on a task that isn't declared yet as a bare stub under a dated `# discovered <date>` header — **append-only**, so existing entries and comments are untouched — ready for you to fill in a `description` / `parent`. Literal tags only (implicit `/`-parents aren't auto-added); re-running adds only what's new. Creates the file if it doesn't exist.
 
 **`tags.yml` location.** Default `${workspaceFolder}/.vscode/tsk/tags.yml` (configurable via `tsk.tags.path`). Both schema forms are accepted:
 

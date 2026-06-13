@@ -14,3 +14,8 @@ import { format } from 'date-fns';
 export function localTimestamp(date: Date = new Date()): string {
     return format(date, "yyyy-MM-dd'T'HH:mm:ssxxx");
 }
+
+/** Local calendar date `YYYY-MM-DD` — used for dated header comments (e.g. tags.yml batches). */
+export function localDate(date: Date = new Date()): string {
+    return format(date, 'yyyy-MM-dd');
+}

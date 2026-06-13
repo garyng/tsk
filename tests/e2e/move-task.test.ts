@@ -175,4 +175,106 @@ suite('move task to file', () => {
             'the source is untouched',
         );
     });
+
+    // ── Extract: move with no breadcrumb (the source block is deleted) ────────
+
+    test('extracts a task to an existing file — source block removed, no breadcrumb', async () => {
+        const src = await writeFile('ex-src.tsk', SRC);
+        const dst = await writeFile('ex-dst.tsk', '# destination\n');
+        win.showQuickPick = async (items: ReadonlyArray<{ uri?: vscode.Uri }>) =>
+            items.find((i) => i.uri?.toString() === dst.toString());
+
+        await cursorOn(src, 1); // "relocate me"
+        await vscode.commands.executeCommand('tsk.extractTaskToFile');
+
+        const srcText = (await vscode.workspace.openTextDocument(src)).getText();
+        assert.ok(!srcText.includes('relocate me'), 'the task line is gone');
+        assert.ok(!srcText.includes('@id:childY'), 'its child left too');
+        assert.ok(
+            !srcText.includes('[>]') && !srcText.includes('@movedTo'),
+            'no [>] breadcrumb is left behind',
+        );
+        assert.ok(srcText.includes('@id:keep1') && srcText.includes('@id:keep2'), 'siblings stay');
+        assert.match(
+            srcText,
+            /keep me[^\n]*\n- \[ \] also keep/,
+            'siblings are adjacent — no orphan blank line where the block was',
+        );
+
+        const dstText = (await vscode.workspace.openTextDocument(dst)).getText();
+        assert.match(dstText, /- \[\/\] relocate me #proj <!-- @id:moveX @created:[\d\-T:+]+ -->/);
+        assert.match(dstText, / {2}- \[ \] child <!-- @id:childY -->/);
+    });
+
+    test('extracting a block at end-of-file leaves no orphan blank line', async () => {
+        const src = await writeFile(
+            'ex-eof.tsk',
+            '- [ ] keep <!-- @id:ex-keep -->\n- [/] last <!-- @id:ex-last -->',
+        );
+        const dst = await writeFile('ex-eof-dst.tsk', '# d\n');
+        win.showQuickPick = async (items: ReadonlyArray<{ uri?: vscode.Uri }>) =>
+            items.find((i) => i.uri?.toString() === dst.toString());
+
+        await cursorOn(src, 1);
+        await vscode.commands.executeCommand('tsk.extractTaskToFile');
+
+        assert.strictEqual(
+            (await vscode.workspace.openTextDocument(src)).getText(),
+            '- [ ] keep <!-- @id:ex-keep -->',
+            'only the kept line remains — the preceding newline was consumed, no trailing blank',
+        );
+    });
+
+    test('extracts from markdown — raw md children convert, original deleted, no breadcrumb', async () => {
+        const src = await writeFile(
+            'ex-md.md',
+            '- [x] parent <!-- @id:ex-mdtop -->\n    - [/] child done\n- [ ] stay\n',
+        );
+        const dst = await writeFile('ex-md-dst.tsk', '# d\n');
+        win.showQuickPick = async (items: ReadonlyArray<{ uri?: vscode.Uri }>) =>
+            items.find((i) => i.uri?.toString() === dst.toString());
+
+        await cursorOn(src, 0);
+        await vscode.commands.executeCommand('tsk.extractTaskToFile');
+
+        const srcText = (await vscode.workspace.openTextDocument(src)).getText();
+        assert.ok(!srcText.includes('parent') && !srcText.includes('child done'), 'block removed');
+        assert.ok(!srcText.includes('[>]') && !srcText.includes('@movedTo'), 'no breadcrumb');
+        assert.strictEqual(srcText.split('\n')[0], '- [ ] stay', 'the sibling stays');
+
+        const dstText = (await vscode.workspace.openTextDocument(dst)).getText();
+        assert.ok(dstText.includes('- [x] parent <!-- @id:ex-mdtop -->'), 'parent moved verbatim');
+        assert.match(
+            dstText,
+            / {4}- \[x\] child done <!-- @id:[a-z0-9]+ @created:[\d\-T:+]+ @completed:[\d\-T:+]+ -->/,
+            'the raw md-done child (md [/]) converted to tsk [x] on the way out',
+        );
+    });
+
+    test('offers Move and Extract on an id-carrying line, neither on an id-less line', async () => {
+        const src = await writeFile(
+            'ex-actions.tsk',
+            '- [ ] has <!-- @id:ex-act -->\n- [ ] none\n',
+        );
+        await cursorOn(src, 0); // the doc must be open for the code-action provider query
+        const onId = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            src,
+            new vscode.Range(0, 0, 0, 0),
+        );
+        const idTitles = (onId ?? []).map((a) => a.title);
+        assert.ok(
+            idTitles.includes('Move task to file…') && idTitles.includes('Extract task to file…'),
+            'both Move and Extract are offered on an @id task line',
+        );
+        const onNone = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            src,
+            new vscode.Range(1, 0, 1, 0),
+        );
+        assert.ok(
+            !(onNone ?? []).some((a) => a.title === 'Extract task to file…'),
+            'an id-less line offers no Extract',
+        );
+    });
 });
