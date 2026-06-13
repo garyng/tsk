@@ -85,8 +85,12 @@ Try `Alt+D` here, pick "plan the launch":
 | `Backspace` (empty task) | degrade to a bare `- ` bullet |
 | `Backspace` (empty `- `) | strip the bullet, leaving the indent |
 | `Shift+Alt+↓` / `Shift+Alt+↑` | duplicate the line; the copy gets a fresh `@id`, content selected to retype |
+| double-click a marker / indent | select the whole block (its *text* → just a word) |
+| `Ctrl+C` / `Ctrl+X` (nothing selected) | copy / cut the whole block, sub-items and all |
 
 Bare bullets (a `- ` item with no `[ ]`) get the same `Enter` / `Tab` / `Shift+Tab` treatment minus the checkbox — handy for notes nested under a task. Duplicate any task above with `Shift+Alt+↓`: the copy is stamped with a new `@id` (so it doesn't shadow the original) and its content lands selected — just type to rename it.
+
+Double-click the marker or indentation of the parent below to grab it *and* its indented child at once — double-click the *text* and you still get a single word, exactly like double-clicking a `{` vs. a word in code. With nothing selected, `Ctrl+C` / `Ctrl+X` copy / cut that whole block too (**Tsk: Select Task Block** is the keyboard version).
 
 - [ ] first step <!-- @id:indent-a -->
 - [ ] Enter here for a fresh task, then Tab to indent it <!-- @id:indent-b -->
@@ -162,6 +166,6 @@ A real slice of a plan — every status, priority, tag, and link at once. The pr
 
 ## More
 
-Open **Tsk: Open Stats** for an activity heatmap of your tasks across the year, and **Tsk: Open Task List** for a searchable, sortable table — fuzzy search, Excel-style header filters on status / tags / priority, click-to-jump — try them against `many-tasks.tsk`.
+Open **Tsk: Open Stats** for an activity heatmap of your tasks across the year, and **Tsk: Open Task List** for a searchable, sortable table — fuzzy search, Excel-style header filters on status / tags / priority, a **Current file** toggle that scopes the list to the file you're editing, click-to-jump — try them against `many-tasks.tsk`.
 
 The cache powers tag search and the lenses — run **Tsk: Rebuild Cache** if anything looks stale. Every `tsk.*` setting is documented in the README. It's all plain text you own.

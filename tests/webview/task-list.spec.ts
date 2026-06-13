@@ -42,6 +42,7 @@ const VIEW = {
             marker: 'inprogress',
             content: 'refactor the cache',
             file: 'foo.tsk',
+            fileUri: 'file:///ws/foo.tsk',
             line: 4,
             tags: ['infra', 'perf'],
             created: '2026-06-07T11:50:00+00:00',
@@ -52,6 +53,7 @@ const VIEW = {
             marker: 'todo',
             content: 'write the parser',
             file: 'foo.tsk',
+            fileUri: 'file:///ws/foo.tsk',
             line: 0,
             tags: ['infra'],
             created: '2026-06-05T09:00:00+00:00',
@@ -62,6 +64,7 @@ const VIEW = {
             marker: 'completed',
             content: 'ship phase 7',
             file: 'bar.tsk',
+            fileUri: 'file:///ws/bar.tsk',
             line: 12,
             tags: [],
             created: '2026-05-20T09:00:00+00:00',
@@ -72,6 +75,7 @@ const VIEW = {
             marker: 'todo',
             content: 'add tests',
             file: 'bar.tsk',
+            fileUri: 'file:///ws/bar.tsk',
             line: 13,
             tags: ['testing'],
             created: undefined,
@@ -118,7 +122,8 @@ async function mount(page: Page, view: unknown = VIEW): Promise<string[]> {
 test('mounts cleanly and renders a chip per status plus All', async ({ page }) => {
     const errors = await mount(page);
     expect(errors).toEqual([]);
-    await expect(page.locator('.tsk-chip')).toHaveCount(7); // All + 6 markers
+    // Scope to the status nav — the "Current file" toggle is also a .tsk-chip.
+    await expect(page.locator('.tsk-chips .tsk-chip')).toHaveCount(7); // All + 6 markers
     await expect(page.getByRole('button', { name: /^All/ })).toContainText('4');
 });
 
@@ -199,6 +204,58 @@ test('a dayFilter message narrows to the given ids with a dismissible banner', a
     await expect(page.locator('.tsk-row')).toHaveCount(4); // banner dismissed → all rows
 });
 
+const postActiveFile = (page: Page, uri: string, name: string): Promise<void> =>
+    page.evaluate((m) => window.postMessage(m, '*'), { type: 'activeFile', uri, name });
+
+test('the Current file toggle is disabled until an activeFile arrives', async ({ page }) => {
+    await mount(page);
+    const toggle = page.locator('.tsk-filescope');
+    await expect(toggle).toBeDisabled();
+    await postActiveFile(page, 'file:///ws/foo.tsk', 'foo.tsk');
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).toContainText('foo.tsk');
+});
+
+test('the Current file toggle filters to the active file', async ({ page }) => {
+    await mount(page);
+    await postActiveFile(page, 'file:///ws/foo.tsk', 'foo.tsk');
+    await page.locator('.tsk-filescope').click();
+    await expect(page.locator('.tsk-row')).toHaveCount(2); // t1 + t2 live in foo.tsk
+    await expect(page.locator('.tsk-row')).toContainText([
+        'refactor the cache',
+        'write the parser',
+    ]);
+});
+
+test('the file filter follows activeFile changes (no re-click)', async ({ page }) => {
+    await mount(page);
+    await postActiveFile(page, 'file:///ws/foo.tsk', 'foo.tsk');
+    await page.locator('.tsk-filescope').click();
+    await expect(page.locator('.tsk-row')).toHaveCount(2);
+    await postActiveFile(page, 'file:///ws/bar.tsk', 'bar.tsk');
+    await expect(page.locator('.tsk-row')).toHaveCount(2); // now t3 + t4 (bar.tsk)
+    await expect(page.locator('.tsk-row')).toContainText(['ship phase 7', 'add tests']);
+});
+
+test('the file filter AND-combines with a status chip', async ({ page }) => {
+    await mount(page);
+    await postActiveFile(page, 'file:///ws/foo.tsk', 'foo.tsk');
+    await page.locator('.tsk-filescope').click();
+    await page.getByRole('button', { name: /^Todo/ }).click();
+    await expect(page.locator('.tsk-row')).toHaveCount(1); // only t2 is todo AND in foo.tsk
+    await expect(page.locator('.tsk-row')).toContainText('write the parser');
+});
+
+test('clear filters also turns off the Current file toggle', async ({ page }) => {
+    await mount(page);
+    await postActiveFile(page, 'file:///ws/foo.tsk', 'foo.tsk');
+    await page.locator('.tsk-filescope').click();
+    await expect(page.locator('.tsk-row')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page.locator('.tsk-row')).toHaveCount(4);
+    await expect(page.locator('.tsk-filescope')).toHaveAttribute('aria-pressed', 'false');
+});
+
 // ── golden snapshots ───────────────────────────────────────────────────────
 
 test.describe('golden snapshots', () => {
@@ -219,5 +276,13 @@ test.describe('golden snapshots', () => {
         await page.locator('.tsk-th[data-col="tags"] .tsk-th__filter').click();
         await page.locator('.tsk-filter').waitFor();
         await expect(page).toHaveScreenshot('task-list-tags-filter.png');
+    });
+
+    test('the current-file filter active', async ({ page }) => {
+        await mount(page);
+        await postActiveFile(page, 'file:///ws/foo.tsk', 'foo.tsk');
+        await page.locator('.tsk-filescope').click();
+        await page.locator('.tsk-row').first().waitFor();
+        await expect(page).toHaveScreenshot('task-list-file-filter.png');
     });
 });

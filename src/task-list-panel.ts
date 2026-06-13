@@ -1,11 +1,20 @@
 import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
+import { isTskDocument } from './editor-guards';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import type { TaskListHostToWebview, TaskListWebviewToHost } from './lib/task-list-protocol';
-import { buildTaskListView } from './lib/task-list-view-model';
+import { type ActiveFile, buildTaskListView, pickActiveFile } from './lib/task-list-view-model';
 import { navigateTo, targetNotFoundMessage } from './navigation';
 import { buildWebviewHtml, webviewLocalResourceRoots } from './webview-html';
+
+/** The active editor as a `pickActiveFile` candidate (its URI + whether it's a `.tsk` doc). */
+function activeFileCandidate(
+    editor: vscode.TextEditor | undefined,
+): { uri: string; isTsk: boolean } | undefined {
+    if (!editor) return undefined;
+    return { uri: editor.document.uri.toString(), isTsk: isTskDocument(editor.document) };
+}
 
 const VIEW_TYPE = 'tsk.taskList';
 
@@ -28,6 +37,8 @@ export class TaskListPanel implements vscode.Disposable {
     private readonly editorSub: vscode.Disposable;
     /** The editor group a jump navigates to — the last active non-panel editor. */
     private sourceColumn: vscode.ViewColumn = vscode.ViewColumn.One;
+    /** The last active `.tsk` file (for the webview's "Current file" filter); `undefined` until one is active. */
+    private activeFile: ActiveFile | undefined;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -35,9 +46,21 @@ export class TaskListPanel implements vscode.Disposable {
         private readonly logger: Logger,
     ) {
         this.sourceColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
+        this.activeFile = pickActiveFile(
+            undefined,
+            activeFileCandidate(vscode.window.activeTextEditor),
+        );
         this.editorSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
             const col = editor?.viewColumn;
             if (col !== undefined && col !== this.panel?.viewColumn) this.sourceColumn = col;
+            // Track the last active .tsk file and tell the webview when it changes,
+            // so the "Current file" filter follows editor switches (last-tsk-wins —
+            // focusing the panel or a non-tsk file keeps the prior target).
+            const next = pickActiveFile(this.activeFile, activeFileCandidate(editor));
+            if (next?.uri !== this.activeFile?.uri) {
+                this.activeFile = next;
+                this.postActiveFile();
+            }
         });
     }
 
@@ -105,6 +128,7 @@ export class TaskListPanel implements vscode.Disposable {
             if (message?.type === 'ready') {
                 this.postRender();
                 this.postDayFilter();
+                this.postActiveFile();
             } else if (message?.type === 'jump') void this.jump(message.id);
         });
         panel.onDidDispose(() => {
@@ -123,6 +147,17 @@ export class TaskListPanel implements vscode.Disposable {
         if (serialized === this.lastPosted) return;
         this.lastPosted = serialized;
         const message: TaskListHostToWebview = { type: 'render', view };
+        void this.panel.webview.postMessage(message);
+    }
+
+    /** Tell the webview which `.tsk` file is active, so its "Current file" filter can target it. */
+    private postActiveFile(): void {
+        if (!this.panel || !this.activeFile) return;
+        const message: TaskListHostToWebview = {
+            type: 'activeFile',
+            uri: this.activeFile.uri,
+            name: this.activeFile.name,
+        };
         void this.panel.webview.postMessage(message);
     }
 

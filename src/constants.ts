@@ -111,6 +111,12 @@ export const AUTOLINKS_KEY = 'autolinks';
 export const MIGRATE_MARKERS_SETTING = 'tsk.migrate.markers';
 export const MIGRATE_MARKERS_KEY = 'migrate.markers';
 
+export const DOUBLE_CLICK_SELECTS_BLOCK_SETTING = 'tsk.doubleClickSelectsBlock';
+export const DOUBLE_CLICK_SELECTS_BLOCK_KEY = 'doubleClickSelectsBlock';
+
+export const BLOCK_TRAILING_NEWLINE_SETTING = 'tsk.blockTrailingNewline';
+export const BLOCK_TRAILING_NEWLINE_KEY = 'blockTrailingNewline';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every
@@ -189,6 +195,9 @@ export const COMMANDS = {
     handleBackspace: 'tsk.handleBackspace',
     duplicateLineDown: 'tsk.duplicateLineDown',
     duplicateLineUp: 'tsk.duplicateLineUp',
+    copyTaskBlock: 'tsk.copyTaskBlock',
+    cutTaskBlock: 'tsk.cutTaskBlock',
+    selectTaskBlock: 'tsk.selectTaskBlock',
     moveTaskToFile: 'tsk.moveTaskToFile',
     extractTaskToFile: 'tsk.extractTaskToFile',
     addDiscoveredTags: 'tsk.addDiscoveredTags',

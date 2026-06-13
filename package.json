@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -208,6 +208,21 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.copyTaskBlock",
+                "title": "Copy Task Block",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.cutTaskBlock",
+                "title": "Cut Task Block",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.selectTaskBlock",
+                "title": "Select Task Block",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.installClipboardBridgeSkill",
                 "title": "Install Clipboard Bridge Skill",
                 "category": "Tsk"
@@ -380,6 +395,18 @@
                 "when": "editorLangId == 'tsk' && editorTextFocus"
             },
             {
+                "command": "tsk.copyTaskBlock",
+                "key": "ctrl+c",
+                "mac": "cmd+c",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !editorHasSelection"
+            },
+            {
+                "command": "tsk.cutTaskBlock",
+                "key": "ctrl+x",
+                "mac": "cmd+x",
+                "when": "editorLangId == 'tsk' && editorTextFocus && !editorHasSelection"
+            },
+            {
                 "command": "tsk.markNow",
                 "key": "alt+w",
                 "when": "editorLangId == 'tsk' && editorTextFocus"
@@ -543,6 +570,16 @@
                     "type": "boolean",
                     "default": true,
                     "description": "When marking a task as \"now\" (via Tsk: Mark Now), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
+                },
+                "tsk.doubleClickSelectsBlock": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Double-click a task's marker, bullet, or indentation in a .tsk editor to select its whole block (the task plus its indented sub-items). Double-clicking the task's text still selects a single word. Turn off to leave double-click as VS Code's default word-select everywhere."
+                },
+                "tsk.blockTrailingNewline": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include the trailing newline when operating on a whole task block: copying / cutting it to the clipboard (Ctrl+C / Ctrl+X with nothing selected), and selecting it (double-click a marker, or Tsk: Select Task Block) extend through the line break. So the block is a self-contained unit on its own line. Off → block operations end at the block's last character."
                 },
                 "tsk.autolinks": {
                     "type": "array",

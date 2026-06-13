@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Marker } from './markers';
-import { buildTaskListView } from './task-list-view-model';
+import { type ActiveFile, buildTaskListView, pickActiveFile } from './task-list-view-model';
 
 type TaskInput = { id: string; marker: Marker; content: string; fileUri: string; line: number };
 
@@ -36,12 +36,39 @@ describe('buildTaskListView', () => {
                 marker: 'inprogress',
                 content: 'refactor the cache #project/area',
                 file: 'foo.tsk',
+                fileUri: 'file:///ws/foo.tsk',
                 line: 4,
                 tags: [],
             },
-            { id: 'b', marker: 'todo', content: 'later', file: 'bar.tsk', line: 0, tags: [] },
+            {
+                id: 'b',
+                marker: 'todo',
+                content: 'later',
+                file: 'bar.tsk',
+                fileUri: 'file:///ws/sub/bar.tsk',
+                line: 0,
+                tags: [],
+            },
         ]);
         expect(view.total).toBe(2);
+    });
+
+    it('keeps the full fileUri on each row (the filter key) distinct from the basename', () => {
+        const view = buildTaskListView(
+            [
+                {
+                    id: 'a',
+                    marker: 'todo',
+                    content: '',
+                    fileUri: 'file:///ws/sub/bar.tsk',
+                    line: 0,
+                },
+            ] satisfies TaskInput[],
+            NO_TAGS,
+            NO_META,
+        );
+        expect(view.rows[0]?.fileUri).toBe('file:///ws/sub/bar.tsk');
+        expect(view.rows[0]?.file).toBe('bar.tsk');
     });
 
     it('counts every marker in registry order, even at zero', () => {
@@ -107,5 +134,33 @@ describe('buildTaskListView', () => {
         expect(b?.tags).toEqual([]);
         expect(b?.created).toBeUndefined();
         expect(b?.priority).toBeUndefined(); // '9' is not 1–3
+    });
+});
+
+describe('pickActiveFile (last-tsk-wins)', () => {
+    const PREV: ActiveFile = { uri: 'file:///ws/old.tsk', name: 'old.tsk' };
+
+    it('a .tsk candidate becomes the target, basename derived', () => {
+        expect(pickActiveFile(PREV, { uri: 'file:///ws/new.tsk', isTsk: true })).toEqual({
+            uri: 'file:///ws/new.tsk',
+            name: 'new.tsk',
+        });
+    });
+
+    it('a non-tsk candidate leaves the prior target in place', () => {
+        expect(pickActiveFile(PREV, { uri: 'file:///ws/notes.md', isTsk: false })).toBe(PREV);
+    });
+
+    it('no candidate (focus left all editors / the panel) leaves the prior target', () => {
+        expect(pickActiveFile(PREV, undefined)).toBe(PREV);
+    });
+
+    it('starts empty and stays empty until a .tsk file is active', () => {
+        expect(pickActiveFile(undefined, undefined)).toBeUndefined();
+        expect(pickActiveFile(undefined, { uri: 'file:///ws/x.md', isTsk: false })).toBeUndefined();
+        expect(pickActiveFile(undefined, { uri: 'file:///ws/x.tsk', isTsk: true })).toEqual({
+            uri: 'file:///ws/x.tsk',
+            name: 'x.tsk',
+        });
     });
 });

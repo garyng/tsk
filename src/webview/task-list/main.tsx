@@ -99,6 +99,9 @@ function TaskList() {
     const [openFilter, setOpenFilter] = useState<{ col: FilterCol; rect: DOMRect } | null>(null);
     // A cross-surface filter from the stats calendar (a set of task ids + a label).
     const [dayFilter, setDayFilter] = useState<{ ids: Set<string>; label: string } | null>(null);
+    // The active .tsk file (pushed by the host) + whether the "Current file" toggle is on.
+    const [activeFile, setActiveFile] = useState<{ uri: string; name: string } | null>(null);
+    const [fileFilterOn, setFileFilterOn] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -110,6 +113,8 @@ function TaskList() {
                 setDayFilter(
                     data.ids?.length ? { ids: new Set(data.ids), label: data.label ?? '' } : null,
                 );
+            else if (data?.type === 'activeFile' && data.uri)
+                setActiveFile({ uri: data.uri, name: data.name ?? '' });
         };
         window.addEventListener('message', onMessage);
         post({ type: 'ready' });
@@ -222,12 +227,14 @@ function TaskList() {
         [],
     );
 
-    // The day-filter (from a stats jump) pre-narrows the rows; the column filters,
-    // search, and sort then apply on top.
+    // The day-filter (from a stats jump) and the "Current file" toggle pre-narrow
+    // the rows; the column filters, search, and sort then apply on top.
     const data = useMemo(() => {
-        const all = view?.rows ?? [];
-        return dayFilter ? all.filter((r) => dayFilter.ids.has(r.id)) : all;
-    }, [view, dayFilter]);
+        let all = view?.rows ?? [];
+        if (dayFilter) all = all.filter((r) => dayFilter.ids.has(r.id));
+        if (fileFilterOn && activeFile) all = all.filter((r) => r.fileUri === activeFile.uri);
+        return all;
+    }, [view, dayFilter, fileFilterOn, activeFile]);
 
     const table = useReactTable({
         data,
@@ -296,11 +303,13 @@ function TaskList() {
         setOpenFilter((cur) => (cur?.col === col ? null : { col, rect }));
     };
 
-    const anyFilter = columnFilters.length > 0 || globalFilter.length > 0 || dayFilter !== null;
+    const anyFilter =
+        columnFilters.length > 0 || globalFilter.length > 0 || dayFilter !== null || fileFilterOn;
     const clearAll = (): void => {
         setColumnFilters([]);
         setGlobalFilter('');
         setDayFilter(null);
+        setFileFilterOn(false);
     };
 
     return (
@@ -344,6 +353,21 @@ function TaskList() {
                             </button>
                         ))}
                     </nav>
+                    <button
+                        type="button"
+                        className={`tsk-chip tsk-filescope${fileFilterOn ? ' tsk-chip--active' : ''}`}
+                        aria-pressed={fileFilterOn}
+                        disabled={!activeFile}
+                        title={
+                            activeFile
+                                ? `Show only tasks in ${activeFile.name}`
+                                : 'Open a .tsk file to filter by it'
+                        }
+                        onClick={() => setFileFilterOn((on) => !on)}
+                    >
+                        Current file
+                        {activeFile && <span className="tsk-chip__count">{activeFile.name}</span>}
+                    </button>
                     {dayFilter && (
                         <span className="tsk-daybanner">
                             {dayFilter.label}
