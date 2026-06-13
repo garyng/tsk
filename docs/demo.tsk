@@ -47,6 +47,8 @@ Colors the whole line; the same number clears it.
 
 `Alt+T` → searchable tag list with counts → opens a search of matching tasks. Its sibling **Tsk: Find All Tasks by Status** (Command Palette) does the same by status marker — pick `[/]` to find every in-progress task, `[x]` every done one, and so on.
 
+Tagged something that isn't in `tags.yml` yet? **Tsk: Add Discovered Tags to tags.yml** (Command Palette) appends every such tag as a bare stub under a dated header, ready for you to give it a description or parent.
+
 - [ ] chase the ticket #JIRAID-123 <!-- @id:tag-a -->
 - [ ] mount the NAS #inventory/homelab/nas1 <!-- @id:tag-b -->
 
