@@ -68,7 +68,10 @@ suite('block commands — copy/cut', () => {
 
         const clip = await vscode.env.clipboard.readText();
         assert.ok(clip.includes('a parent paragraph'), 'native copied the cursor line');
-        assert.ok(!clip.includes('child'), 'must NOT have expanded to the block on a non-task line');
+        assert.ok(
+            !clip.includes('child'),
+            'must NOT have expanded to the block on a non-task line',
+        );
         assert.strictEqual(editor.document.getText(), 'a parent paragraph\n    - [ ] child');
     });
 
@@ -79,6 +82,24 @@ suite('block commands — copy/cut', () => {
         await vscode.commands.executeCommand('tsk.copyTaskBlock');
 
         assert.strictEqual(await vscode.env.clipboard.readText(), 'keep1');
+    });
+
+    test('select: on a parent task, the whole block is selected', async () => {
+        const editor = await openTsk(PARENT_BLOCK, 1);
+        await vscode.commands.executeCommand('tsk.selectTaskBlock');
+        assert.strictEqual(editor.document.getText(editor.selection), BLOCK_TEXT);
+    });
+
+    test('select: on a leaf task, just that line is selected', async () => {
+        const editor = await openTsk(PARENT_BLOCK, 0); // "- [ ] keep1" — no children
+        await vscode.commands.executeCommand('tsk.selectTaskBlock');
+        assert.strictEqual(editor.document.getText(editor.selection), '- [ ] keep1');
+    });
+
+    test('select: on a non-task line it is a no-op (selection stays a bare cursor)', async () => {
+        const editor = await openTsk('just a paragraph\n- [ ] task', 0);
+        await vscode.commands.executeCommand('tsk.selectTaskBlock');
+        assert.ok(editor.selection.isEmpty, 'selection should remain an empty cursor');
     });
 
     test('contributes.keybindings binds Ctrl/Cmd+C/X to the block commands, gated no-selection', () => {

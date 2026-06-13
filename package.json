@@ -218,6 +218,11 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.selectTaskBlock",
+                "title": "Select Task Block",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.installClipboardBridgeSkill",
                 "title": "Install Clipboard Bridge Skill",
                 "category": "Tsk"

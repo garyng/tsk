@@ -191,6 +191,7 @@ export const COMMANDS = {
     duplicateLineUp: 'tsk.duplicateLineUp',
     copyTaskBlock: 'tsk.copyTaskBlock',
     cutTaskBlock: 'tsk.cutTaskBlock',
+    selectTaskBlock: 'tsk.selectTaskBlock',
     moveTaskToFile: 'tsk.moveTaskToFile',
     extractTaskToFile: 'tsk.extractTaskToFile',
     addDiscoveredTags: 'tsk.addDiscoveredTags',

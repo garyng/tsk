@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
-import { isTskDocument } from './editor-guards';
+import { isTskDocument, requireTskEditor } from './editor-guards';
 import type { Logger } from './lib/logger';
 import { computeBlockDeletion, computeTaskBlockRange } from './lib/move-task-logic';
 import { parseLine } from './lib/parser';
@@ -11,14 +11,17 @@ import { parseLine } from './lib/parser';
  * block-range machinery from Move/Extract (`computeTaskBlockRange` /
  * `computeBlockDeletion`).
  *
- * This phase: `tsk.copyTaskBlock` / `tsk.cutTaskBlock`, which **shadow** VS
- * Code's copy/cut in `.tsk` files so that — with nothing selected and a single
- * cursor on a task line — the whole block is copied/cut, not just the one line
- * the built-in "copy line" would take. Every other case (a real selection,
- * multiple cursors, a non-task line, a non-tsk doc) falls straight through to
- * the native action, the same way `duplicate-commands.ts` defers to the
- * built-in. Calling the native command *by id* via `executeCommand` does not
- * re-enter our keybinding, so there is no recursion.
+ * - `tsk.copyTaskBlock` / `tsk.cutTaskBlock` **shadow** VS Code's copy/cut in
+ *   `.tsk` files so that — with nothing selected and a single cursor on a task
+ *   line — the whole block is copied/cut, not just the one line the built-in
+ *   "copy line" would take. Every other case (a real selection, multiple
+ *   cursors, a non-task line, a non-tsk doc) falls straight through to the
+ *   native action, the same way `duplicate-commands.ts` defers to the built-in.
+ *   Calling the native command *by id* via `executeCommand` does not re-enter
+ *   our keybinding, so there is no recursion.
+ * - `tsk.selectTaskBlock` selects the block under the cursor — the deterministic,
+ *   keyboard-accessible backbone that the double-click gesture also routes
+ *   through (via the shared {@link selectBlockAt}).
  */
 
 /** The active editor's tab width (block indent is column-aware); 4 by default. */
@@ -37,7 +40,33 @@ export function registerBlockCommands(context: vscode.ExtensionContext, logger: 
             clipboardBlock(false, logger),
         ),
         vscode.commands.registerCommand(COMMANDS.cutTaskBlock, () => clipboardBlock(true, logger)),
+        vscode.commands.registerCommand(COMMANDS.selectTaskBlock, () => selectTaskBlock(logger)),
     );
+}
+
+/**
+ * Select the whole task block at `line` (the task + its indented sub-items) and
+ * reveal it. The shared primitive behind `tsk.selectTaskBlock` and the
+ * double-click gesture — both start from a line and want it selected.
+ */
+function selectBlockAt(editor: vscode.TextEditor, line: number): void {
+    const lines = editor.document.getText().split(/\r?\n/);
+    const { start, end } = computeTaskBlockRange(lines, line, tabSizeOf(editor));
+    const selection = new vscode.Selection(start, 0, end, editor.document.lineAt(end).text.length);
+    editor.selection = selection;
+    editor.revealRange(selection);
+}
+
+/** `tsk.selectTaskBlock` — select the block under the cursor (no-op off a task line). */
+function selectTaskBlock(logger: Logger): void {
+    const editor = requireTskEditor(logger, COMMANDS.selectTaskBlock);
+    if (!editor) return;
+    const line = editor.selection.active.line;
+    if (!parseLine(editor.document.lineAt(line).text)) {
+        void vscode.window.showInformationMessage('Tsk: the cursor is not on a task line.');
+        return;
+    }
+    selectBlockAt(editor, line);
 }
 
 /**
