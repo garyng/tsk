@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
-import { COMMANDS } from './constants';
+import { COMMANDS, DOUBLE_CLICK_SELECTS_BLOCK_KEY } from './constants';
 import { isTskDocument, requireTskEditor } from './editor-guards';
+import { mouseSelectionInPrefix } from './lib/block-select';
 import type { Logger } from './lib/logger';
 import { computeBlockDeletion, computeTaskBlockRange } from './lib/move-task-logic';
 import { parseLine } from './lib/parser';
+import { taskContentRange } from './lib/toggle';
 
 /**
  * Task-block convenience gestures — operations that act on a task's whole
@@ -22,6 +24,10 @@ import { parseLine } from './lib/parser';
  * - `tsk.selectTaskBlock` selects the block under the cursor — the deterministic,
  *   keyboard-accessible backbone that the double-click gesture also routes
  *   through (via the shared {@link selectBlockAt}).
+ * - A selection-change listener (`onMouseSelection` → {@link blockExpandTarget})
+ *   turns a **double-click on a task's marker / indentation** into a block
+ *   selection (content double-clicks still select a word), gated by the default-on
+ *   `tsk.doubleClickSelectsBlock` setting.
  */
 
 /** The active editor's tab width (block indent is column-aware); 4 by default. */
@@ -41,6 +47,9 @@ export function registerBlockCommands(context: vscode.ExtensionContext, logger: 
         ),
         vscode.commands.registerCommand(COMMANDS.cutTaskBlock, () => clipboardBlock(true, logger)),
         vscode.commands.registerCommand(COMMANDS.selectTaskBlock, () => selectTaskBlock(logger)),
+        // Double-click a task's marker / indent → select its block (marker-scoped,
+        // so double-clicking the content still selects a word). Setting-gated.
+        vscode.window.onDidChangeTextEditorSelection(onMouseSelection),
     );
 }
 
@@ -67,6 +76,56 @@ function selectTaskBlock(logger: Logger): void {
         return;
     }
     selectBlockAt(editor, line);
+}
+
+/**
+ * Decide whether a mouse selection-change should expand to a block, and which
+ * line — or `null` to leave the selection alone. Factored out of the listener so
+ * every decision branch is testable WITHOUT a synthetic mouse event (the host
+ * can't emit a `kind === Mouse` selection, so the listener is otherwise
+ * unreachable from e2e). A double-click on the task's structural prefix (indent /
+ * bullet / `[marker]`) expands; a double-click on its content — or any non-Mouse,
+ * multi-, empty, or off-task selection — does not. See {@link mouseSelectionInPrefix}.
+ */
+export function blockExpandTarget(
+    doc: vscode.TextDocument,
+    selections: readonly vscode.Selection[],
+    kind: vscode.TextEditorSelectionChangeKind | undefined,
+    enabled: boolean,
+): number | null {
+    if (!enabled) return null;
+    if (kind !== vscode.TextEditorSelectionChangeKind.Mouse) return null;
+    if (!isTskDocument(doc)) return null;
+    if (selections.length !== 1) return null;
+    const [sel] = selections;
+    if (!sel || sel.isEmpty || sel.start.line !== sel.end.line) return null;
+    const content = taskContentRange(doc.lineAt(sel.start.line).text);
+    if (!content) return null; // not a task line
+    return mouseSelectionInPrefix(
+        sel.start.line,
+        sel.start.character,
+        sel.end.line,
+        sel.end.character,
+        content.start,
+    )
+        ? sel.start.line
+        : null;
+}
+
+/**
+ * The selection-change listener behind double-click-selects-block. Reads the
+ * (default-on) `tsk.doubleClickSelectsBlock` setting per event — cheap, and
+ * keeps the manifest the single source of truth — then expands when
+ * {@link blockExpandTarget} says so. The expansion sets `editor.selection`,
+ * which re-fires this event with `kind === Command`/`undefined`; the kind filter
+ * inside `blockExpandTarget` drops it, so there is no feedback loop.
+ */
+function onMouseSelection(e: vscode.TextEditorSelectionChangeEvent): void {
+    const enabled = vscode.workspace
+        .getConfiguration('tsk')
+        .get<boolean>(DOUBLE_CLICK_SELECTS_BLOCK_KEY, true);
+    const line = blockExpandTarget(e.textEditor.document, e.selections, e.kind, enabled);
+    if (line !== null) selectBlockAt(e.textEditor, line);
 }
 
 /**

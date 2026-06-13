@@ -111,6 +111,9 @@ export const AUTOLINKS_KEY = 'autolinks';
 export const MIGRATE_MARKERS_SETTING = 'tsk.migrate.markers';
 export const MIGRATE_MARKERS_KEY = 'migrate.markers';
 
+export const DOUBLE_CLICK_SELECTS_BLOCK_SETTING = 'tsk.doubleClickSelectsBlock';
+export const DOUBLE_CLICK_SELECTS_BLOCK_KEY = 'doubleClickSelectsBlock';
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 //
 // There are intentionally NO `DEFAULT_*` setting constants here. Every

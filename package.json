@@ -571,6 +571,11 @@
                     "default": true,
                     "description": "When marking a task as \"now\" (via Tsk: Mark Now), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
                 },
+                "tsk.doubleClickSelectsBlock": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Double-click a task's marker, bullet, or indentation in a .tsk editor to select its whole block (the task plus its indented sub-items). Double-clicking the task's text still selects a single word. Turn off to leave double-click as VS Code's default word-select everywhere."
+                },
                 "tsk.autolinks": {
                     "type": "array",
                     "default": [],

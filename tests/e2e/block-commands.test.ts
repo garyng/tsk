@@ -1,5 +1,6 @@
 import * as assert from 'node:assert';
 import * as vscode from 'vscode';
+import { blockExpandTarget } from '../../src/block-commands';
 
 const EXTENSION_ID = 'garyng.tsk';
 
@@ -122,5 +123,75 @@ suite('block commands — copy/cut', () => {
             assert.strictEqual(found.mac, exp.mac);
             assert.strictEqual(found.when, when);
         }
+    });
+});
+
+/**
+ * Double-click → select block: the listener's decision, `blockExpandTarget`.
+ * A real double-click's `kind === Mouse` can't be synthesized in the host, so we
+ * test the decision function directly (the listener is a thin
+ * read-setting → decide → `selectBlockAt` wrapper; `selectBlockAt` is covered by
+ * the select tests above). `- [ ] parent` → content starts at col 6, so the
+ * marker interior is cols 3..4 and the content "parent" is cols 6..12.
+ */
+suite('block commands — double-click decision (blockExpandTarget)', () => {
+    suiteSetup(async () => {
+        await vscode.extensions.getExtension(EXTENSION_ID)?.activate();
+    });
+
+    const Kind = vscode.TextEditorSelectionChangeKind;
+    const TASK = '- [ ] parent <!-- @id:p1 -->';
+    const tskDoc = (content: string): Thenable<vscode.TextDocument> =>
+        vscode.workspace.openTextDocument({ content, language: 'tsk' });
+    const sel = (line: number, c1: number, c2: number): vscode.Selection =>
+        new vscode.Selection(line, c1, line, c2);
+
+    test('a Mouse selection in the marker prefix returns the task line', async () => {
+        const doc = await tskDoc(TASK);
+        assert.strictEqual(blockExpandTarget(doc, [sel(0, 3, 4)], Kind.Mouse, true), 0);
+    });
+
+    test('a Mouse selection in the content returns null (word-select preserved)', async () => {
+        const doc = await tskDoc(TASK);
+        assert.strictEqual(blockExpandTarget(doc, [sel(0, 6, 12)], Kind.Mouse, true), null);
+    });
+
+    test('a non-Mouse selection (keyboard / command / undefined) returns null', async () => {
+        const doc = await tskDoc(TASK);
+        const prefix = [sel(0, 3, 4)];
+        assert.strictEqual(blockExpandTarget(doc, prefix, Kind.Keyboard, true), null);
+        assert.strictEqual(blockExpandTarget(doc, prefix, Kind.Command, true), null);
+        assert.strictEqual(blockExpandTarget(doc, prefix, undefined, true), null);
+    });
+
+    test('disabled (setting off) returns null even for a prefix Mouse selection', async () => {
+        const doc = await tskDoc(TASK);
+        assert.strictEqual(blockExpandTarget(doc, [sel(0, 3, 4)], Kind.Mouse, false), null);
+    });
+
+    test('a non-task line returns null', async () => {
+        const doc = await tskDoc('just a paragraph');
+        assert.strictEqual(blockExpandTarget(doc, [sel(0, 0, 4)], Kind.Mouse, true), null);
+    });
+
+    test('multiple, empty, or multi-line selections return null', async () => {
+        const doc = await tskDoc(`${TASK}\n    - [ ] child`);
+        assert.strictEqual(
+            blockExpandTarget(doc, [sel(0, 3, 4), sel(0, 0, 1)], Kind.Mouse, true),
+            null,
+        );
+        assert.strictEqual(blockExpandTarget(doc, [sel(0, 3, 3)], Kind.Mouse, true), null); // empty
+        const multiLine = new vscode.Selection(0, 3, 1, 4);
+        assert.strictEqual(blockExpandTarget(doc, [multiLine], Kind.Mouse, true), null);
+    });
+
+    test('contributes.configuration declares tsk.doubleClickSelectsBlock default true', () => {
+        const ext = vscode.extensions.getExtension(EXTENSION_ID);
+        assert.ok(ext);
+        const setting =
+            ext.packageJSON.contributes.configuration.properties['tsk.doubleClickSelectsBlock'];
+        assert.ok(setting, 'tsk.doubleClickSelectsBlock should be declared');
+        assert.strictEqual(setting.type, 'boolean');
+        assert.strictEqual(setting.default, true);
     });
 });
