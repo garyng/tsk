@@ -5,7 +5,9 @@ import { MARKERS } from './markers';
 import {
     DEFAULT_MD_MARKER_MAP,
     type MdStamps,
+    matchMdBareBullet,
     matchMdTask,
+    migrateMdBullet,
     migrateMdLine,
     prepareMdBlockForTsk,
     stampKeyForMarker,
@@ -266,5 +268,85 @@ describe('prepareMdBlockForTsk', () => {
         expect(stamps).toHaveBeenCalledTimes(1);
         expect(stamps).toHaveBeenCalledWith(1);
         expect(ids).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('matchMdBareBullet', () => {
+    it('matches a plain bullet and splits indent / bullet / content', () => {
+        expect(matchMdBareBullet('    *   a bare note  ')).toEqual({
+            indent: '    ',
+            bullet: '*   ',
+            content: 'a bare note',
+        });
+    });
+
+    it('accepts every bullet char', () => {
+        for (const bullet of ['-', '*', '+']) {
+            expect(matchMdBareBullet(`${bullet} note`)?.content).toBe('note');
+        }
+    });
+
+    it('rejects a bracketed task — mapped or not', () => {
+        expect(matchMdBareBullet('- [ ] water the plants')).toBeNull();
+        expect(matchMdBareBullet('- [>>] file taxes')).toBeNull();
+        expect(matchMdBareBullet('- [zzz] unknown glyph')).toBeNull();
+        expect(matchMdBareBullet('- []')).toBeNull();
+    });
+
+    it('treats a markdown LINK as a bullet, matching the non-task rule elsewhere', () => {
+        // `]` is followed by `(`, not whitespace — so it is not a task, and
+        // `matchMdTask` agrees.
+        expect(matchMdTask('- [a link](https://example.com), not a task', MAP)).toBeNull();
+        expect(matchMdBareBullet('- [a link](https://example.com), not a task')?.content).toBe(
+            '[a link](https://example.com), not a task',
+        );
+    });
+
+    it('rejects an empty bullet and a non-list line', () => {
+        expect(matchMdBareBullet('- ')).toBeNull();
+        expect(matchMdBareBullet('-')).toBeNull();
+        expect(matchMdBareBullet('just prose')).toBeNull();
+        expect(matchMdBareBullet('')).toBeNull();
+    });
+
+    it('strips a trailing CR', () => {
+        expect(matchMdBareBullet('- note\r')?.content).toBe('note');
+    });
+});
+
+describe('migrateMdBullet', () => {
+    it('bare bullet → tsk [ ] with @id + @created (status stamp ignored)', () => {
+        expect(migrateMdBullet('- aaaa', STAMPS, 'id1')).toBe(
+            '- [ ] aaaa <!-- @id:id1 @created:2026-03-01T10:00:00+08:00 -->',
+        );
+    });
+
+    it('preserves indent and bullet char verbatim', () => {
+        expect(migrateMdBullet('    + nested note', STAMPS, 'id2')).toBe(
+            '    + [ ] nested note <!-- @id:id2 @created:2026-03-01T10:00:00+08:00 -->',
+        );
+    });
+
+    it('produces a line tsk parses back as a todo', () => {
+        const out = migrateMdBullet('- aaaa', STAMPS, 'id3') as string;
+        const parsed = parseLine(out);
+        expect(parsed?.marker).toBe('todo');
+        expect(parsed?.content).toBe('aaaa');
+        expect(parsed?.metadata.get('id')).toBe('id3');
+    });
+
+    it('returns null for a task line — that is the other command', () => {
+        expect(migrateMdBullet('- [ ] water the plants', STAMPS, 'id4')).toBeNull();
+    });
+
+    it('returns null for a bullet that already carries an @id (idempotent)', () => {
+        const once = migrateMdBullet('- aaaa', STAMPS, 'id5') as string;
+        expect(migrateMdBullet(once, STAMPS, 'id6')).toBeNull();
+        expect(migrateMdBullet('- aaaa <!-- @id:zz -->', STAMPS, 'id7')).toBeNull();
+    });
+
+    it('returns null for an empty bullet and a non-bullet line', () => {
+        expect(migrateMdBullet('- ', STAMPS, 'id8')).toBeNull();
+        expect(migrateMdBullet('just prose', STAMPS, 'id9')).toBeNull();
     });
 });

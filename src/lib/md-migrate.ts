@@ -171,6 +171,65 @@ export function migrateMdLine(
  */
 const BRACKET_PROBE_RE = /^\s*[-*+]\s+\[[^\]]*\](?:\s|$)/;
 
+/** A matched bare markdown bullet — a list item carrying no `[glyph]` checkbox. */
+export interface MdBullet {
+    /** Leading whitespace, verbatim. */
+    indent: string;
+    /** The bullet plus its trailing whitespace, verbatim (e.g. `'- '`, `'*   '`). */
+    bullet: string;
+    /** Content after the bullet, trailing whitespace trimmed. Never empty. */
+    content: string;
+}
+
+/** A `-`/`*`/`+` list item with at least one non-whitespace character of content. */
+const BARE_BULLET_RE = /^(\s*)([-*+]\s+)(\S.*?)\s*$/;
+
+/**
+ * Match `line` as a **bare** markdown bullet — a list item that is NOT a
+ * bracketed task under any vocabulary. The exclusion reuses
+ * {@link BRACKET_PROBE_RE}, so "is this a task?" keeps one definition: a
+ * `[…]` followed by whitespace or end-of-line is a task (mapped or not) and
+ * never a bullet, while `- [a link](url)` — bracket followed by `(` — is a
+ * bullet here exactly as it's a non-task everywhere else.
+ *
+ * Empty bullets (`-` with no content) return `null`: a bulk run has nothing
+ * to convert there, and stamping `@id`s onto blank list scaffolding is noise.
+ * (`toggleTodo` in a `.tsk` file deliberately DOES wrap an empty line — that
+ * is a single deliberate keystroke, not a sweep.)
+ */
+export function matchMdBareBullet(line: string): MdBullet | null {
+    if (BRACKET_PROBE_RE.test(line)) return null;
+    const match = BARE_BULLET_RE.exec(line);
+    if (!match) return null;
+    return {
+        indent: match[1] as string,
+        bullet: match[2] as string,
+        content: match[3] as string,
+    };
+}
+
+/**
+ * Rewrite one bare markdown bullet as a tsk **todo**: keep indent, bullet and
+ * content verbatim, insert `[ ]`, and append a fresh `@id` + `@created`
+ * comment. Returns `null` when the line isn't a bare bullet, or already
+ * carries an `@id` (the same idempotency rule as {@link migrateMdLine}).
+ *
+ * `todo` has no status stamp ({@link stampKeyForMarker} is `undefined` for
+ * it), so only `stamps.created` is read — a caller's fallback `status` is
+ * ignored, exactly as it is when a `[ ]` line migrates.
+ */
+export function migrateMdBullet(line: string, stamps: MdStamps, id: string): string | null {
+    const bullet = matchMdBareBullet(line);
+    if (!bullet) return null;
+    if (extractMetadata(line).metadata.has('id')) return null;
+
+    const metadata = new Map<string, string | null>([
+        ['id', id],
+        ['created', stamps.created],
+    ]);
+    return `${bullet.indent}${bullet.bullet}[${GLYPH.todo}] ${bullet.content} ${serializeMetadata(metadata)}`;
+}
+
 /** The result of preparing one block of md lines for life in a `.tsk` file. */
 export interface PreparedBlock {
     /** The block with every id-less md-task line converted to tsk format. */

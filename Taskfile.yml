@@ -35,3 +35,11 @@ tasks:
     dir: "{{ .TASKFILE_DIR }}"
     cmds:
       - npm run test:webview
+
+  install:
+    dir: "{{ .TASKFILE_DIR }}"
+    desc: Package the extension and install that VSIX into this devcontainer's VS Code.
+    deps:
+      - package
+    cmds:
+      - bash scripts/install-extension.sh

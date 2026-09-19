@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -271,6 +271,11 @@
             {
                 "command": "tsk.migrateMarkdownTasks",
                 "title": "Migrate Markdown Tasks",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.migrateMarkdownBullets",
+                "title": "Migrate Markdown Bullets as Todos",
                 "category": "Tsk"
             },
             {

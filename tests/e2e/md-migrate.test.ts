@@ -108,6 +108,25 @@ suite('migrate markdown tasks', () => {
         );
         git(['add', 'bulk.md']);
         commit('add bulk fixture', T1);
+
+        // bullets*.md: the bare-bullet command's surface — plain bullets, a
+        // real task (the OTHER command's job), a markdown link (not a task,
+        // so a bullet here), prose, and a bullet that already carries an @id.
+        const bullets = [
+            '# notes',
+            '- aaaa',
+            '- bbbb',
+            '- [ ] a real task',
+            '- [a link](https://example.com), not a task',
+            'plain prose',
+            `- already done <!-- @id:bull1 @created:${T1} -->`,
+            '',
+        ].join('\n');
+        for (const name of ['bullets.md', 'bullets-sel.md', 'bullets-actions.md']) {
+            writeRepoFile(name, bullets);
+            git(['add', name]);
+        }
+        commit('add bullet fixtures', T1);
     });
 
     suiteTeardown(async () => {
@@ -440,6 +459,82 @@ suite('migrate markdown tasks', () => {
                 'Send task to tsk file…',
             ),
             'an id-less md task offers Send',
+        );
+    });
+
+    // ── bare-bullet migration (`tsk.migrateMarkdownBullets`) ───────────────
+
+    test('a bare bullet becomes a tsk todo with a git-derived @created', async () => {
+        const doc = await open('bullets.md');
+        await vscode.commands.executeCommand('tsk.migrateMarkdownBullets', doc.uri, 1);
+        const lines = doc.getText().split('\n');
+        assert.match(
+            lines[1] as string,
+            new RegExp(`^- \\[ \\] aaaa <!-- @id:[a-z0-9]+ @created:${esc(T1)} -->$`),
+            'todo marker + @id + @created from the adding commit, no status stamp',
+        );
+        assert.strictEqual(lines[2], '- bbbb', 'the untargeted bullet is untouched');
+    });
+
+    test('the selection scope converts bullets and links, never task lines or prose', async () => {
+        const doc = await open('bullets-sel.md');
+        const editor = vscode.window.activeTextEditor;
+        assert.ok(editor);
+        editor.selection = new vscode.Selection(2, 0, 5, 0); // bbbb → prose
+        await vscode.commands.executeCommand('tsk.migrateMarkdownBullets');
+        const lines = doc.getText().split('\n');
+
+        assert.strictEqual(lines[1], '- aaaa', 'outside the selection, untouched');
+        assert.match(lines[2] as string, /^- \[ \] bbbb <!-- @id:/, 'selected bullet converted');
+        assert.strictEqual(
+            lines[3],
+            '- [ ] a real task',
+            'a bracketed task is the OTHER command — never touched here',
+        );
+        assert.match(
+            lines[4] as string,
+            /^- \[ \] \[a link\]\(https:\/\/example\.com\), not a task <!-- @id:/,
+            'a markdown link is not a task, so it IS a bare bullet',
+        );
+        assert.strictEqual(lines[5], 'plain prose', 'a non-list line is untouched');
+        assert.match(
+            lines[6] as string,
+            /@id:bull1/,
+            'a bullet that already carries an @id keeps it (idempotent)',
+        );
+    });
+
+    test('the bullet code action is offered on bare bullets only', async () => {
+        const doc = await open('bullets-actions.md');
+        assert.ok(
+            await queryActions(
+                doc.uri,
+                new vscode.Range(1, 0, 1, 0), // "- aaaa"
+                'Migrate bullet to tsk todo',
+            ),
+            'a bare bullet offers the bullet action',
+        );
+        const onTask = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            doc.uri,
+            new vscode.Range(3, 0, 3, 0), // "- [ ] a real task"
+        );
+        assert.ok(
+            !onTask?.some((a) => a.title === 'Migrate bullet to tsk todo'),
+            'a task line offers the task actions, not the bullet one',
+        );
+        assert.ok(
+            onTask?.some((a) => a.title === 'Migrate task to tsk format'),
+            'a task line still offers the task action',
+        );
+        const onIdCarrying = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            doc.uri,
+            new vscode.Range(6, 0, 6, 0), // already carries @id
+        );
+        assert.ok(
+            !onIdCarrying?.some((a) => a.title === 'Migrate bullet to tsk todo'),
+            'an id-carrying bullet no longer offers it',
         );
     });
 });

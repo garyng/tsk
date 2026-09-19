@@ -9,7 +9,9 @@ import { gitFileLineStamps, gitShowHead, mapDocLinesToHead } from './lib/md-git-
 import {
     DEFAULT_MD_MARKER_MAP,
     type MdStamps,
+    matchMdBareBullet,
     matchMdTask,
+    migrateMdBullet,
     migrateMdLine,
     validateMarkerMap,
 } from './lib/md-migrate';
@@ -29,10 +31,15 @@ import { localTimestamp } from './lib/time';
  * `WorkspaceEdit` applies every line — a single undo step. Cancelling the
  * progress notification applies nothing.
  *
+ * `tsk.migrateMarkdownBullets` is the same machinery pointed at BARE
+ * bullets — a `- aaaa` with no checkbox becomes a tsk todo. It's a separate
+ * command on purpose: md files are mostly prose bullets, so the task
+ * migration must never touch them, and only an explicit invocation should.
+ *
  * Also contributes the id-less-line code actions — "Migrate task to tsk
- * format" (rewrite) and "Send task to tsk file…" (move, handled in
- * `move-task-commands.ts`). Already-migrated lines (carrying `@id`) are
- * skipped everywhere — the idempotency rule.
+ * format" / "Migrate bullet to tsk todo" (rewrite) and "Send task to tsk
+ * file…" (move, handled in `move-task-commands.ts`). Already-migrated lines
+ * (carrying `@id`) are skipped everywhere — the idempotency rule.
  */
 interface MigrateDeps {
     generateId: () => string;
@@ -142,7 +149,12 @@ export function registerMdMigrateCommands(
         vscode.commands.registerCommand(
             COMMANDS.migrateMarkdownTasks,
             (uri?: vscode.Uri, line?: number) =>
-                migrateMarkdownTasks(cache, logger, deps, uri, line),
+                runMdMigration(MIGRATE_TASKS_SPEC, cache, logger, deps, uri, line),
+        ),
+        vscode.commands.registerCommand(
+            COMMANDS.migrateMarkdownBullets,
+            (uri?: vscode.Uri, line?: number) =>
+                runMdMigration(MIGRATE_BULLETS_SPEC, cache, logger, deps, uri, line),
         ),
         vscode.languages.registerCodeActionsProvider(
             { language: MARKDOWN_LANGUAGE_ID },
@@ -158,9 +170,10 @@ export function registerMdMigrateCommands(
 }
 
 /**
- * Offer the two id-less-md-task actions: "Migrate task to tsk format"
- * (convert in place) and "Send task to tsk file…" (convert + relocate in one
- * step). Id-carrying lines get neither — those offer the plain Move (from
+ * Offer the id-less-line actions. An md TASK gets two: "Migrate task to tsk
+ * format" (convert in place) and "Send task to tsk file…" (convert +
+ * relocate in one step). A bare BULLET gets one: "Migrate bullet to tsk
+ * todo". Id-carrying lines get none — those offer the plain Move (from
  * `move-task-commands.ts`'s provider) instead.
  */
 function provideMigrateAction(
@@ -171,8 +184,23 @@ function provideMigrateAction(
     const line = document.lineAt(lineNumber).text;
     // A silent map read — config problems surface when the command runs.
     const map = readMigrateMarkerMap();
-    if (!matchMdTask(line, map)) return undefined;
     if (extractMetadata(line).metadata.has('id')) return undefined;
+    if (!matchMdTask(line, map)) {
+        // Not a task — a bare bullet gets the one-line todo conversion
+        // instead. No `Send…` counterpart: send relocates a task BLOCK, and a
+        // bullet isn't one.
+        if (!matchMdBareBullet(line)) return undefined;
+        const toTodo = new vscode.CodeAction(
+            'Migrate bullet to tsk todo',
+            vscode.CodeActionKind.RefactorRewrite,
+        );
+        toTodo.command = {
+            command: COMMANDS.migrateMarkdownBullets,
+            title: toTodo.title,
+            arguments: [document.uri, lineNumber],
+        };
+        return [toTodo];
+    }
     const migrate = new vscode.CodeAction(
         'Migrate task to tsk format',
         vscode.CodeActionKind.RefactorRewrite,
@@ -194,7 +222,41 @@ function provideMigrateAction(
     return [migrate, send];
 }
 
-async function migrateMarkdownTasks(
+/**
+ * The per-command half of an in-place migration: which lines are candidates,
+ * how each one is rewritten, and how the run is announced. Everything else —
+ * scope resolution, the `@id` idempotency rule, git derivation, the single
+ * `WorkspaceEdit`, the summary — is shared by {@link runMdMigration}.
+ */
+interface MigrationSpec {
+    commandId: string;
+    /** Candidate test, BEFORE the shared id-less rule is applied. */
+    matches: (line: string, map: ReadonlyMap<string, Marker>) => boolean;
+    /** Rewrite one candidate; `null` is unreachable for a pre-filtered line. */
+    rewrite: (
+        line: string,
+        map: ReadonlyMap<string, Marker>,
+        stamps: MdStamps,
+        id: string,
+    ) => string | null;
+    /** Singular noun for the summary ("task" / "bullet"). */
+    noun: string;
+    /** Shown when the scope holds no candidates at all. */
+    emptyMessage: string;
+    /** Shown when every candidate in scope already carries an `@id`. */
+    allMigratedMessage: string;
+    /**
+     * Ask before a WHOLE-FILE run (selection scope and the single-line code
+     * action always apply silently). Set for the bullet command: converting
+     * every prose bullet in a file is the one genuinely destructive outcome
+     * here, and the easiest to trigger by accident. The task command needs no
+     * gate — its matcher only ever sees bracketed task lines.
+     */
+    confirmWholeFile?: boolean;
+}
+
+async function runMdMigration(
+    spec: MigrationSpec,
     cache: CacheService,
     logger: Logger,
     deps: MigrateDeps,
@@ -212,33 +274,47 @@ async function migrateMarkdownTasks(
     // Scope: one line (code action) → the selection's lines → the whole file.
     let firstLine = 0;
     let lastLine = doc.lineCount - 1;
+    let wholeFile = true;
     if (lineArg !== undefined) {
         firstLine = lineArg;
         lastLine = lineArg;
+        wholeFile = false;
     } else if (editor?.document === doc && !editor.selection.isEmpty) {
         firstLine = editor.selection.start.line;
         lastLine = editor.selection.end.line;
+        wholeFile = false;
     }
 
     const map = readMigrateMarkerMap(logger);
     const docLines = doc.getText().split(/\r?\n/);
 
-    // Candidates = md-task lines in scope without an @id; matched-but-id'd
+    // Candidates = matching lines in scope without an @id; matched-but-id'd
     // lines are the "already tsk" count (idempotent re-runs report, not edit).
     const candidates: number[] = [];
     let alreadyTsk = 0;
     for (let i = firstLine; i <= lastLine && i < docLines.length; i++) {
-        if (!matchMdTask(docLines[i] as string, map)) continue;
+        if (!spec.matches(docLines[i] as string, map)) continue;
         if (extractMetadata(docLines[i] as string).metadata.has('id')) alreadyTsk++;
         else candidates.push(i);
     }
     if (candidates.length === 0) {
         void vscode.window.showInformationMessage(
-            alreadyTsk > 0
-                ? 'Tsk: every Markdown task here is already migrated.'
-                : 'Tsk: no Markdown tasks to migrate here.',
+            alreadyTsk > 0 ? spec.allMigratedMessage : spec.emptyMessage,
         );
         return;
+    }
+
+    if (spec.confirmWholeFile === true && wholeFile) {
+        const plural = candidates.length === 1 ? '' : 's';
+        const choice = await vscode.window.showWarningMessage(
+            `Tsk: convert ${candidates.length} bare bullet${plural} in ${basename(doc.uri.fsPath)} to todos?`,
+            { modal: true, detail: 'Select lines first to convert only part of the file.' },
+            'Convert',
+        );
+        if (choice !== 'Convert') {
+            logger.info(`${spec.commandId}: declined at the whole-file confirmation.`);
+            return;
+        }
     }
 
     // Derive stamps against the PRE-edit doc (one edit at the end keeps the
@@ -256,7 +332,7 @@ async function migrateMarkdownTasks(
             ),
     );
     if (derived.cancelled) {
-        logger.info(`${COMMANDS.migrateMarkdownTasks}: cancelled — nothing applied.`);
+        logger.info(`${spec.commandId}: cancelled — nothing applied.`);
         return;
     }
     const fallbacks = derived.fallbacks;
@@ -264,7 +340,7 @@ async function migrateMarkdownTasks(
     const freshId = makeGuardedIdFactory(cache, deps.generateId);
     const edit = new vscode.WorkspaceEdit();
     for (const lineNo of candidates) {
-        const migrated = migrateMdLine(
+        const migrated = spec.rewrite(
             docLines[lineNo] as string,
             map,
             derived.stamps.get(lineNo) as MdStamps,
@@ -283,9 +359,31 @@ async function migrateMarkdownTasks(
         return;
     }
 
-    const parts = [`migrated ${candidates.length} task${candidates.length === 1 ? '' : 's'}`];
+    const plural = candidates.length === 1 ? '' : 's';
+    const parts = [`migrated ${candidates.length} ${spec.noun}${plural}`];
     if (alreadyTsk > 0) parts.push(`${alreadyTsk} already tsk`);
     if (fallbacks > 0) parts.push(`${fallbacks} stamped now (no git history)`);
     void vscode.window.showInformationMessage(`Tsk: ${parts.join(' · ')}.`);
-    logger.info(`${COMMANDS.migrateMarkdownTasks}: ${parts.join(', ')} in ${doc.uri.fsPath}`);
+    logger.info(`${spec.commandId}: ${parts.join(', ')} in ${doc.uri.fsPath}`);
 }
+
+const MIGRATE_TASKS_SPEC: MigrationSpec = {
+    commandId: COMMANDS.migrateMarkdownTasks,
+    matches: (line, map) => matchMdTask(line, map) !== null,
+    rewrite: (line, map, stamps, id) => migrateMdLine(line, map, stamps, id),
+    noun: 'task',
+    emptyMessage: 'Tsk: no Markdown tasks to migrate here.',
+    allMigratedMessage: 'Tsk: every Markdown task here is already migrated.',
+};
+
+const MIGRATE_BULLETS_SPEC: MigrationSpec = {
+    commandId: COMMANDS.migrateMarkdownBullets,
+    // The marker map is irrelevant to a bare bullet — it has no glyph. It
+    // still rides the shared signature so both specs share one runner.
+    matches: (line) => matchMdBareBullet(line) !== null,
+    rewrite: (line, _map, stamps, id) => migrateMdBullet(line, stamps, id),
+    noun: 'bullet',
+    emptyMessage: 'Tsk: no bare Markdown bullets to convert here.',
+    allMigratedMessage: 'Tsk: every bullet here already carries an @id.',
+    confirmWholeFile: true,
+};

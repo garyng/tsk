@@ -120,7 +120,7 @@ A reference to a missing id gets a yellow squiggle. `Ctrl+.` → remove or repla
 - [ ] relocate me to another file <!-- @id:movefile-demo -->
     - [ ] my child rides along <!-- @id:movefile-child @parent:movefile-demo -->
 
-Coming **from Markdown**? **Tsk: Send All Markdown Tasks to Tsk File…** evacuates an `.md` checklist into tsk — markers remapped, timestamps recovered from git history. Try it on `migrate-sample.md` in this folder; details in the README's *Migrating from Markdown*.
+Coming **from Markdown**? **Tsk: Send All Markdown Tasks to Tsk File…** evacuates an `.md` checklist into tsk — markers remapped, timestamps recovered from git history. A list that never used checkboxes at all? **Tsk: Migrate Markdown Bullets as Todos** turns each bare `- bullet` into a `[ ]` todo. Try both on `migrate-sample.md` in this folder; details in the README's *Migrating from Markdown*.
 
 ## 9. Copy id
 

@@ -202,6 +202,7 @@ export const COMMANDS = {
     extractTaskToFile: 'tsk.extractTaskToFile',
     addDiscoveredTags: 'tsk.addDiscoveredTags',
     migrateMarkdownTasks: 'tsk.migrateMarkdownTasks',
+    migrateMarkdownBullets: 'tsk.migrateMarkdownBullets',
     sendMarkdownTaskToFile: 'tsk.sendMarkdownTaskToFile',
     sendAllMarkdownTasks: 'tsk.sendAllMarkdownTasks',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
