@@ -1,10 +1,12 @@
-import * as vscode from 'vscode';
+import type * as vscode from 'vscode';
 import type { CodelensHandle } from './codelens';
 import type { DiagnosticsManager } from './diagnostics-manager';
+import { readText, statMtime } from './fast-fs';
 import type { CacheService, CacheWarning, RescanResult } from './lib/cache';
 import { cancelDebounced, scheduleDebounced } from './lib/debounce';
 import type { GraphService } from './lib/graph-service';
 import type { Logger } from './lib/logger';
+import type { WorkspaceFiles } from './workspace-files';
 
 /**
  * Owns the cache-rescan orchestration: the initial workspace scan, per-file
@@ -28,28 +30,43 @@ export class ScanController {
         private readonly codelens: CodelensHandle,
         private readonly logger: Logger,
         /**
+         * The non-ignored workspace files. Undefined without a workspace
+         * folder, in which case there is nothing to scan.
+         */
+        private readonly files: WorkspaceFiles | undefined,
+        /**
          * Fired at the end of the shared rescan tail (every cache mutation +
-         * rebuild). The now-decoration re-resolves here so an external / line-
-         * shifting edit or a `Tsk: Rebuild Cache` re-paints the current-now line.
+         * rebuild). The now-decoration re-resolves and the Now / Stats / Task
+         * List panels refresh here, so an external or line-shifting edit, or a
+         * `Tsk: Rebuild Cache`, repaints all of them.
          */
         private readonly onRescanComplete?: () => void,
     ) {}
 
     /**
-     * Scan `**​/*.tsk` (excluding node_modules) on activation. A file whose disk
+     * Scan the workspace's non-ignored `.tsk` files on activation. A file whose disk
      * mtime matches the persisted cache is hydrated into the (always-fresh)
      * in-memory graph without a re-parse; a changed file gets a full rescan.
      */
     async runInitialScan(): Promise<void> {
         const start = Date.now();
-        const uris = await vscode.workspace.findFiles('**/*.tsk', '**/node_modules/**');
+        // `git ls-files` rather than `findFiles`: 13ms vs 112ms warm, no
+        // search-service round-trip, and it answers the gitignore question in
+        // the same call. See `workspace-files.ts` for the benchmark.
+        const all = (await this.files?.all('**/*.tsk')) ?? [];
+        const uris = all.filter((uri: vscode.Uri) => uri.path.endsWith('.tsk'));
+        const found = Date.now() - start;
         let scanned = 0;
         let skipped = 0;
 
+        let statMs = 0;
+        let rescanMs = 0;
         for (const uri of uris) {
             try {
-                const stat = await vscode.workspace.fs.stat(uri);
-                if (this.cache.getFileMtime(uri.toString()) === stat.mtime) {
+                const t0 = Date.now();
+                const mtime = await statMtime(uri);
+                statMs += Date.now() - t0;
+                if (this.cache.getFileMtime(uri.toString()) === mtime) {
                     // Cache on disk is current, but the in-memory graph is fresh
                     // on every activation. Hydrate it from the persisted cache so
                     // codelens / lookups work without a rebuildCache invocation.
@@ -60,7 +77,9 @@ export class ScanController {
                     skipped++;
                     continue;
                 }
+                const t1 = Date.now();
                 await this.rescanFromFs(uri);
+                rescanMs += Date.now() - t1;
                 scanned++;
             } catch (err) {
                 this.logger.error(`scan failed for ${uri}: ${(err as Error).message}`);
@@ -69,22 +88,28 @@ export class ScanController {
 
         // The all-files-skipped case (every mtime matched on cold start) never
         // hit a per-file tail, so refresh once here or the lenses stay empty.
+        const t2 = Date.now();
         this.refreshDiagnosticsAndLenses();
+        const tailMs = Date.now() - t2;
 
         const elapsed = Date.now() - start;
         const counts = this.cache.counts();
         this.logger.info(
-            `initial scan: ${scanned} scanned, ${skipped} unchanged, ${counts.tasks} tasks indexed, ${counts.tags} tags, ${elapsed}ms.`,
+            `initial scan: ${scanned} scanned, ${skipped} unchanged, ${counts.tasks} tasks indexed, ${counts.tags} tags, ${elapsed}ms (list ${found}ms, index ${elapsed - found}ms).`,
+        );
+        // The breakdown that diagnosed the 9s `workspace.fs.stat` cost. Kept at
+        // debug, not info: a one-line total is enough until a scan looks wrong.
+        this.logger.debug(
+            `initial scan timing: list ${found}ms, stat ${statMs}ms, rescan ${rescanMs}ms, tail ${tailMs}ms.`,
         );
     }
 
     /** Re-read `uri` from disk and rescan it (FileSystemWatcher create / change). */
     async rescanFromFs(uri: vscode.Uri): Promise<void> {
         try {
-            const stat = await vscode.workspace.fs.stat(uri);
-            const bytes = await vscode.workspace.fs.readFile(uri);
-            const text = new TextDecoder().decode(bytes);
-            const result = this.cache.rescanFile(uri.toString(), text, stat.mtime);
+            const mtime = await statMtime(uri);
+            const text = await readText(uri);
+            const result = this.cache.rescanFile(uri.toString(), text, mtime);
             this.applyRescanResult(uri.toString(), result);
         } catch (err) {
             this.logger.error(`rescan failed for ${uri}: ${(err as Error).message}`);

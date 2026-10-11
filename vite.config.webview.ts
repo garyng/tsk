@@ -1,12 +1,15 @@
 import { defineConfig } from 'vite';
+import { watchPolling } from './vite.watch';
 
 // The webview clients — small React apps, one ESM bundle per entry (`now-stack` ·
 // `stats` · `task-list`), each loaded by its panel via `asWebviewUri`. Unlike the
 // host build, these are BROWSER bundles: nothing is externalized (React +
-// ReactDOM are bundled), and JSX is transformed by esbuild's automatic runtime
-// (no @vitejs/plugin-react, so no Vite-major plugin-compat coupling).
+// ReactDOM are bundled), and JSX uses the automatic runtime via Vite's built-in
+// transformer (no @vitejs/plugin-react, so no Vite-major plugin-compat
+// coupling). It's configured through the `esbuild` option below, which Vite 8
+// deprecates and converts to its Oxc equivalent.
 //
-// Multiple entries → Vite/Rollup hoists the shared React into one chunk the
+// Multiple entries → the bundler hoists the shared React into one chunk the
 // entries import. That's fine here, and is the standard VS Code + Vite webview
 // pattern: the panel CSP allows scripts from the extension's own origin
 // (`script-src ${webview.cspSource}`, locked to `dist/webview` by
@@ -30,8 +33,8 @@ export default defineConfig(({ mode }) => ({
         emptyOutDir: true,
         sourcemap: true,
         minify: mode !== 'development',
-        // Pin React core (the only dep shared by all three entries) to a stable
-        // `vendor-*` chunk. Otherwise Rollup names that auto-generated shared
+        // Pin React core (the only dep shared by every entry) to a stable
+        // `vendor-*` chunk. Otherwise the bundler names that auto-generated shared
         // chunk after whichever common module seeds it — it drifted to `marker`
         // once `shared/marker.css` became a 3-entry import, confusing next to the
         // `markers` lib chunk and churning on unrelated import changes. Scoped to
@@ -44,11 +47,12 @@ export default defineConfig(({ mode }) => ({
                     /node_modules\/(react|react-dom|scheduler)\//.test(id) ? 'vendor' : undefined,
             },
         },
-        // Some bind mounts (9p/drvfs and similar) deliver no inotify events, so
-        // poll or `--watch` never fires. Gated on dev mode so the one-shot
-        // production build stays unwatched. See vite.config.host.ts for the full
-        // rationale.
-        watch: mode === 'development' ? { chokidar: { usePolling: true, interval: 300 } } : null,
+        // Poll only where file events never arrive (see vite.watch.ts). Gated on dev
+        // mode so the one-shot production build stays unwatched.
+        watch:
+            mode === 'development'
+                ? { chokidar: { usePolling: watchPolling(process.cwd()), interval: 300 } }
+                : null,
         lib: {
             entry: {
                 'now-stack': 'src/webview/now-stack/main.tsx',

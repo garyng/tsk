@@ -74,6 +74,19 @@ function canonical(alias: string): string {
 
 const TASK_COLS = 'id, file_uri, line, marker, content, raw';
 
+/**
+ * Bump this on ANY change to {@link SCHEMA}'s shape. It is the only thing
+ * standing between a schema edit and a dead extension: the DDL below is all
+ * `CREATE TABLE IF NOT EXISTS`, which is a no-op against an existing table of
+ * the WRONG shape — so a re-keyed table survives an upgrade untouched and the
+ * first statement that isn't a `CREATE TABLE` throws against the old columns.
+ * That is exactly how 0.2.1 → 0.7.0 killed activation (`no such column:
+ * file_uri` from the `idx_metadata_occ` index), and why the guard below also
+ * has to count tables: an unversioned legacy cache and a brand-new file both
+ * report `user_version = 0`.
+ */
+const CACHE_SCHEMA_VERSION = 1;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS files (
     uri TEXT PRIMARY KEY,
@@ -145,18 +158,67 @@ interface PreparedStatements {
     countTags: StatementSync;
 }
 
+export interface DbOptions {
+    /** Called (never thrown) when an incompatible `cache.db` is discarded on open. */
+    warn?: (message: string) => void;
+}
+
 export class Db {
     private readonly db: DatabaseSync;
     private readonly stmts: PreparedStatements;
 
-    constructor(path: string) {
+    constructor(path: string, options: DbOptions = {}) {
         // WAL + synchronous hardening is shared via `openDatabase`. cache.db
         // relies on FK cascades (deleting a `files` row wipes its tasks, and
         // each task its metadata/tags), so assert foreign_keys ON explicitly.
         this.db = openDatabase(path);
         this.db.exec('PRAGMA foreign_keys = ON');
+        this.discardIfIncompatible(options.warn);
         this.db.exec(SCHEMA);
+        this.db.exec(`PRAGMA user_version = ${CACHE_SCHEMA_VERSION}`);
         this.stmts = this.prepareStatements();
+    }
+
+    /**
+     * Drop everything when the DB on disk was written by a different
+     * {@link CACHE_SCHEMA_VERSION}. `cache.db` is derived entirely from the
+     * workspace's `.tsk` files, so discard-and-rebuild is always correct here
+     * and no migration path is ever needed (`state.db` is the durable one —
+     * `NowStore` has its own, narrower guard).
+     *
+     * The version alone can't decide this: a brand-new file and a pre-guard
+     * (0.2.x–0.7.x) cache BOTH report `user_version = 0`, because the version
+     * was never stamped before this guard existed. So the table count is what
+     * separates "fresh, nothing to discard" from "legacy, unreadable".
+     */
+    private discardIfIncompatible(warn: ((message: string) => void) | undefined): void {
+        const versionRow = this.db.prepare('PRAGMA user_version').get() as
+            | { user_version: number }
+            | undefined;
+        const onDisk = versionRow?.user_version ?? 0;
+        if (onDisk === CACHE_SCHEMA_VERSION) return;
+
+        const objects = this.db
+            .prepare(
+                `SELECT type, name FROM sqlite_master
+                 WHERE name NOT LIKE 'sqlite_%' AND type IN ('table', 'index', 'view', 'trigger')`,
+            )
+            .all() as { type: string; name: string }[];
+        if (objects.length === 0) return; // Fresh file — SCHEMA is about to create it.
+
+        warn?.(
+            `cache.db is schema v${onDisk}, expected v${CACHE_SCHEMA_VERSION}; discarding and rebuilding it.`,
+        );
+        // FKs off for the drop so the cascade order can't matter; dropping a
+        // table takes its own indexes with it, hence the `IF EXISTS`.
+        this.db.exec('PRAGMA foreign_keys = OFF');
+        try {
+            for (const { type, name } of objects) {
+                this.db.exec(`DROP ${type.toUpperCase()} IF EXISTS "${name}"`);
+            }
+        } finally {
+            this.db.exec('PRAGMA foreign_keys = ON');
+        }
     }
 
     private prepareStatements(): PreparedStatements {

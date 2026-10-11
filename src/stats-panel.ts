@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
-import { COMMANDS } from './constants';
+import { COMMANDS, STATS_PANEL_DIRECTION_KEY } from './constants';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { type Metric, taskIdsForDay } from './lib/stats-aggregation';
 import type { StatsHostToWebview, StatsWebviewToHost } from './lib/stats-protocol';
 import { buildStatsView } from './lib/stats-view-model';
 import { buildWebviewHtml, webviewLocalResourceRoots } from './webview-html';
+import { createPlacedPanel } from './webview-placement';
 
 const VIEW_TYPE = 'tsk.stats';
 
@@ -27,8 +28,9 @@ const RANGE_TICK_MS = 60_000;
  * {@link NowPanel}) showing a GitHub-style activity calendar of task events plus
  * current-state count tiles. It loads `dist/webview/stats.js` under the shared
  * CSP, posts a host-built {@link StatsView} on the `ready` handshake, and
- * re-posts whenever the cache rescans (the panel's only input is the cache, so
- * there are no user actions to route back — the metric toggle is client-side).
+ * re-posts whenever the cache rescans. The metric toggle is client-side; the
+ * only message routed back is a calendar-day click (`jumpToDay`), which hands
+ * that day's tasks to the task list.
  *
  * `registerWebviewPanelSerializer` revives a left-open / popped-out panel.
  */
@@ -48,18 +50,22 @@ export class StatsPanel implements vscode.Disposable {
         private readonly onJumpToDay?: (ids: string[], label: string) => void,
     ) {}
 
-    /** Open the panel, or reveal it if already open. */
-    open(): void {
+    /**
+     * Open the panel, or reveal it if already open. Placement follows
+     * `tsk.panel.stats.openDirection` on CREATE only.
+     */
+    async open(): Promise<void> {
         if (this.panel) {
-            this.panel.reveal(vscode.ViewColumn.Active);
+            this.panel.reveal();
             return;
         }
         this.adopt(
-            vscode.window.createWebviewPanel(
+            await createPlacedPanel(
                 VIEW_TYPE,
                 'Tsk Stats',
-                vscode.ViewColumn.Active,
                 this.webviewOptions(),
+                STATS_PANEL_DIRECTION_KEY,
+                'active',
             ),
         );
     }

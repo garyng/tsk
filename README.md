@@ -36,7 +36,7 @@ The commands below operate on the cursor line (or every unique cursor line in a 
 The picker-driven commands (move + the relationships) open an input box prefilled with the sanitized first token of clipboard text. Click the **Browse tasks…** button (search icon) to switch to a list of every cached task across the workspace.
 
 **Keybinding caveats:**
-- `Alt+1` / `Alt+2` / `Alt+3` are globally bound to "Focus N-th Editor Group" in VS Code defaults. The `when: editorLangId == 'tsk'` clause makes the toggle win inside `.tsk` files; the editor-group focus still works elsewhere.
+- `Alt+1` / `Alt+2` / `Alt+3` are bound by default (Windows/Linux) to "Open Editor at Index N" — switch to the N-th tab. The `when: editorLangId == 'tsk'` clause makes the toggle win inside `.tsk` files; the editor-group focus still works elsewhere.
 - `` Alt+` `` uses the backtick key, which varies by keyboard layout — UK / DE / FR users may need to rebind via the Keyboard Shortcuts editor.
 - Other `Alt`-letter combos depend on installed extensions and themes; the language-scoped `when` clause prevents `.tsk` toggles from leaking outside, but a third-party extension binding the same chord with an equally specific `when` clause could clash.
 
@@ -77,13 +77,53 @@ The `tsk.marker.*` / `tsk.metadata.foreground` *workbench* colors (override via 
 
 Every list-edit keybinding carries `when: editorLangId == 'tsk' && editorTextFocus && !suggestWidgetVisible && !inSnippetMode`, so `Enter` accepts an IntelliSense suggestion when one is visible and `Tab` advances a snippet placeholder when one is active — the list-edit handler stays out of the way.
 
+## Tag definitions
+
+**Ctrl+click a `#tag`** to jump to its entry in `tags.yml`. That's Go-to-Definition, so `F12`, `Alt+F12` (peek) and the context menu all work too.
+
+A tag that isn't declared there resolves to nothing, and VS Code says "no definition found" — a truthful answer rather than silence. `Ctrl+.` on it then offers **Define #tag in tags.yml…**, which prompts for a description and appends `tag: "description"`, creating the file if needed. **Tsk: Define Tag in tags.yml…** is the palette equivalent for the tag under the cursor, and on an already-declared tag it just opens `tags.yml` at that entry.
+
+Descriptions are always written double-quoted. A tag *name* is safe as a bare YAML key, but a description is free text — a `: ` in it, or a leading `#`, `-` or `{`, would otherwise change or break the parse.
+
+## Where the panels open
+
+Each webview panel has its own setting — `tsk.panel.nowStack.openDirection`, `tsk.panel.stats.openDirection`, `tsk.panel.taskList.openDirection` — each accepting `right`, `left`, `above`, `below`, or `active` (a tab in the editor's own group).
+
+They are separate rather than one shared key so that **each default is the placement that panel always had**: Now Stack `right`, Stats and Task List `active`. One key could not default to both.
+
+A direction applies when a panel is **created**, never when an already-open one is revealed — so a panel you have dragged somewhere stays where you put it. `left` / `above` / `below` can't be expressed as a `ViewColumn` (there is no `ViewColumn.Below`), so those create the panel in the editor's group and then split it with VS Code's own group commands; that is why the panel appears for an instant before landing.
+
+## Sections (divider lines)
+
+A line of the form `-label` followed by at least three dashes is a divider — a named section break:
+
+```
+-todo-----------------------------------------------------------------------------------------------
+```
+
+Each divider gets a **collapsible region** running to the line before the next divider, or to the end of the file. Its trailing dash run is dimmed (the `taskDivider` semantic token) so the label reads as a heading rather than drowning in hyphens. **Tsk: Insert Divider…** prompts for a label and pads the line to `tsk.divider.width` (default 100); run it while the cursor is on an existing divider and the prompt arrives prefilled, which is also how you re-pad one after renaming it. Existing dividers of any width keep working — the setting only shapes new ones.
+
+A divider can't be confused with a task or a bullet: both of those need whitespace after the `-`, and a divider never has any. A bare `---` horizontal rule isn't one either, since the label has to start with a letter or digit.
+
+Note that registering a folding provider *replaces* VS Code's indentation folding for the language rather than adding to it, so tsk's provider emits task-block indentation ranges as well — otherwise adding section folding would quietly remove the task-block folding you already had.
+
+## Linking to files
+
+Write `[[path/to/file.md]]` in a task and Ctrl+Click opens it. Paths resolve **workspace-relative first** (the form these links are usually written in), then relative to the linking file; an absolute path is taken as-is. A link whose target doesn't exist stays a link and says so on hover rather than silently going dead — the span is still there, so a typo is visible instead of just inert. It also raises a warning in the Problems panel, squiggled on the brackets alone. That squiggle covers **open** `.tsk` documents only: a warm start skips unchanged files without reading them, so there is nothing to check them against, and the hover is the signal that is always current (a diagnostic computed on edit can't notice the target being created afterwards).
+
+Typing `[[` opens path completion over the workspace. Items are labelled by basename with the directory alongside, but **filtered on the full relative path**, so `notes/20` narrows as you'd expect. **`Alt+L`** (*Tsk: Insert Link to File…*) does the same through a quick-pick, and completes an unclosed `[[` in place rather than doubling the brackets.
+
+Every file in the workspace is offered, except the ones **git ignores** — the candidate list comes from `git ls-files`, so `.gitignore` (including nested ones, `.git/info/exclude` and negations) decides what you see, and `node_modules` and build output stay out without any setting to maintain. In a workspace without git, tsk falls back to a plain file search and says so in the Output channel, since it then has no ignore rules to honour.
+
+`[[…]]` deliberately only ever means a file. Task-to-task references are `@parent` / `@relatedTo` / `@dependsOn`, which carry code lenses and graph diagnostics — giving the bracket form a second meaning would make "where does this go?" ambiguous.
+
 ## Migrating from Markdown
 
 Bring existing Markdown checklists into tsk. Markdown task lists speak their own marker vocabulary and carry no inline metadata, so the migration commands do two things: **remap the markers** (per the `tsk.migrate.markers` glyph→status map) and **derive the metadata from git history** — `@created` from the commit that added the line, `@completed` / `@cancelled` / `@moved` / `@started` from the commit of the most recent switch *into* the current marker (a task done → reopened → done again stamps the second done; file renames are followed). Every migrated line gains a fresh `@id`. Lines git can't answer for (uncommitted, untracked, not a repo) are stamped with the current time and counted in the summary toast.
 
 - **Tsk: Send All Markdown Tasks to Tsk File…** — the one-shot evacuation: every top-level task block in the `.md` file (or just the blocks your selection touches) is converted and appended, in order, to one `.tsk` file you pick (or a new one via the save dialog), leaving a `[>]` breadcrumb per block. One atomic edit, one undo. Per-task: `Ctrl+.` → *Send task to tsk file…* on any unmigrated task line.
 - **Tsk: Migrate Markdown Tasks** — the staged alternative: convert in place (whole file, selection, or `Ctrl+.` → *Migrate task to tsk format* per line). Converted tasks keep living in the `.md` file — the metadata comment is invisible in rendered Markdown — until you relocate them with *Move task to file…*, which auto-converts any still-raw children riding along in the block.
-- **Tsk: Migrate Markdown Bullets as Todos** — for checklists that never used checkboxes: a bare `- aaaa` becomes `- [ ] aaaa` with the same git-derived `@id` + `@created`. Separate from the command above on purpose — most bullets in a `.md` file are prose, so the task migration never touches them and only this explicit invocation does. Scope is the same (whole file, selection, or `Ctrl+.` → *Migrate bullet to tsk todo* per line); a whole-file run asks first, since that is the one sweep that can turn a page of notes into tasks.
+- **Tsk: Migrate Markdown Bullets as Todos** — for checklists that never used checkboxes: a bare `- aaaa` becomes `- [ ] aaaa` with a fresh `@id` plus the same git-derived `@created`. Separate from the command above on purpose — most bullets in a `.md` file are prose, so the task migration never touches them and only this explicit invocation does. Scope is the same (whole file, selection, or `Ctrl+.` → *Migrate bullet to tsk todo* per line); a whole-file run asks first, since that is the one sweep that can turn a page of notes into tasks.
 
 The default vocabulary reads `[ ]` todo, `[/]` **done**, `[>>]` moved, `[x]` **cancelled**, `[n]` note — `[/]` and `[x]` mean different things in tsk, so the remap is semantic, not textual (`[/]` → `[x]` + `@completed`; `[x]` → `[!]` + `@cancelled`). GFM-style lists should override the map, e.g. `{" ": "todo", "x": "completed", "/": "inprogress"}`. Migration only ever touches lines without an `@id` (re-running is harmless), and `- [text](url)` links are never mistaken for tasks — the bullet command treats such a link as the bare bullet it is. Try it hands-on with `docs/migrate-sample.md`.
 
@@ -142,7 +182,7 @@ Every task with relationship metadata grows code lenses showing forward edges (`
 | `movedHereFrom: N`         | `tsk.findAllMovedHereFrom` | Peek view of every task that `@movedTo`-points here. |
 | `<key>: <id> (missing)`    | `tsk.codelens.missing`   | Info toast — the referenced `@id` isn't in the workspace. |
 
-These commands are invoked exclusively by lens clicks — no palette entries, no keybindings; the lens *is* the invocation.
+These commands are invoked by lens clicks and by the hover's links — no palette entries, no keybindings.
 
 **Canonical-occurrence gating.** Lenses render only on the canonical occurrence of an `@id` (the lex-lowest `(file, line)` in the workspace). Duplicate-`@id` losers get a diagnostic squiggle pointing at the canonical winner instead of a potentially misleading lens.
 
@@ -189,12 +229,14 @@ Hovering a task surfaces a Markdown popup of its parsed metadata, so you needn't
 
 ## Code actions & diagnostics
 
-Two `Ctrl+.` helpers:
+`Ctrl+.` helpers:
 
 - **Add missing id.** A markered task with no `@id` (any marker, not only `[ ]`) offers *"Tsk: Add missing id + created"* (or *"…Add missing id"* when `@created` is already present), writing the same metadata `Alt+A` would. Unlike the `Alt+A` toggle — which fires only on its own target marker — the quick-fix is marker-agnostic, so you can promote a hand-typed `- [x] done` imported from elsewhere.
 - **Broken references.** When a task's `@parent` / `@dependsOn` / `@relatedTo` / `@movedTo` points at an `@id` with no canonical occurrence in the workspace, the line gets a `Warning` squiggle. The lightbulb offers *"Tsk: Remove broken @parent"* (or `@movedTo`, etc.) to drop it, or *"Tsk: Replace @parent via picker…"* to pick a real task.
 
-Warnings surface in both the `tsk` Output channel and the Problems panel: today's categories are duplicate `@id` and task-without-`@id`.
+- **Duplicate `@id`.** Every occurrence after the first offers *"Tsk: Regenerate @id (resolve duplicate)"*, giving that occurrence a fresh id and leaving the canonical one alone.
+
+Warnings surface in both the `tsk` Output channel and the Problems panel: duplicate `@id`, task-without-`@id`, broken `@parent` / `@dependsOn` / `@relatedTo` / `@movedTo` references, and `[[links]]` to missing files.
 
 ## Paste an image
 
@@ -221,7 +263,7 @@ The command **Tsk: Install Clipboard Bridge Skill** writes a ready-made [Claude 
 
 ## The cache
 
-On activation, tsk scans `**/*.tsk` (excluding `**/node_modules/**`) and indexes tasks into a SQLite cache that powers tag search and the relationship graph:
+On activation, tsk scans every `.tsk` file git doesn't ignore (a workspace without git falls back to a search that skips `node_modules` and `.git`) and indexes tasks into a SQLite cache that powers tag search and the relationship graph:
 
 - Default location `${workspaceFolder}/.vscode/tsk/cache.db`, configurable via `tsk.cache.path`. Falls back to in-memory when no workspace folder is open.
 - File events (watcher, save, debounced edit) trigger per-file rescans; reopening preserves data.
@@ -247,8 +289,12 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.migrate.markers` | `[/]`=done, `[x]`=cancelled, … | Markdown glyph → tsk status map used by the migration commands (multi-char glyphs like `>>` allowed). See *Migrating from Markdown*. |
 | `tsk.doubleClickSelectsBlock` | `true` | Double-click a task's marker / bullet / indentation in a `.tsk` editor to select its whole block; double-clicking the task's text still selects a word. Off ⇒ default word-select everywhere. See *List editing*. |
 | `tsk.blockTrailingNewline` | `true` | Include the trailing line break when operating on a whole task block — `Ctrl+C` / `Ctrl+X` copy/cut (nothing selected) and double-click / `Tsk: Select Task Block` selection all extend through it, so a block is a self-contained unit on its own line. Off ⇒ block operations end at the block's last character. See *List editing*. |
+| `tsk.panel.nowStack.openDirection` | `right` | Where the Now Stack panel opens: `right` / `left` / `above` / `below` / `active` (a tab in the editor's group). Applied when the panel is created, never on reveal. See *Where the panels open*. |
+| `tsk.panel.stats.openDirection` | `active` | Same, for the Stats panel. |
+| `tsk.panel.taskList.openDirection` | `active` | Same, for the Task List panel. |
+| `tsk.divider.width` | `100` | Column width *Tsk: Insert Divider…* pads a divider to. Existing dividers of any width keep working. See *Sections*. |
 
-Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. The marker and metadata colors drive the **Search Editor result rows** (which can't carry semantic tokens); `tsk.navigation.highlight` and `tsk.now.highlight` are in-editor line decorations (the navigate-flash and the now-task border). In `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
+Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. The marker and metadata colors drive the **Search Editor result rows** (which can't carry semantic tokens); `tsk.navigation.highlight` and `tsk.now.highlight` are in-editor line decorations (the navigation highlight and the now-task border). In `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 
 ## Limitations
 
@@ -291,13 +337,14 @@ npm test               # vitest unit tests (src/**/*.test.ts)
 npm run test -- --coverage   # with v8 coverage; fails under 80% on src/lib/**
 npm run test:e2e       # @vscode/test-cli — runs against `stable` VS Code (latest)
 npm run test:e2e:floor # @vscode/test-cli — runs against the engine floor (1.112)
-npm run test:e2e:all   # both labels in sequence
+npm run test:e2e:all   # stable, then floor
 ```
 
-`.vscode-test.mjs` defines two labeled configurations:
+`.vscode-test.mjs` defines labeled configurations:
 
 - **`stable`** — downloads the latest VS Code at run time. Catches the "newest still works" signal.
 - **`floor`** — pinned to VS Code `1.112.0`, the engine floor. Catches the "minimum supported still works" signal. Together with a strict-subset `@types/vscode@~1.110` typecheck (1.110 is the closest published type package at or below the floor; anything that typechecks against that subset is guaranteed to run on 1.112+), this is the second of two layers holding the codebase to the floor. The floor config carries a more generous mocha timeout (60s) — extension-host startup and config-change propagation are slower on the 1.112 host in a devcontainer.
+- **`bench`** — not a test: the file-search benchmark, run with `task bench:file-search` against a large workspace (`TSK_BENCH_WORKSPACE`). With no `--label`, `vscode-test` runs every configuration, so `test:e2e:all` names `stable` and `floor` explicitly.
 
 The e2e runner auto-wraps in `xvfb-run` when available (devcontainer/CI) and otherwise relies on a real display. The coverage gate is opt-in (instrumentation slows iteration) — bare `npm test` skips it.
 
@@ -355,4 +402,4 @@ Pure, vscode-free logic lives in `src/lib/**` and is unit-tested with vitest (pa
 
 ### Contributing
 
-This extension is developed inside a larger private monorepo and published here as a standalone repository, mirrored with `git subtree split` (fast-forward only, never force-pushed). Please file **issues** on this repo. **Pull requests** are welcome too, but because the monorepo is authoritative, an accepted PR is applied upstream via cherry-pick (you keep authorship) and lands here on the next sync — so your PR may be closed with an "applied as `<sha>`" note rather than merged directly. For a small fix, an issue with a diff is the quickest path.
+This extension is developed inside a larger private monorepo and published here as a standalone repository with **one commit per release** — `tsk: <version>`, holding the extension exactly as it stood when that version was cut. The individual changes behind each release live in the monorepo. Please file **issues** on this repo. **Pull requests** are welcome too, but because the monorepo is authoritative, an accepted PR is applied there and ships here in the next release commit — so your PR will be closed with an "included in `tsk: <version>`" note rather than merged directly. For a small fix, an issue with a diff is the quickest path.

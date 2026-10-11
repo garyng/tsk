@@ -18,10 +18,13 @@ import {
 } from './constants';
 import { type DecorationSnapshot, DecorationsController } from './decorations-controller';
 import { DiagnosticsManager } from './diagnostics-manager';
+import { registerDividerCommands } from './divider-commands';
+import { registerDividerFolding } from './divider-folding';
 import { registerDuplicateCommands } from './duplicate-commands';
 import { isPersistableDocument, isTskDocument } from './editor-guards';
 import { registerFindAllTasksByStatusCommand } from './find-tasks-by-marker';
 import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
+
 import { registerHoverProvider } from './hover';
 import { registerInstallClipboardBridgeSkillCommand } from './install-clipboard-bridge-skill';
 import { CacheService } from './lib/cache';
@@ -46,6 +49,7 @@ import { registerPasteImageProvider } from './paste-image';
 import { ScanController } from './scan-controller';
 import { registerSemanticTokens } from './semantic-tokens';
 import { registerStatsPanel } from './stats-panel';
+import { registerTagDefinition } from './tag-definition';
 import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
 import { registerTagsSyncCommand } from './tags-sync-commands';
@@ -55,6 +59,8 @@ import {
     registerRelationshipCommands,
     registerToggleCommands,
 } from './toggle-commands';
+import { registerWikiLinks } from './wiki-link-provider';
+import { createWorkspaceFiles } from './workspace-files';
 
 /**
  * Stable surface returned from `activate()`. End-to-end tests acquire this
@@ -135,6 +141,14 @@ interface ActivationState {
     scan: ScanController;
 }
 
+/**
+ * Create the Output channel + logger, then wire everything up. The try/catch
+ * exists because VS Code's own handler swallows an activation throw's MESSAGE
+ * (it logs only a stack, to `exthost1/remoteexthost.log`) — so a dead
+ * extension used to leave nothing behind but a truncated `tsk extension
+ * activating.` line that read like a hang. Re-thrown after logging so VS Code
+ * still marks the extension failed.
+ */
 export async function activate(context: vscode.ExtensionContext): Promise<TskExtensionApi> {
     const channel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
     context.subscriptions.push(channel);
@@ -142,6 +156,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     const logger = new Logger(channel, readLogLevel());
     logger.info('tsk extension activating.');
 
+    const started = Date.now();
+    try {
+        const api = await activateFeatures(context, logger);
+        // Timed because activation is awaited by VS Code: anything slow here
+        // delays the extension being usable. A 9s `workspace.fs.stat` cost hid
+        // in this window once (see `fast-fs.ts`), and only a number found it.
+        logger.info(`tsk extension activated in ${Date.now() - started}ms.`);
+        return api;
+    } catch (err) {
+        const error = err as Error;
+        logger.error(`activation failed: ${error.message}\n${error.stack ?? '(no stack)'}`);
+        void vscode.window.showErrorMessage(
+            'Tsk: activation failed — see the tsk Output channel for details.',
+        );
+        throw err;
+    }
+}
+
+async function activateFeatures(
+    context: vscode.ExtensionContext,
+    logger: Logger,
+): Promise<TskExtensionApi> {
+    const workspaceFiles = createWorkspaceFiles(logger);
     const { cache } = openCache(context, logger);
     const nowStore = openNowStore(context, logger);
     const decorations = new DecorationsController(context, readPriorityOpacity());
@@ -164,12 +201,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
         taskListPanel.openWithDayFilter(ids, label),
     );
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
-    const scan = new ScanController(cache, graph, diagnosticsManager, codelens, logger, () => {
-        nowDecoration.reapply();
-        nowPanel.refresh();
-        statsPanel.refresh();
-        taskListPanel.refresh();
-    });
+    const scan = new ScanController(
+        cache,
+        graph,
+        diagnosticsManager,
+        codelens,
+        logger,
+        workspaceFiles,
+        () => {
+            nowDecoration.reapply();
+            nowPanel.refresh();
+            statsPanel.refresh();
+            taskListPanel.refresh();
+        },
+    );
 
     state = {
         logger,
@@ -199,8 +244,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     registerPasteImageProvider(context, logger);
     registerSemanticTokens(context);
     const autolinks = registerAutoLinksProvider(context, logger);
-
-    logger.info('tsk extension activated.');
+    registerWikiLinks(context, diagnosticsManager, workspaceFiles, logger);
+    registerDividerFolding(context);
+    registerDividerCommands(context, logger);
+    registerTagDefinition(context, tagsLoader, logger);
 
     return {
         counts: () => cache.counts(),
@@ -243,7 +290,7 @@ function openCache(
     const cachePath = resolveCachePath(rawSetting, workspaceFolder);
     ensureCacheParentDir(cachePath);
 
-    const db = new Db(cachePath);
+    const db = new Db(cachePath, { warn: (message) => logger.warn(message) });
     const cache = new CacheService(db);
     context.subscriptions.push({ dispose: () => db.close() });
 
@@ -281,9 +328,9 @@ function openNowStore(context: vscode.ExtensionContext, logger: Logger): NowStor
 }
 
 /**
- * Wire the `onDidChangeConfiguration` listener. Reacts to two settings:
- * the log level (re-reads the level + announces the change) and the
- * priority opacity (rebuilds the decoration types + announces).
+ * Wire the `onDidChangeConfiguration` listener. Reacts to the log level
+ * (re-reads the level + announces the change) and the priority opacity
+ * (rebuilds the decoration types + announces).
  */
 function attachConfigListener(context: vscode.ExtensionContext, logger: Logger): void {
     context.subscriptions.push(
@@ -372,12 +419,13 @@ function attachDocumentListeners(context: vscode.ExtensionContext): void {
 
 /**
  * Register the contributed command + provider families: the toggle set,
- * copy-id, the relationship pickers, list-edit, duplicate-line, move/extract-task,
+ * copy-id, the relationship pickers, list-edit, duplicate-line, the task-block
+ * copy/cut/select commands, move/extract-task,
  * the markdown migrate/send set, the tags completion provider, find-by-tag,
  * find-by-status, add-discovered-tags, code actions, hover, and the now +
  * now-tree commands, plus the `tsk.rebuildCache` palette entry. (Codelens,
  * semantic-token, autolinks, clipboard-bridge and paste-image providers are
- * registered separately in `activate()`.)
+ * registered separately in `activateFeatures()`.)
  */
 function registerAllCommands(
     context: vscode.ExtensionContext,

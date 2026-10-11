@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Db } from './db';
 
@@ -456,5 +457,153 @@ describe('Db — file-backed', () => {
         d = new Db(path);
         expect(d.getFile('file:///a.tsk')).toEqual({ uri: 'file:///a.tsk', mtime: 42 });
         d.close();
+    });
+});
+
+/**
+ * The 0.2.x cache DDL, verbatim from a real pre-0.7 `cache.db` (`sqlite_master`
+ * dump, 2026-09-19). `tasks` is keyed by `id`, and `metadata`/`tags` by
+ * `task_id` — all three re-keyed to `(file_uri, line)` in the 0.7.0
+ * occurrence-store change, which is what makes this DB unreadable by the
+ * current schema.
+ */
+const LEGACY_SCHEMA = `
+CREATE TABLE files (uri TEXT PRIMARY KEY, mtime INTEGER NOT NULL);
+CREATE TABLE tasks (
+    id TEXT PRIMARY KEY, file_uri TEXT NOT NULL, line INTEGER NOT NULL,
+    marker TEXT NOT NULL, content TEXT NOT NULL, raw TEXT NOT NULL,
+    FOREIGN KEY (file_uri) REFERENCES files(uri) ON DELETE CASCADE
+);
+CREATE INDEX idx_tasks_file ON tasks(file_uri);
+CREATE INDEX idx_tasks_id ON tasks(id);
+CREATE TABLE metadata (
+    task_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT,
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_metadata_task ON metadata(task_id);
+CREATE INDEX idx_metadata_key ON metadata(key);
+CREATE TABLE tags (
+    task_id TEXT NOT NULL, tag TEXT NOT NULL,
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_tags_task ON tags(task_id);
+CREATE INDEX idx_tags_tag ON tags(tag);
+CREATE TABLE tag_defs (tag TEXT PRIMARY KEY, description TEXT, parent TEXT);
+`;
+
+describe('Db — schema version guard', () => {
+    let tmp: string;
+
+    beforeEach(() => {
+        tmp = mkdtempSync(join(tmpdir(), 'tsk-db-guard-'));
+    });
+
+    afterEach(() => {
+        rmSync(tmp, { recursive: true, force: true });
+    });
+
+    /** Seed a raw sqlite file with `ddl` (+ optional `user_version`), then close it. */
+    const seed = (path: string, ddl: string, userVersion?: number): void => {
+        const raw = new DatabaseSync(path);
+        raw.exec(ddl);
+        if (userVersion !== undefined) raw.exec(`PRAGMA user_version = ${userVersion}`);
+        raw.close();
+    };
+
+    /** The current `user_version` stamped on the file at `path`. */
+    const versionOf = (path: string): number => {
+        const raw = new DatabaseSync(path);
+        const row = raw.prepare('PRAGMA user_version').get() as { user_version: number };
+        raw.close();
+        return row.user_version;
+    };
+
+    it('pins WHY the legacy cache is unreadable — IF NOT EXISTS hides the re-key', () => {
+        // The original 0.2.1 → 0.7.0 failure, reproduced without the guard: the
+        // `CREATE TABLE IF NOT EXISTS` statements no-op against the legacy
+        // tables, so the first index that assumes the new columns throws. If
+        // this ever stops throwing, the guard above is no longer testing
+        // anything and this file needs rewriting against the new incompatibility.
+        const path = join(tmp, 'legacy.db');
+        seed(path, LEGACY_SCHEMA);
+        const raw = new DatabaseSync(path);
+        expect(() =>
+            raw.exec('CREATE INDEX IF NOT EXISTS idx_metadata_occ ON metadata(file_uri, line)'),
+        ).toThrow(/no such column: file_uri/);
+        raw.close();
+    });
+
+    it('discards a 0.2.x cache (tables, unstamped) and rebuilds on the current schema', () => {
+        const path = join(tmp, 'cache.db');
+        seed(path, LEGACY_SCHEMA);
+        expect(versionOf(path)).toBe(0);
+
+        const warnings: string[] = [];
+        const db = new Db(path, { warn: (m) => warnings.push(m) });
+
+        // The pre-guard failure was a THROW here; the guard turns it into one warning.
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toMatch(/schema v0, expected v1/);
+
+        // And the rebuilt schema is usable through the occurrence-keyed API.
+        db.upsertFile('file:///a.tsk', 1);
+        db.insertTask({
+            id: 'aaa',
+            fileUri: 'file:///a.tsk',
+            line: 0,
+            marker: 'todo',
+            content: 'x',
+            raw: '- [ ] x',
+        });
+        expect(db.findTaskById('aaa')?.fileUri).toBe('file:///a.tsk');
+        db.close();
+
+        expect(versionOf(path)).toBe(1);
+    });
+
+    it('does not warn for a fresh file, and stamps it', () => {
+        const path = join(tmp, 'fresh.db');
+        const warnings: string[] = [];
+        const db = new Db(path, { warn: (m) => warnings.push(m) });
+        db.close();
+
+        expect(warnings).toEqual([]);
+        expect(versionOf(path)).toBe(1);
+    });
+
+    it('leaves a current (v1) cache alone — rows survive a reopen', () => {
+        const path = join(tmp, 'cache.db');
+        let db = new Db(path);
+        db.upsertFile('file:///keep.tsk', 7);
+        db.close();
+
+        const warnings: string[] = [];
+        db = new Db(path, { warn: (m) => warnings.push(m) });
+        expect(warnings).toEqual([]);
+        expect(db.getFile('file:///keep.tsk')).toEqual({ uri: 'file:///keep.tsk', mtime: 7 });
+        db.close();
+    });
+
+    it('discards a FUTURE version too (a downgrade is still a rebuild)', () => {
+        const path = join(tmp, 'cache.db');
+        let db = new Db(path);
+        db.upsertFile('file:///stale.tsk', 7);
+        db.close();
+        seed(path, 'PRAGMA user_version = 999');
+
+        const warnings: string[] = [];
+        db = new Db(path, { warn: (m) => warnings.push(m) });
+        expect(warnings[0]).toMatch(/schema v999, expected v1/);
+        expect(db.getFile('file:///stale.tsk')).toBeUndefined();
+        db.close();
+    });
+
+    it('a warn-less caller still recovers (the callback is optional)', () => {
+        const path = join(tmp, 'cache.db');
+        seed(path, LEGACY_SCHEMA);
+        const db = new Db(path);
+        db.upsertFile('file:///a.tsk', 1);
+        expect(db.getFile('file:///a.tsk')?.mtime).toBe(1);
+        db.close();
     });
 });

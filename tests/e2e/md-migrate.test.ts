@@ -39,6 +39,13 @@ suite('migrate markdown tasks', () => {
         git(['init', '-q']);
         git(['config', 'user.name', 'e2e']);
         git(['config', 'user.email', 'e2e@test.local']);
+        // A scripted throwaway repo must not inherit the developer's signing
+        // setup. With `commit.gpgsign=true` globally and signing done through
+        // an interactive SSH agent, each commit stalls ~20s and then fails with
+        // "communication with agent failed?" — the agent wants an approval a
+        // test worker can't give. Same reason user.name/user.email are pinned
+        // above: hermetic, not optional.
+        git(['config', 'commit.gpgsign', 'false']);
 
         // tasks.md: every default-map glyph + non-task lines; beta flips at T2.
         const v1 = [
@@ -480,7 +487,9 @@ suite('migrate markdown tasks', () => {
         const doc = await open('bullets-sel.md');
         const editor = vscode.window.activeTextEditor;
         assert.ok(editor);
-        editor.selection = new vscode.Selection(2, 0, 5, 0); // bbbb → prose
+        // bbbb → the id-carrying bullet. Line 6 must be INSIDE the selection,
+        // or the idempotency assertion below proves nothing.
+        editor.selection = new vscode.Selection(2, 0, 6, 0);
         await vscode.commands.executeCommand('tsk.migrateMarkdownBullets');
         const lines = doc.getText().split('\n');
 
@@ -497,10 +506,12 @@ suite('migrate markdown tasks', () => {
             'a markdown link is not a task, so it IS a bare bullet',
         );
         assert.strictEqual(lines[5], 'plain prose', 'a non-list line is untouched');
-        assert.match(
-            lines[6] as string,
-            /@id:bull1/,
-            'a bullet that already carries an @id keeps it (idempotent)',
+        // Byte-for-byte, not a regex for the id: a line converted *around* its
+        // old comment would still match `@id:bull1`.
+        assert.strictEqual(
+            lines[6],
+            `- already done <!-- @id:bull1 @created:${T1} -->`,
+            'a bullet that already carries an @id is left exactly as it was (idempotent)',
         );
     });
 

@@ -10,8 +10,8 @@ const EXTENSION_ID = 'garyng.tsk';
  * keystrokes; this test makes sure it never references a keybinding we've
  * since renamed or removed. It reads the real demo from the extension's
  * `docs/`, scans the `Alt+<key>` chords it mentions, and asserts each is a
- * contributed keybinding whose command is actually registered. The three
- * list-edit keys (Enter / Tab / Shift+Tab) are checked explicitly since the
+ * contributed keybinding whose command is actually registered. The list-edit
+ * keys (Enter / Tab / Shift+Tab) are checked explicitly since the
  * demo documents them by name.
  */
 suite('demo.tsk smoke (M24)', () => {
@@ -36,12 +36,15 @@ suite('demo.tsk smoke (M24)', () => {
     });
 
     test('every Alt+<key> the demo mentions is a registered keybinding', () => {
-        // Single-char Alt chords. The (?![A-Za-z]) guard means a prose word
-        // like "Alt+backtick" is NOT misread as the chord "Alt+b" — only a
-        // genuine one-character chord (followed by a non-letter) matches. The
-        // backtick is in the class so the `Alt+`` copy-id chord is covered.
+        // Single-char Alt chords. The (?![A-Za-z0-9]) guard keeps two things
+        // out: a prose word like "Alt+backtick" (which would otherwise read as
+        // the chord "Alt+b"), and a FUNCTION-key chord like "Alt+F12" (which
+        // read as "Alt+F" while the guard excluded only letters — tsk doesn't
+        // bind Alt+F and never should, so the demo mentioning VS Code's own
+        // peek-definition chord failed this test). The backtick is in the
+        // class so the `Alt+`` copy-id chord is still covered.
         const found = new Set<string>();
-        for (const m of demoText.matchAll(/Alt\+([A-Za-z0-9`])(?![A-Za-z])/g)) {
+        for (const m of demoText.matchAll(/Alt\+([A-Za-z0-9`])(?![A-Za-z0-9])/g)) {
             const ch = m[1];
             if (ch) found.add(`alt+${ch.toLowerCase()}`);
         }

@@ -14,7 +14,7 @@
  *   point at an absolute path or a path inside a different workspace.
  *
  * Pure — no I/O. The activation layer probes the resolved path with
- * `vscode.workspace.fs.readFile`.
+ * `fast-fs.ts`'s `readText`.
  */
 export function resolveTagsPath(
     rawSetting: string,

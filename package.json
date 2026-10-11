@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.7.1",
+    "version": "0.8.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -51,6 +51,10 @@
             {
                 "id": "taskMetadata",
                 "description": "A tsk task's inline <!-- ... --> metadata block, dimmed so it recedes."
+            },
+            {
+                "id": "taskDivider",
+                "description": "The trailing dash run of a divider line, dimmed so the section label reads as a heading."
             }
         ],
         "semanticTokenModifiers": [
@@ -92,7 +96,8 @@
                         "fontStyle": "strikethrough"
                     },
                     "taskMarker.notes": "#bb6dd9",
-                    "taskMetadata": "#808080"
+                    "taskMetadata": "#808080",
+                    "taskDivider": "#808080"
                 }
             }
         },
@@ -279,6 +284,21 @@
                 "category": "Tsk"
             },
             {
+                "command": "tsk.insertWikiLink",
+                "title": "Insert Link to File…",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.insertDivider",
+                "title": "Insert Divider…",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.defineTag",
+                "title": "Define Tag in tags.yml…",
+                "category": "Tsk"
+            },
+            {
                 "command": "tsk.sendMarkdownTaskToFile",
                 "title": "Send Markdown Task to Tsk File…",
                 "category": "Tsk"
@@ -412,6 +432,11 @@
                 "when": "editorLangId == 'tsk' && editorTextFocus && !editorHasSelection"
             },
             {
+                "command": "tsk.insertWikiLink",
+                "key": "alt+l",
+                "when": "editorLangId == 'tsk' && editorTextFocus"
+            },
+            {
                 "command": "tsk.markNow",
                 "key": "alt+w",
                 "when": "editorLangId == 'tsk' && editorTextFocus"
@@ -420,7 +445,7 @@
         "colors": [
             {
                 "id": "tsk.marker.todo",
-                "description": "Foreground color of the [ ] todo task marker triplet.",
+                "description": "Foreground color of the [ ] todo task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.",
                 "defaults": {
                     "light": "#b8860b",
                     "dark": "#e5c07b"
@@ -428,7 +453,7 @@
             },
             {
                 "id": "tsk.marker.inprogress",
-                "description": "Foreground color of the [/] in-progress task marker triplet.",
+                "description": "Foreground color of the [/] in-progress task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.",
                 "defaults": {
                     "light": "#1976d2",
                     "dark": "#3794ff"
@@ -436,7 +461,7 @@
             },
             {
                 "id": "tsk.marker.completed",
-                "description": "Foreground color of the [x] completed task marker triplet.",
+                "description": "Foreground color of the [x] completed task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.",
                 "defaults": {
                     "light": "#388e3c",
                     "dark": "#67c23a"
@@ -444,7 +469,7 @@
             },
             {
                 "id": "tsk.marker.moved",
-                "description": "Foreground color of the [>] moved task marker triplet.",
+                "description": "Foreground color of the [>] moved task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.",
                 "defaults": {
                     "light": "#f57c00",
                     "dark": "#ff9d00"
@@ -452,7 +477,7 @@
             },
             {
                 "id": "tsk.marker.cancelled",
-                "description": "Foreground color of the [!] cancelled task marker triplet.",
+                "description": "Foreground color of the [!] cancelled task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.",
                 "defaults": {
                     "light": "#757575",
                     "dark": "#9e9e9e"
@@ -460,7 +485,7 @@
             },
             {
                 "id": "tsk.marker.notes",
-                "description": "Foreground color of the [n] notes task marker triplet.",
+                "description": "Foreground color of the [n] notes task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.",
                 "defaults": {
                     "light": "#7e57c2",
                     "dark": "#bb6dd9"
@@ -468,7 +493,7 @@
             },
             {
                 "id": "tsk.metadata.foreground",
-                "description": "Foreground color of inline metadata comments (<!-- @key:value -->), dimmed so they recede into the editor background. Hover-on-task surfaces the parsed values.",
+                "description": "Foreground color of inline metadata comments (<!-- @key:value -->) on Search Editor result rows. In .tsk editors, recolor the taskMetadata semantic token via editor.semanticTokenColorCustomizations instead.",
                 "defaults": {
                     "light": "#5c5c5cb0",
                     "dark": "#969696b0"
@@ -484,7 +509,7 @@
             },
             {
                 "id": "tsk.now.highlight",
-                "description": "Border color of the current \"now\" task line (marked via Tsk: Mark Now). Persistent — distinct from the transient tsk.navigation.highlight jump flash and from the priority line-background fill. Defaults to the in-progress blue so \"now\" reads as a box around the line on light and dark themes; override via workbench.colorCustomizations.",
+                "description": "Border color of the current \"now\" task line (marked via Tsk: Mark Now). Persistent — distinct from the tsk.navigation.highlight navigate tint and from the priority line-background fill. Defaults to the in-progress blue so \"now\" reads as a box around the line on light and dark themes; override via workbench.colorCustomizations.",
                 "defaults": {
                     "light": "#3794ffcc",
                     "dark": "#3794ffcc"
@@ -519,7 +544,7 @@
                         "x": "cancelled",
                         "n": "notes"
                     },
-                    "markdownDescription": "Marker vocabulary the Markdown migration commands (migrate / send / move-from-markdown) use to read task glyphs in Markdown files: each key is the text between `[` and `]` (multi-character glyphs like `>>` allowed), each value the tsk status it migrates to. The default reads `[/]` as *done* and `[x]` as *cancelled*; GFM-style lists want e.g. `{\" \": \"todo\", \"x\": \"completed\", \"/\": \"inprogress\"}`. Migrated lines get the matching tsk marker plus `@id`/`@created` (and the status timestamp) derived from git history."
+                    "markdownDescription": "Marker vocabulary the Markdown migration commands (migrate / send / move-from-markdown) use to read task glyphs in Markdown files: each key is the text between `[` and `]` (multi-character glyphs like `>>` allowed), each value the tsk status it migrates to. The default reads `[/]` as *done* and `[x]` as *cancelled*; GFM-style lists want e.g. `{\" \": \"todo\", \"x\": \"completed\", \"/\": \"inprogress\"}`. Migrated lines get the matching tsk marker, a fresh `@id`, and `@created` (and the status timestamp) derived from git history."
                 },
                 "tsk.tags.path": {
                     "type": "string",
@@ -586,6 +611,69 @@
                     "default": true,
                     "description": "Include the trailing newline when operating on a whole task block: copying / cutting it to the clipboard (Ctrl+C / Ctrl+X with nothing selected), and selecting it (double-click a marker, or Tsk: Select Task Block) extend through the line break. So the block is a self-contained unit on its own line. Off → block operations end at the block's last character."
                 },
+                "tsk.panel.nowStack.openDirection": {
+                    "type": "string",
+                    "enum": [
+                        "right",
+                        "left",
+                        "above",
+                        "below",
+                        "active"
+                    ],
+                    "default": "right",
+                    "enumDescriptions": [
+                        "In a group to the right of the editor.",
+                        "In a group to the left of the editor.",
+                        "In a group above the editor.",
+                        "In a group below the editor.",
+                        "As a tab in the editor's own group."
+                    ],
+                    "markdownDescription": "Where the Now Stack panel opens. Applied when the panel is created, not when an already-open one is revealed — so a panel you have dragged elsewhere stays put. The default is where this panel opened before the setting existed."
+                },
+                "tsk.panel.stats.openDirection": {
+                    "type": "string",
+                    "enum": [
+                        "right",
+                        "left",
+                        "above",
+                        "below",
+                        "active"
+                    ],
+                    "default": "active",
+                    "enumDescriptions": [
+                        "In a group to the right of the editor.",
+                        "In a group to the left of the editor.",
+                        "In a group above the editor.",
+                        "In a group below the editor.",
+                        "As a tab in the editor's own group."
+                    ],
+                    "markdownDescription": "Where the Stats panel opens. Applied when the panel is created, not when an already-open one is revealed — so a panel you have dragged elsewhere stays put. The default is where this panel opened before the setting existed."
+                },
+                "tsk.panel.taskList.openDirection": {
+                    "type": "string",
+                    "enum": [
+                        "right",
+                        "left",
+                        "above",
+                        "below",
+                        "active"
+                    ],
+                    "default": "active",
+                    "enumDescriptions": [
+                        "In a group to the right of the editor.",
+                        "In a group to the left of the editor.",
+                        "In a group above the editor.",
+                        "In a group below the editor.",
+                        "As a tab in the editor's own group."
+                    ],
+                    "markdownDescription": "Where the Task List panel opens. Applied when the panel is created, not when an already-open one is revealed — so a panel you have dragged elsewhere stays put. The default is where this panel opened before the setting existed."
+                },
+                "tsk.divider.width": {
+                    "type": "number",
+                    "default": 100,
+                    "minimum": 8,
+                    "markdownDescription": "Column width `Tsk: Insert Divider…` pads a divider line to. Only affects newly written dividers — an existing one of any length still folds and styles."
+                },
                 "tsk.autolinks": {
                     "type": "array",
                     "default": [],
@@ -630,7 +718,7 @@
         "prepare:e2e": "npm run compile:tests && npm run build",
         "test:e2e": "npm run prepare:e2e && bash scripts/run-e2e.sh --label stable",
         "test:e2e:floor": "npm run prepare:e2e && bash scripts/run-e2e.sh --label floor",
-        "test:e2e:all": "npm run prepare:e2e && bash scripts/run-e2e.sh",
+        "test:e2e:all": "npm run prepare:e2e && bash scripts/run-e2e.sh --label stable --label floor",
         "test:webview": "npm run build:webview && playwright test",
         "test:webview:update": "npm run build:webview && playwright test --update-snapshots",
         "lint": "biome check .",
@@ -640,7 +728,7 @@
     "devDependencies": {
         "@biomejs/biome": "^2.4.15",
         "@grida/tree-view": "0.1.0",
-        "@playwright/test": "^1.60.0",
+        "@playwright/test": "^1.64.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.19.19",
         "@types/react": "^18.3.30",

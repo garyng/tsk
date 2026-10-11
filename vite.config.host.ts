@@ -1,5 +1,6 @@
 import { builtinModules } from 'node:module';
 import { defineConfig } from 'vite';
+import { watchPolling } from './vite.watch';
 
 // The extension runs in VS Code's Node-based host, so every Node built-in and
 // the `vscode` API must stay external — Vite must not bundle or browser-polyfill
@@ -15,8 +16,8 @@ const isExternal = (id: string) =>
 // `dev:host` runs with `--mode development` so the watch build stays
 // non-minified — readable identifiers in CPU profiles and debugger frames,
 // which minified output mangles even with a source map. `build:host` /
-// `package` (default production mode) keep esbuild minification for a smaller
-// .vsix.
+// `package` (default production mode) keep minification (Oxc, Vite 8's
+// default) for a smaller .vsix.
 export default defineConfig(({ mode }) => ({
     build: {
         lib: {
@@ -29,12 +30,13 @@ export default defineConfig(({ mode }) => ({
         sourcemap: true,
         emptyOutDir: true,
         minify: mode !== 'development',
-        // Some bind mounts (9p/drvfs and similar) deliver NO inotify events — so
-        // a default `--watch` (Rollup → chokidar) never sees edits and the watch
-        // silently does nothing. Force chokidar to poll. Gated on dev mode so the
-        // one-shot production `build` stays event-free (no accidental watch). Same
-        // root cause as the clipboard bridge (M22).
-        watch: mode === 'development' ? { chokidar: { usePolling: true, interval: 300 } } : null,
+        // Poll only where file events never arrive (a 9p-shared Windows drive; see
+        // vite.watch.ts). Gated on dev mode so the one-shot production `build` stays
+        // event-free (no accidental watch). Same root cause as the clipboard bridge (M22).
+        watch:
+            mode === 'development'
+                ? { chokidar: { usePolling: watchPolling(process.cwd()), interval: 300 } }
+                : null,
         rollupOptions: {
             external: isExternal,
         },

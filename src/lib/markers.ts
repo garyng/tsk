@@ -48,7 +48,8 @@ export const MARKERS = [
         symbols: [' '],
         color: {
             id: 'tsk.marker.todo',
-            description: 'Foreground color of the [ ] todo task marker triplet.',
+            description:
+                'Foreground color of the [ ] todo task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.',
             light: '#b8860b',
             dark: '#e5c07b',
         },
@@ -61,7 +62,8 @@ export const MARKERS = [
         symbols: ['/'],
         color: {
             id: 'tsk.marker.inprogress',
-            description: 'Foreground color of the [/] in-progress task marker triplet.',
+            description:
+                'Foreground color of the [/] in-progress task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.',
             light: '#1976d2',
             dark: '#3794ff',
         },
@@ -74,7 +76,8 @@ export const MARKERS = [
         symbols: ['x', 'X'],
         color: {
             id: 'tsk.marker.completed',
-            description: 'Foreground color of the [x] completed task marker triplet.',
+            description:
+                'Foreground color of the [x] completed task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.',
             light: '#388e3c',
             dark: '#67c23a',
         },
@@ -90,7 +93,8 @@ export const MARKERS = [
         symbols: ['>'],
         color: {
             id: 'tsk.marker.moved',
-            description: 'Foreground color of the [>] moved task marker triplet.',
+            description:
+                'Foreground color of the [>] moved task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.',
             light: '#f57c00',
             dark: '#ff9d00',
         },
@@ -103,7 +107,8 @@ export const MARKERS = [
         symbols: ['!'],
         color: {
             id: 'tsk.marker.cancelled',
-            description: 'Foreground color of the [!] cancelled task marker triplet.',
+            description:
+                'Foreground color of the [!] cancelled task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.',
             light: '#757575',
             dark: '#9e9e9e',
         },
@@ -116,7 +121,8 @@ export const MARKERS = [
         symbols: ['n', 'N'],
         color: {
             id: 'tsk.marker.notes',
-            description: 'Foreground color of the [n] notes task marker triplet.',
+            description:
+                'Foreground color of the [n] notes task marker triplet. Applies to Search Editor result rows; in .tsk editors recolor the taskMarker semantic token via editor.semanticTokenColorCustomizations.',
             light: '#7e57c2',
             dark: '#bb6dd9',
         },

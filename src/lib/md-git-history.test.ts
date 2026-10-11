@@ -221,6 +221,13 @@ describe('git runner (real scripted repo)', () => {
         git(['init', '-q']);
         git(['config', 'user.name', 'test']);
         git(['config', 'user.email', 'test@test.local']);
+        // A scripted throwaway repo must not inherit the developer's signing
+        // setup. With `commit.gpgsign=true` globally and signing done through
+        // an interactive SSH agent, each commit stalls ~20s and then fails with
+        // "communication with agent failed?" — the agent wants an approval a
+        // test worker can't give. Same reason user.name/user.email are pinned
+        // above: hermetic, not optional.
+        git(['config', 'commit.gpgsign', 'false']);
         writeFileSync(join(repo, 'tasks.md'), '# list\n- [ ] alpha\n- [ ] beta\n');
         git(['add', 'tasks.md']);
         commit('add', T1);

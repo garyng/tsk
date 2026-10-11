@@ -1,14 +1,19 @@
 import { computeMarkerRanges, computeMetadataRanges } from './decorations';
+import { matchDivider } from './divider';
 import type { Marker } from './markers';
 import type { Task } from './parser';
 
 /** Semantic token types tsk emits for `.tsk` documents. */
-export type TskTokenType = 'taskMarker' | 'taskMetadata';
+export type TskTokenType = 'taskMarker' | 'taskMetadata' | 'taskDivider';
 
 /**
  * One semantic token over a `.tsk` document range. `taskMarker` covers a task's
  * `[X]` triplet and carries its `status` (encoded as the token's modifier);
- * `taskMetadata` covers a whole inline `<!-- ... -->` block (no modifier).
+ * `taskMetadata` covers a whole inline `<!-- ... -->` block (no modifier); and
+ * `taskDivider` covers the trailing dash run of a divider line (no modifier),
+ * which is pure visual filler — dimming it is what lets the label read as a
+ * heading instead of drowning in hyphens. The label itself is left at the
+ * default text color, so it pops by contrast rather than by another hex.
  *
  * Pure (no `vscode`) so vitest can cover positioning without a host; the
  * activation-layer provider maps these onto a `vscode.SemanticTokensBuilder`.
@@ -32,11 +37,20 @@ export interface SemanticToken {
 
 /**
  * Compute the semantic tokens for a parsed document — marker triplets (`[X]`,
- * tagged by status) and inline metadata blocks (`<!-- ... -->`) — ordered
+ * tagged by status), inline metadata blocks (`<!-- ... -->`), and divider dash
+ * runs (from `lines`) — ordered
  * ascending by `(line, char)`, which `SemanticTokensBuilder` requires since it
  * delta-encodes each token against the previous one.
  */
-export function computeSemanticTokens(tasks: readonly Task[]): SemanticToken[] {
+export function computeSemanticTokens(
+    tasks: readonly Task[],
+    /**
+     * Raw document lines, needed only for divider dash runs — dividers are not
+     * tasks, so `parseDocument` never sees them. Defaults to empty so every
+     * existing caller (and test) keeps working unchanged.
+     */
+    lines: readonly string[] = [],
+): SemanticToken[] {
     const tokens: SemanticToken[] = [];
     for (const [status, ranges] of computeMarkerRanges(tasks)) {
         for (const range of ranges) {
@@ -57,6 +71,16 @@ export function computeSemanticTokens(tasks: readonly Task[]): SemanticToken[] {
             tokenType: 'taskMetadata',
         });
     }
+    lines.forEach((text, line) => {
+        const divider = matchDivider(text);
+        if (!divider) return;
+        tokens.push({
+            line,
+            char: divider.dashStartCol,
+            length: divider.endCol - divider.dashStartCol,
+            tokenType: 'taskDivider',
+        });
+    });
     tokens.sort((a, b) => a.line - b.line || a.char - b.char);
     return tokens;
 }

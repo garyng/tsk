@@ -1,12 +1,14 @@
 import * as vscode from 'vscode';
-import { COMMANDS } from './constants';
+import { COMMANDS, TASK_LIST_PANEL_DIRECTION_KEY } from './constants';
 import { isTskDocument } from './editor-guards';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
+import { reviseSourceColumn } from './lib/panel-placement';
 import type { TaskListHostToWebview, TaskListWebviewToHost } from './lib/task-list-protocol';
 import { type ActiveFile, buildTaskListView, pickActiveFile } from './lib/task-list-view-model';
 import { navigateTo, targetNotFoundMessage } from './navigation';
 import { buildWebviewHtml, webviewLocalResourceRoots } from './webview-html';
+import { createPlacedPanel } from './webview-placement';
 
 /** The active editor as a `pickActiveFile` candidate (its URI + whether it's a `.tsk` doc). */
 function activeFileCandidate(
@@ -64,18 +66,22 @@ export class TaskListPanel implements vscode.Disposable {
         });
     }
 
-    /** Open the panel, or reveal it if already open. */
-    open(): void {
+    /**
+     * Open the panel, or reveal it if already open. Placement follows
+     * `tsk.panel.taskList.openDirection` on CREATE only.
+     */
+    async open(): Promise<void> {
         if (this.panel) {
-            this.panel.reveal(vscode.ViewColumn.Active);
+            this.panel.reveal();
             return;
         }
         this.adopt(
-            vscode.window.createWebviewPanel(
+            await createPlacedPanel(
                 VIEW_TYPE,
                 'Tsk Task List',
-                vscode.ViewColumn.Active,
                 this.webviewOptions(),
+                TASK_LIST_PANEL_DIRECTION_KEY,
+                'active',
             ),
         );
     }
@@ -93,10 +99,10 @@ export class TaskListPanel implements vscode.Disposable {
     openWithDayFilter(ids: string[], label: string): void {
         this.pendingDayFilter = { ids, label };
         if (this.panel) {
-            this.panel.reveal(vscode.ViewColumn.Active);
+            this.panel.reveal();
             this.postDayFilter();
         } else {
-            this.open();
+            void this.open();
         }
     }
 
@@ -115,6 +121,16 @@ export class TaskListPanel implements vscode.Disposable {
 
     private adopt(panel: vscode.WebviewPanel): void {
         this.logger.debug(`${COMMANDS.openTaskList}: task-list webview panel attached`);
+        // An `above` / `left` placement renumbers the groups, so the column
+        // captured in the constructor can now BE the panel's. Correct it here
+        // rather than waiting for the next editor focus to do it.
+        this.sourceColumn = reviseSourceColumn(
+            this.sourceColumn,
+            panel.viewColumn,
+            vscode.window.visibleTextEditors
+                .map((editor) => editor.viewColumn)
+                .filter((column): column is vscode.ViewColumn => column !== undefined),
+        );
         this.panel = panel;
         this.lastPosted = undefined; // a fresh webview needs the next render unconditionally
         panel.webview.options = this.webviewOptions();

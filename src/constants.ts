@@ -10,7 +10,7 @@
  *   - Setting keys (`tsk.cache.path`, `tsk.tags.path`, `tsk.log.level`,
  *     … — defaults live only in `package.json`, not here).
  *   - Theme color ids (`tsk.metadata.foreground`, `tsk.navigation.highlight`).
- *   - Debounce / timing defaults that are intentionally tweakable.
+ *   - Timing constants (the clipboard-bridge poll interval).
  *   - Command ids (`tsk.toggleTodo`, `tsk.goToParent`, …) — added in M13/C
  *     as the `COMMANDS` registry.
  *
@@ -37,16 +37,6 @@
  *
  * Both literals are kept here even if only one is currently referenced
  * elsewhere — together they document the full setting contract.
- *
- * **TODO — configurability**
- *
- * Entries marked `// TODO: configurable` are candidates to be exposed as
- * user settings in a future iteration.
- * They are values where a power-user might reasonably want a different
- * trade-off (e.g. debounce latency vs. responsiveness) but where we haven't
- * yet seen the demand. When such a setting lands, the constant here becomes
- * the *default* and the lookup site reads
- * `getConfiguration('tsk').get(..., DEFAULT)` instead.
  */
 
 // ── Identifiers ─────────────────────────────────────────────────────────────
@@ -59,7 +49,7 @@
 export const TSK_LANGUAGE_ID = 'tsk';
 
 /**
- * Display name of the Output channel created at activation (`Output → Tsk`).
+ * Display name of the Output channel created at activation (`Output → tsk`).
  * Shares the `'tsk'` literal with {@link TSK_LANGUAGE_ID} today but is
  * semantically distinct — this string is user-facing UI, the other is a
  * VSCode-internal language registry key.
@@ -104,6 +94,39 @@ export const STATE_PATH_KEY = 'state.path';
 
 export const NOW_AUTO_IN_PROGRESS_SETTING = 'tsk.now.autoInProgress';
 export const NOW_AUTO_IN_PROGRESS_KEY = 'now.autoInProgress';
+
+/**
+ * Directories excluded from the `findFiles` FALLBACK used when git can't list
+ * the workspace (`workspace-files.ts`). The normal path goes through
+ * `git ls-files`, which honours `.gitignore` and needs no glob.
+ *
+ * It has to be stated explicitly, and the reason is a `findFiles` subtlety
+ * worth knowing: an `undefined` exclude applies `files.exclude` but
+ * **NOT** `search.exclude` (per the API docs), and `node_modules` lives in
+ * `search.exclude` by default. So "inherit the user's excludes" does not
+ * exclude `node_modules` (on a ~100k-file monorepo, vendored `.md` files
+ * outnumbered real ones 4:1). Passing a glob replaces the defaults entirely,
+ * hence `.git` is listed here too.
+ */
+export const FILE_SEARCH_EXCLUDE = '{**/node_modules/**,**/.git/**}';
+
+/**
+ * Open-direction settings, one per webview panel. Separate rather than one
+ * shared key so each panel's DEFAULT can be the placement it had before the
+ * setting existed — Now Stack opened `Beside`, Stats and Task List opened in
+ * the editor's own group, and a single key cannot default to both.
+ */
+export const NOW_PANEL_DIRECTION_SETTING = 'tsk.panel.nowStack.openDirection';
+export const NOW_PANEL_DIRECTION_KEY = 'panel.nowStack.openDirection';
+
+export const STATS_PANEL_DIRECTION_SETTING = 'tsk.panel.stats.openDirection';
+export const STATS_PANEL_DIRECTION_KEY = 'panel.stats.openDirection';
+
+export const TASK_LIST_PANEL_DIRECTION_SETTING = 'tsk.panel.taskList.openDirection';
+export const TASK_LIST_PANEL_DIRECTION_KEY = 'panel.taskList.openDirection';
+
+export const DIVIDER_WIDTH_SETTING = 'tsk.divider.width';
+export const DIVIDER_WIDTH_KEY = 'divider.width';
 
 export const AUTOLINKS_SETTING = 'tsk.autolinks';
 export const AUTOLINKS_KEY = 'autolinks';
@@ -203,6 +226,9 @@ export const COMMANDS = {
     addDiscoveredTags: 'tsk.addDiscoveredTags',
     migrateMarkdownTasks: 'tsk.migrateMarkdownTasks',
     migrateMarkdownBullets: 'tsk.migrateMarkdownBullets',
+    insertWikiLink: 'tsk.insertWikiLink',
+    insertDivider: 'tsk.insertDivider',
+    defineTag: 'tsk.defineTag',
     sendMarkdownTaskToFile: 'tsk.sendMarkdownTaskToFile',
     sendAllMarkdownTasks: 'tsk.sendAllMarkdownTasks',
     installClipboardBridgeSkill: 'tsk.installClipboardBridgeSkill',
@@ -215,8 +241,9 @@ export const COMMANDS = {
 
 /**
  * Commands registered programmatically and invoked only via CodeLens
- * descriptors (see `lib/codelens-logic.ts`) or the now-stack webview bridge
- * (see `now-tree-commands.ts`). Deliberately NOT in
+ * descriptors (`lib/codelens-logic.ts`), the hover's command links
+ * (`lib/hover-logic.ts`), the broken-reference quick fix (`code-actions.ts`),
+ * or the now-stack webview bridge (`now-tree-commands.ts`). Deliberately NOT in
  * `package.json#contributes.commands` — they require arguments (a task `@id`,
  * a tree `entryId`) only those layers can supply, so surfacing them in the
  * Command Palette would just produce broken invocations.

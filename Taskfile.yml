@@ -1,8 +1,8 @@
 version: "3"
 
 tasks:
-  # `watch` rebuilds the extension host; `watch:webview` the now-stack React
-  # bundle; `watch:all` runs both in one terminal (labelled output via
+  # `watch` rebuilds the extension host; `watch:webview` the webview React
+  # bundles; `watch:all` runs both in one terminal (labelled output via
   # concurrently). `build` / `package` already cover both (build chains host+webview).
   watch:
     dir: "{{ .TASKFILE_DIR }}"
@@ -33,13 +33,30 @@ tasks:
 
   test:webview:
     dir: "{{ .TASKFILE_DIR }}"
+    deps: [test:webview:browsers]
     cmds:
       - npm run test:webview
 
+  test:webview:browsers:
+    desc: Install the Playwright browser (chromium) test:webview needs, at the locked version — a no-op when present
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npx playwright install chromium
+
   install:
     dir: "{{ .TASKFILE_DIR }}"
-    desc: Package the extension and install that VSIX into this devcontainer's VS Code.
+    desc: Package the extension and install that VSIX into the running VS Code.
     deps:
       - package
     cmds:
       - bash scripts/install-extension.sh
+
+  bench:file-search:
+    dir: "{{ .TASKFILE_DIR }}"
+    desc: Benchmark the ways tsk can enumerate its files, in a real VS Code against the root repository.
+    env:
+      # ROOT_DIR is the directory of the Taskfile `task` was invoked through —
+      # the enclosing monorepo when included from one, this repo standalone.
+      TSK_BENCH_WORKSPACE: "{{ .ROOT_DIR }}"
+    cmds:
+      - bash scripts/bench-file-search.sh

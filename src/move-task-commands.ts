@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { COMMANDS, TSK_LANGUAGE_ID } from './constants';
 import { isTskDocument } from './editor-guards';
+import { uriExists } from './fast-fs';
 import type { CacheService } from './lib/cache';
 import { generateId } from './lib/ids';
 import type { Logger } from './lib/logger';
@@ -34,7 +35,7 @@ import {
  * line with an `@id`, deferred to the command (the destination QuickPick is
  * interactive, so it can only run at click time).
  *
- * `deps` is injected for tests; the default wires the real nanoid + timestamp.
+ * `deps` is injectable; the default wires the real nanoid + timestamp.
  */
 interface MoveDeps {
     generateId: () => string;
@@ -286,15 +287,6 @@ async function revealMovedTask(uri: vscode.Uri, blockLineCount: number): Promise
     targetEditor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
 }
 
-async function uriExists(uri: vscode.Uri): Promise<boolean> {
-    try {
-        await vscode.workspace.fs.stat(uri);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 function eolOf(doc: vscode.TextDocument): string {
     return doc.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
 }
@@ -400,8 +392,8 @@ async function convertBlocks(
 
 function warnPassedThrough(count: number): void {
     if (count === 0) return;
-    // Worded prospectively — this fires before the target pick / applyEdit,
-    // either of which the user can still cancel.
+    // Worded prospectively — this fires before applyEdit (and, for move /
+    // send-one, before the target pick), which the user can still cancel.
     void vscode.window.showWarningMessage(
         `Tsk: ${count} bracketed line(s) match neither the markdown marker map nor tsk — they move as-is.`,
     );

@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import type { CacheWarning } from './lib/cache';
 import type { BrokenEdgeReport, DuplicateIdReport } from './lib/graph';
+import type { DanglingWikiLink } from './lib/wiki-link';
 
 /**
- * Tracks per-file diagnostic state for the tsk extension and merges the
- * three warning sources before writing to `diagnostics.set`:
+ * Tracks per-file diagnostic state for the tsk extension and merges its
+ * warning sources before writing to `diagnostics.set`:
  *
  *   - **Per-file scan warnings** from `CacheService.rescanFile` — today
  *     only `no-id`. The cache's occurrence store no longer reports
@@ -18,6 +19,9 @@ import type { BrokenEdgeReport, DuplicateIdReport } from './lib/graph';
  *     `GraphService.getBrokenForwardEdges` (M20/B). One diagnostic per
  *     `(sourceLine, key)` pair — a task with three broken refs gets
  *     three squiggles, each carrying the offending key name.
+ *   - **Dangling `[[wiki link]]` warnings** from `wiki-link-provider.ts` —
+ *     open documents only (see `setLinkWarnings`), each on the exact
+ *     bracket span rather than the whole line.
  *
  * The merge is necessary because `vscode.DiagnosticCollection.set(uri, …)`
  * replaces the URI's collection wholesale — so we can't write scan
@@ -28,6 +32,8 @@ const ROW_END = Number.MAX_SAFE_INTEGER;
 
 export class DiagnosticsManager {
     private scanWarningsByFile = new Map<string, CacheWarning[]>();
+    /** Dangling `[[wiki link]]`s per file — OPEN documents only; see `setLinkWarnings`. */
+    private linkWarningsByFile = new Map<string, DanglingWikiLink[]>();
     private graphDuplicates: readonly DuplicateIdReport[] = [];
     /** Files mentioned in the *current* graph dup report; refreshed on each setGraphDuplicates call. */
     private graphFiles = new Set<string>();
@@ -47,6 +53,25 @@ export class DiagnosticsManager {
             this.scanWarningsByFile.delete(fileUri);
         } else {
             this.scanWarningsByFile.set(fileUri, [...warnings]);
+        }
+        this.flushFile(fileUri);
+    }
+
+    /**
+     * Update this file's dangling-`[[wiki link]]` warnings.
+     *
+     * **Open documents only.** Unlike the scan warnings above, these are not
+     * workspace-wide: a warm start skips unchanged files entirely (their text
+     * is never read), so there is nothing to check them against. Covering
+     * unopened files would mean persisting link spans in `cache.db` — a schema
+     * change, and a `CACHE_SCHEMA_VERSION` bump. Deliberately not done: the
+     * case that bites is a typo in a link you are looking at.
+     */
+    setLinkWarnings(fileUri: string, warnings: readonly DanglingWikiLink[]): void {
+        if (warnings.length === 0) {
+            this.linkWarningsByFile.delete(fileUri);
+        } else {
+            this.linkWarningsByFile.set(fileUri, [...warnings]);
         }
         this.flushFile(fileUri);
     }
@@ -91,10 +116,18 @@ export class DiagnosticsManager {
     /** Drop any state for a file (e.g. on delete). */
     deleteFile(fileUri: string): void {
         this.scanWarningsByFile.delete(fileUri);
+        this.linkWarningsByFile.delete(fileUri);
         this.collection.delete(vscode.Uri.parse(fileUri));
     }
 
-    /** Clear everything. Used during `tsk.rebuildCache`. */
+    /**
+     * Clear every CACHE-derived warning. Used during `tsk.rebuildCache`.
+     *
+     * Dangling-link warnings are kept and re-flushed: they come from open
+     * documents, not the cache, and nothing re-derives them until a document
+     * is next opened, saved or edited — so clearing them here made every
+     * dangling-link squiggle vanish after a rebuild.
+     */
     clear(): void {
         this.scanWarningsByFile.clear();
         this.graphDuplicates = [];
@@ -102,6 +135,7 @@ export class DiagnosticsManager {
         this.brokenReferences = [];
         this.brokenRefFiles.clear();
         this.collection.clear();
+        for (const fileUri of this.linkWarningsByFile.keys()) this.flushFile(fileUri);
     }
 
     private flushFile(fileUri: string): void {
@@ -118,6 +152,18 @@ export class DiagnosticsManager {
                     ),
                 );
             }
+        }
+
+        for (const link of this.linkWarningsByFile.get(fileUri) ?? []) {
+            diagnostics.push(
+                new vscode.Diagnostic(
+                    // Exact span — the brackets and nothing else, unlike the
+                    // whole-line ranges the other sources are stuck with.
+                    new vscode.Range(link.line, link.startCol, link.line, link.endCol),
+                    `No file found for "${link.path}".`,
+                    vscode.DiagnosticSeverity.Warning,
+                ),
+            );
         }
 
         for (const dup of this.graphDuplicates) {

@@ -1,6 +1,7 @@
 import { basename, dirname } from 'node:path';
 import * as vscode from 'vscode';
 import { TAGS_PATH_KEY, TAGS_PATH_SETTING } from './constants';
+import { isFileNotFound, readText } from './fast-fs';
 import type { Logger } from './lib/logger';
 import { parseTagsYaml, type TagDef } from './lib/tags-config';
 import { resolveTagsPath } from './lib/tags-path';
@@ -59,8 +60,7 @@ export async function createTagsLoader(
             return;
         }
         try {
-            const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(path));
-            const text = new TextDecoder().decode(bytes);
+            const text = await readText(vscode.Uri.file(path));
             const parsed = parseTagsYaml(text);
             if (parsed.size === 0) {
                 logger.warn(`tags.yml at ${path} parsed to empty.`);
@@ -69,8 +69,7 @@ export async function createTagsLoader(
             }
             state = parsed;
         } catch (err) {
-            const code = (err as { code?: string }).code;
-            if (code === 'FileNotFound') {
+            if (isFileNotFound(err)) {
                 // Expected — the file may not exist yet. Watcher will pick
                 // it up on create.
                 state = new Map();

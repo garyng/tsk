@@ -1,7 +1,7 @@
 import { defineConfig } from '@vscode/test-cli';
 
 /**
- * E2E configurations. Two labels:
+ * Test configurations, by label:
  *
  *   - `stable` — default. Runs against whatever the latest VS Code release
  *     is at download time. Catches the "newest still works" signal.
@@ -9,10 +9,11 @@ import { defineConfig } from '@vscode/test-cli';
  *     package.json#engines.vscode). Catches the "minimum supported still
  *     works" signal — together with the strict-subset `@types/vscode@~1.110`
  *     typecheck, this is the second of two layers that pin us to the floor.
+ *   - `bench` — not a test: the file-search benchmark (`task bench:file-search`).
  *
- * Pick with `vscode-test --label <name>`. The `test:e2e` script runs `stable`
- * by default; `test:e2e:floor` runs the floor; `test:e2e:all` runs both in
- * sequence.
+ * Pick with `vscode-test --label <name>`. With NO label, vscode-test runs every
+ * configuration — the benchmark included — which is why `test:e2e:all` names
+ * `stable` and `floor` explicitly instead of relying on that.
  */
 const baseConfig = {
     files: 'out-test/tests/e2e/**/*.test.js',
@@ -27,6 +28,17 @@ export default defineConfig([
     {
         ...baseConfig,
         label: 'stable',
+    },
+    {
+        // Benchmarks, not tests: the thing measured is how file search
+        // behaves on a LARGE tree, so the workspace comes from
+        // TSK_BENCH_WORKSPACE (the `bench:file-search` task passes the root
+        // of whatever repository it runs in). Never part of `test:e2e`.
+        ...baseConfig,
+        label: 'bench',
+        files: 'out-test/tests/bench/**/*.test.js',
+        workspaceFolder: process.env.TSK_BENCH_WORKSPACE ?? baseConfig.workspaceFolder,
+        mocha: { ...baseConfig.mocha, timeout: 300000 },
     },
     {
         ...baseConfig,

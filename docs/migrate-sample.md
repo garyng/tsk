@@ -8,7 +8,7 @@
 - [>>] file taxes
 - [n] the hose adapter is 13mm
 
-Not everything bracketed is a task — these stay untouched:
+Not everything bracketed is a task — the task migration leaves this link alone (the bullet command below treats it as a bullet):
 
 - [a link](https://example.com), not a task
 

@@ -54,6 +54,7 @@ Tagged something that isn't in `tags.yml` yet? **Tsk: Add Discovered Tags to tag
 
 `JIRAID-123` above is also a **link** — this folder's `.vscode/settings.json` has an autolink rule (regex → URL), so Ctrl/Cmd+Click opens the ticket.
 
+Ctrl+click a tag to jump to its entry in `tags.yml` (`F12` and `Alt+F12` work too). Not declared yet? VS Code says so, and `Ctrl+.` offers **Define #tag in tags.yml…** — it asks for a description and writes the entry for you.
 ## 4. Links
 
 | Key | Link |
@@ -73,6 +74,15 @@ Parent + two children — look at the lenses:
 Try `Alt+D` here, pick "plan the launch":
 
 - [ ] arrange the catering <!-- @id:link-dep -->
+
+Those link tasks to each other. To link a task to a **file**, write `[[path]]` — Ctrl+Click opens it. Paths are workspace-relative first, then relative to this file:
+
+- [n] the markdown migration sample: [[migrate-sample.md]] <!-- @id:link-wiki -->
+- [n] a file that isn't there is still a link, and says so on hover: [[nope.md]] <!-- @id:link-wiki-dangling -->
+
+Type `[[` and completion drops in — it filters on the whole path, not just the filename, so typing a folder narrows it. `Alt+L` does the same through a quick-pick. Everything in the workspace is offered except what `.gitignore` excludes.
+
+- [ ] link me to something with `Alt+L` <!-- @id:link-wiki-try -->
 
 ## 5. Structure
 
@@ -142,6 +152,8 @@ Coming **from Markdown**? **Tsk: Send All Markdown Tasks to Tsk File…** evacua
 
 `Alt+W` stamps a missing `@id`, flips the task to `[/]` (stamping `@started`, just like `Alt+S`), and pushes it onto a persistent undo-**tree** of "what am I working on now" — the marked line gets a border around it. Open the tree from the `target` button in this editor's title bar (or **Tsk: Open Now Stack**); it docks beside the file like a Markdown preview — click a node to jump straight back to it.
 
+Each panel has its own placement setting — `tsk.panel.nowStack.openDirection`, `tsk.panel.stats.openDirection`, `tsk.panel.taskList.openDirection` — taking `right`, `left`, `above`, `below`, or `active` for a tab beside your other editors. Each defaults to where that panel has always opened. It applies when a panel opens, so one you've dragged somewhere stays put.
+
 Mark the first line, then the second (it becomes a *child*). Open the stack, click the first to switch back, then mark the third — the tree keeps **both** branches, so your history is never lost:
 
 - [ ] draft the launch plan <!-- @id:now-draft -->
@@ -163,6 +175,16 @@ A real slice of a plan — every status, priority, tag, and link at once. The pr
     - [>] write the migration guide <!-- @id:show-move @parent:show-root @created:2026-05-20T09:10:00+08:00 @moved:2026-05-25T08:00:00+08:00 @movedTo:show-pub -->
     - a loose note (bare bullet — no checkbox, no metadata)
 - [ ] gather launch feedback #project/tsk <!-- @id:show-feedback @relatedTo:show-root @created:2026-05-20T09:11:00+08:00 @priority:3 -->
+
+## 13. Sections
+
+A line that reads `-label` followed by dashes is a **divider** — a section break. Click the gutter arrow on one to collapse everything under it, down to the next divider (or the end of the file). **Tsk: Insert Divider…** writes one padded to `tsk.divider.width`; run it on an existing divider to rename and re-pad it in place. The dash run is dimmed so the label reads as a heading.
+
+-focus-----------------------------------------------------------------------------------------------
+- [/] the one thing I'm on <!-- @id:divider-focus @started:2026-05-25T11:00:00+08:00 -->
+
+-later-----------------------------------------------------------------------------------------------
+- [ ] not now, but not forgotten <!-- @id:divider-later -->
 
 ## More
 

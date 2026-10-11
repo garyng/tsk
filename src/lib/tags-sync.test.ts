@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseTagsYaml } from './tags-config';
-import { buildTagsAppendText, computeMissingTags } from './tags-sync';
+import { buildTagEntryText, buildTagsAppendText, computeMissingTags, yamlKey } from './tags-sync';
 
 const TODAY = '2026-06-13';
 
@@ -75,5 +75,72 @@ describe('round-trip through parseTagsYaml (output is valid yaml)', () => {
         expect([...parsed.keys()].sort()).toEqual(['milestone/M2', 'project/tsk', 'urgent']);
         expect(parsed.get('project/tsk')).toEqual({ description: 'The tsk extension itself' });
         expect(parsed.get('urgent')).toEqual({});
+    });
+});
+
+describe('buildTagEntryText', () => {
+    it('writes the string-shorthand form, quoted', () => {
+        expect(buildTagEntryText('idea: x\n', 'p/tsk', 'the tsk extension', '\n')).toBe(
+            'p/tsk: "the tsk extension"\n',
+        );
+    });
+
+    it('adds a separator when the file lacks a trailing newline, none for an empty file', () => {
+        expect(buildTagEntryText('idea: x', 'new', 'd', '\n')).toBe('\nnew: "d"\n');
+        expect(buildTagEntryText('', 'new', 'd', '\n')).toBe('new: "d"\n');
+    });
+
+    it('survives a description YAML would otherwise choke on', () => {
+        for (const description of [
+            'has: a colon',
+            '# starts like a comment',
+            '- starts like a list',
+            '{flow: mapping}',
+            'ends with a backslash \\',
+            'has "quotes" inside',
+            '',
+        ]) {
+            const text = buildTagEntryText('', 'tag', description, '\n');
+            const parsed = parseTagsYaml(text);
+            expect(parsed.get('tag')?.description, `failed on ${JSON.stringify(description)}`).toBe(
+                description === '' ? undefined : description,
+            );
+        }
+    });
+});
+
+describe('yamlKey — tags that YAML would reinterpret', () => {
+    // Every one of these is a legal tag (`#[A-Za-z][A-Za-z0-9_/-]*`).
+    const KEYWORDS = ['null', 'Null', 'NULL', 'true', 'True', 'FALSE'];
+
+    it('leaves ordinary tags bare', () => {
+        expect(yamlKey('idea')).toBe('idea');
+        expect(yamlKey('p/tsk')).toBe('p/tsk');
+        expect(yamlKey('a-b_c')).toBe('a-b_c');
+    });
+
+    it('quotes exactly the keywords that would not re-parse as themselves', () => {
+        for (const tag of ['null', 'Null', 'NULL', 'True', 'FALSE']) {
+            expect(yamlKey(tag)).toBe(JSON.stringify(tag));
+        }
+        // Lowercase `true` parses as a boolean key, which stringifies straight
+        // back to "true" — the same tag, so it needs no quotes. This is why the
+        // parser decides rather than a keyword list: a list would quote it.
+        expect(yamlKey('true')).toBe('true');
+    });
+
+    it('Define Tag: a keyword tag survives the round trip', () => {
+        // Unquoted, `null:` re-parsed as an empty key that parseTagsYaml drops,
+        // and `True:` as `true` — the declaration was silently lost.
+        for (const tag of KEYWORDS) {
+            const parsed = parseTagsYaml(buildTagEntryText('', tag, 'desc', '\n'));
+            expect([...parsed.keys()], tag).toEqual([tag]);
+            expect(parsed.get(tag)?.description).toBe('desc');
+        }
+    });
+
+    it('Add Discovered Tags: keyword tags survive the round trip', () => {
+        const parsed = parseTagsYaml(buildTagsAppendText('', KEYWORDS, TODAY, '\n'));
+        expect([...parsed.keys()].sort()).toEqual([...KEYWORDS].sort());
     });
 });
