@@ -36,10 +36,11 @@ import {
     type TreeNode,
 } from '../lib/task-tree';
 import { formatList, formatReady, formatShow, formatTrail, label } from './format';
-import { linkIds } from './links';
+import { selectClicked, type Tmux } from './select-clicked';
 import { sessionStart } from './session-hook';
 import { showInTui } from './show-in-tui';
 import { readDoc, readOutside, StoreError, treeWithOutside, updateDoc } from './store';
+import { idsAsRefs } from './terminal-ids';
 
 /**
  * `tsk` — the command line that agent sessions (and people) use to track work
@@ -74,6 +75,9 @@ export const USAGE = `tsk — track work in a .tsk file (default: the nearest ${
   tsk tui [--follow-pid <pid>]      a live view in the terminal; follows a Claude Code process's session
           [--no-mouse]              leave the mouse to the terminal (or TSK_NO_MOUSE)
   tsk session start                 Claude Code's SessionStart hook (reads the hook input on stdin)
+  tsk select-clicked --pane=<%n> --client=<name> --column=<n> --line=<text> [--hyperlink=<uri>]
+                                    tmux's Ctrl+Click: select the tsk:<id> under the mouse in the
+                                    TUI beside that pane (a tmux binding passes these)
 
 options:
   --file <path>     the .tsk file (or TSK_FILE)
@@ -87,8 +91,10 @@ export interface CliIo {
     readonly err: (text: string) => void;
     readonly readStdin?: () => Promise<string>;
     readonly deps?: OpsDeps;
-    /** The output is a terminal: each task's id is printed as a link to it (`links.ts`). */
-    readonly links?: boolean;
+    /** The output is a terminal: each task's id is printed as a coloured `tsk:<id>` (`terminal-ids.ts`). */
+    readonly terminal?: boolean;
+    /** Runs tmux, for `select-clicked`; tests stand one in. */
+    readonly tmux?: Tmux;
 }
 
 class UsageError extends Error {}
@@ -112,7 +118,11 @@ export function resolveSession(flag: string | undefined, env: CliIo['env']): str
 }
 
 export async function main(given: CliIo): Promise<number> {
-    const io = given.links ? { ...given, out: (text: string) => given.out(linkIds(text)) } : given;
+    // Any NO_COLOR but an empty one turns colour off (https://no-color.org).
+    const colour = !given.env.NO_COLOR;
+    const io = given.terminal
+        ? { ...given, out: (text: string) => given.out(idsAsRefs(text, colour)) }
+        : given;
     const deps = io.deps ?? defaultOpsDeps;
     try {
         const { values, positionals } = parseArgs({
@@ -131,6 +141,11 @@ export async function main(given: CliIo): Promise<number> {
                 'follow-pid': { type: 'string' },
                 'no-mouse': { type: 'boolean' },
                 tui: { type: 'boolean' },
+                pane: { type: 'string' },
+                client: { type: 'string' },
+                column: { type: 'string' },
+                line: { type: 'string' },
+                hyperlink: { type: 'string' },
                 help: { type: 'boolean', short: 'h' },
             },
         });
@@ -158,6 +173,18 @@ export async function main(given: CliIo): Promise<number> {
             });
             if (output) io.out(output);
             return 0;
+        }
+        if (command === 'select-clicked') {
+            // Before the file: tmux runs it in its own working directory, and each TUI knows its file.
+            const { pane, client, line } = values;
+            const column = Number(values.column);
+            if (!pane || !client || line === undefined || !Number.isInteger(column)) {
+                throw new UsageError(
+                    'select-clicked: needs --pane, --client, --column and --line, as a tmux binding passes them',
+                );
+            }
+            const click = { pane, client, column, line, hyperlink: values.hyperlink || undefined };
+            return await selectClicked(click, io);
         }
         const file = resolveFile(values.file, io.env, io.cwd);
         const session = resolveSession(values.session, io.env);

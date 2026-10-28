@@ -129,6 +129,15 @@ The **Markdown preview** shows the same links and markers. A click opens the tas
 
 In **VS Code's terminal** a `tsk:<id>` is a link too — in Claude's output, in a tmux pane, whatever printed it — for ids the workspace knows only, since terminal output is noisier and has no marker to flag an unknown one. Hover for the task's text, Ctrl+Click to reveal it. The click also selects it in a running `tsk tui` beside the terminal: one in a pane of the tmux window that terminal shows, or, outside tmux, one following a Claude that runs in it (see `tsk show <id> --tui`, under Command line). That TUI must be showing the task's file; nothing else is asked, so a click beside one Claude never moves another's pane.
 
+**In tmux**, from any terminal (Windows Terminal too), Ctrl+Click on a `tsk:<id>` selects the task in the TUI in that pane's window. tsk's own output writes each id that way on a terminal, in cyan (`NO_COLOR` leaves the colour out), and plain where Claude reads it. A binding in `tmux.conf` runs `tsk select-clicked` with the line, the column and the link under the mouse, then passes the click on to the pane. The TUI's footer says it was asked; when nothing was selected, tmux's message line says why. A terminal that opens links still opens one, so neither tsk nor a reply writes the id as a `vscode://` link; a reply writes it as inline code, which Claude Code colours.
+
+```tmux
+bind -n C-MouseDown1Pane {
+    send-keys -M
+    run-shell -b "tsk select-clicked --pane=#{pane_id} --client=#{q:client_name} --column=#{mouse_x} --line=#{q:mouse_line} --hyperlink=#{q:mouse_hyperlink} >/dev/null"
+}
+```
+
 ## Migrating from Markdown
 
 Bring existing Markdown checklists into tsk. Markdown task lists speak their own marker vocabulary and carry no inline metadata, so the migration commands do two things: **remap the markers** (per the `tsk.migrate.markers` glyph→status map) and **derive the metadata from git history** — `@created` from the commit that added the line, `@completed` / `@cancelled` / `@moved` / `@started` from the commit of the most recent switch *into* the current marker (a task done → reopened → done again stamps the second done; file renames are followed). Every migrated line gains a fresh `@id`. Lines git can't answer for (uncommitted, untracked, not a repo) are stamped with the current time and counted in the summary toast.

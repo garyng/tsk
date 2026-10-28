@@ -7,7 +7,7 @@
 
 /** The URI path that opens a task. */
 export const OPEN_TASK_PATH = '/open';
-/** The extension as VS Code names it, `<publisher>.<name>`, for a URI built outside it (the CLI). */
+/** The extension as VS Code names it, `<publisher>.<name>`, for a URI read outside it (tmux's Ctrl+Click). */
 export const EXTENSION_ID = 'garyng.tsk';
 
 const ID_RE = /^[A-Za-z0-9_-]+$/;

@@ -150,7 +150,7 @@ Or name it as a plan would — tsk:copy-demo — and Ctrl+Click: the marker afte
 
 A plan's preview shows them too: open [[plan-sample.md]], then its preview (`Ctrl+Shift+V`).
 
-In VS Code's terminal, `echo tsk:copy-demo` and Ctrl+Click what it prints. With `tsk tui --file <this file>` running in a tmux pane of the same window, the click selects the task there too.
+In VS Code's terminal, `echo tsk:copy-demo` and Ctrl+Click what it prints. With `tsk tui --file <this file>` running in a tmux pane of the same window, the click selects the task there too. In tmux from any terminal, Windows Terminal too, Ctrl+Click on `tsk:copy-demo` selects it in that TUI without VS Code.
 
 ## 10. Paste image
 

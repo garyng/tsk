@@ -306,24 +306,24 @@ describe('dependencies on tasks in the files beside it', () => {
 });
 
 describe('tsk in a terminal', () => {
-    it("links each id to the extension's URI when the output is a terminal, and only then", async () => {
+    it('writes each id as tsk:<id> in cyan when the output is a terminal, and only then', async () => {
         await tsk('add "the plan" --root');
-        const show = async (links: boolean) => {
+        const show = async (terminal: boolean, env: Record<string, string> = {}) => {
             const out: string[] = [];
             await main({
                 argv: ['show', 't0000001'],
-                env: { CLAUDE_CODE_SESSION_ID: 'sess0001-uuid' },
+                env: { CLAUDE_CODE_SESSION_ID: 'sess0001-uuid', ...env },
                 cwd: dir,
                 out: (t) => out.push(t),
                 err: () => {},
                 deps,
-                links,
+                terminal,
             });
             return out.join('\n');
         };
-        expect(await show(true)).toContain(
-            '[ ] \u001B]8;;vscode://garyng.tsk/open?id=t0000001\u001B\\t0000001\u001B]8;;\u001B\\ the plan',
-        );
+        expect(await show(true)).toContain('[ ] \u001B[36mtsk:t0000001\u001B[39m the plan');
+        expect(await show(true, { NO_COLOR: '1' })).toContain('[ ] tsk:t0000001 the plan');
+        expect(await show(true, { NO_COLOR: '' })).toContain('\u001B[36mtsk:t0000001');
         expect(await show(false)).toContain('[ ] t0000001 the plan');
     });
 });
@@ -414,6 +414,129 @@ describe('tsk show <id> --tui', () => {
             err: 'tsk: no task with @id:zz',
         });
         expect(asked).toEqual(['t0000001']);
+    });
+});
+
+describe('tsk select-clicked', () => {
+    let stop: (() => void) | undefined;
+    afterEach(() => stop?.());
+    const runtime = () => path.join(dir, 'rt');
+    const socket = '/tmp/tmux-test/default';
+    /** A stand-in TUI in this process, in tmux pane `pane`. */
+    const tui = async (
+        pane: string,
+        answer: (id: string) => SelectReply = () => ({ ok: true }),
+    ) => {
+        const asked: string[] = [];
+        stop = await listenForRequests({
+            dir: runtime(),
+            shows: { file: fs.realpathSync(file), tmux: { socket, pane } },
+            onSelect: (id) => {
+                asked.push(id);
+                return answer(id);
+            },
+            onError: (e) => {
+                throw e;
+            },
+        });
+        return asked;
+    };
+    /** A Ctrl+Click in pane %1, whose window holds %1 and %2, from client /dev/pts/3. */
+    const click = async (line: string, column: number, extra: string[] = []) => {
+        const out: string[] = [];
+        const err: string[] = [];
+        const tmux: string[][] = [];
+        const code = await main({
+            argv: [
+                'select-clicked',
+                '--pane=%1',
+                '--client=/dev/pts/3',
+                `--column=${column}`,
+                `--line=${line}`,
+                ...extra,
+            ],
+            env: { TSK_RUNTIME_DIR: runtime(), TMUX: `${socket},123,0` },
+            // tmux runs it in its own working directory, where there's no claude.tsk.
+            cwd: os.tmpdir(),
+            out: (t) => out.push(t),
+            err: (t) => err.push(t),
+            tmux: async (s, args) => {
+                tmux.push([s, ...args]);
+                return args[0] === 'list-panes' ? '%1\n%2\n' : '';
+            },
+        });
+        return { code, out: out.join('\n'), err: err.join('\n'), tmux };
+    };
+    const told = (text: string) => [socket, 'display-message', '-l', '-c', '/dev/pts/3', text];
+
+    it('selects the tsk:<id> under the mouse in the TUI in the same window', async () => {
+        const asked = await tui('%2');
+        const r = await click('- see tsk:t0000001 for it', 8);
+        expect(r).toMatchObject({
+            code: 0,
+            out: `selected tsk:t0000001 in the TUI pid ${process.pid}`,
+            err: '',
+        });
+        expect(r.tmux).toEqual([[socket, 'list-panes', '-t', '%1', '-F', '#{pane_id}']]);
+        expect(asked).toEqual(['t0000001']);
+    });
+
+    it("takes the id from the extension's link under the mouse", async () => {
+        const asked = await tui('%2');
+        const r = await click('[ ] t0000001 the plan', 4, [
+            '--hyperlink=vscode://garyng.tsk/open?id=t0000001',
+        ]);
+        expect(r.code).toBe(0);
+        expect(asked).toEqual(['t0000001']);
+    });
+
+    it('does nothing for a click on no task', async () => {
+        const asked = await tui('%2');
+        expect(await click('- see tsk:t0000001 for it', 2, ['--hyperlink='])).toEqual({
+            code: 0,
+            out: '',
+            err: '',
+            tmux: [],
+        });
+        expect(asked).toEqual([]);
+    });
+
+    it('tells the client when no TUI is in the window, and asks none elsewhere', async () => {
+        const asked = await tui('%9');
+        const r = await click('tsk:t0000001', 0);
+        expect(r.code).toBe(0);
+        expect(r.err).toBe('tsk: no TUI beside this pane; tsk tui opens one');
+        expect(r.tmux.at(-1)).toEqual(told('tsk: no TUI beside this pane; tsk tui opens one'));
+        expect(asked).toEqual([]);
+    });
+
+    it("tells the client why the TUI didn't select it", async () => {
+        await tui('%2', (id) => ({ ok: false, why: `no task ${id} in claude.tsk` }));
+        const r = await click('tsk:zz', 0);
+        expect(r.code).toBe(0);
+        expect(r.tmux.at(-1)).toEqual(told('tsk: tsk:zz not selected: no task zz in claude.tsk'));
+    });
+
+    it('needs what tmux passes, and tmux', async () => {
+        const r = await click('tsk:t0000001', Number.NaN);
+        expect(r).toMatchObject({
+            code: 1,
+            err: expect.stringMatching(/^tsk: select-clicked: needs/),
+        });
+        const outside = await main({
+            argv: [
+                'select-clicked',
+                '--pane=%1',
+                '--client=c',
+                '--column=0',
+                '--line=tsk:t0000001',
+            ],
+            env: { TSK_RUNTIME_DIR: runtime() },
+            cwd: dir,
+            out: () => {},
+            err: () => {},
+        });
+        expect(outside).toBe(1);
     });
 });
 

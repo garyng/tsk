@@ -14,7 +14,7 @@ void main({
     out: (text) => process.stdout.write(`${text}\n`),
     err: (text) => process.stderr.write(`${text}\n`),
     readStdin,
-    links: process.stdout.isTTY === true,
+    terminal: process.stdout.isTTY === true,
 }).then((code) => {
     process.exitCode = code;
 });

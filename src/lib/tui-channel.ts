@@ -34,9 +34,14 @@ export interface TmuxPane {
     readonly pane: string;
 }
 
-/** The pane a process runs in, from the `TMUX` (`<socket>,<server pid>,<session>`) and `TMUX_PANE` tmux gives it. */
+/** The server's socket, from the `TMUX` (`<socket>,<server pid>,<session>`) tmux gives what it runs. */
+export function tmuxSocket(env: Readonly<Record<string, string | undefined>>): string | undefined {
+    return /^(.+),\d+,\d+$/.exec(env.TMUX ?? '')?.[1];
+}
+
+/** The pane a process runs in, from `TMUX` and the `TMUX_PANE` tmux gives it. */
 export function tmuxOf(env: Readonly<Record<string, string | undefined>>): TmuxPane | undefined {
-    const socket = /^(.+),\d+,\d+$/.exec(env.TMUX ?? '')?.[1];
+    const socket = tmuxSocket(env);
     const pane = env.TMUX_PANE;
     return socket && pane && /^%\d+$/.test(pane) ? { socket, pane } : undefined;
 }
