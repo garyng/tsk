@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MARKER_SYMBOL_CHAR_CLASS, MARKERS, markerForSymbol } from './markers';
+import { themeColorVar } from './theme-color';
 
 /**
  * Drift detection: `MARKERS` is the TS source of truth, but VSCode reads
@@ -137,16 +138,26 @@ describe('drift — tsk.tmLanguage.json mentions every MARKER scope', () => {
 
 describe('drift — marker.css fallbacks mirror MARKERS dark colors', () => {
     const cssText = readFileSync(MARKER_CSS_PATH, 'utf-8');
-    // Each palette alias reads `--tsk-marker-<name>: var(--vscode-tsk-marker-<name>, <hex>)`.
-    // The <hex> fallback is what renders when no theme overrides the host color
+    // Each palette alias reads `--tsk-marker-<name>: var(<the host color's variable>, <hex>)`.
+    // The <hex> fallback is what renders where the host defines no variable
     // (e.g. the Playwright harness), so it must match the registry's dark value —
     // a check the package.json / grammar drift tests don't cover.
-    const FALLBACK_RE =
-        /--tsk-marker-([a-z]+):\s*var\(--vscode-tsk-marker-\1,\s*(#[0-9a-fA-F]{6})\)/g;
+    const FALLBACK_RE = /--tsk-marker-([a-z]+):\s*var\(([^,]+),\s*(#[0-9a-fA-F]{6})\)/g;
     const fallbacks = new Map<string, string>();
+    const hostVars = new Map<string, string>();
     for (const match of cssText.matchAll(FALLBACK_RE)) {
-        fallbacks.set(match[1] as string, (match[2] as string).toLowerCase());
+        hostVars.set(match[1] as string, match[2] as string);
+        fallbacks.set(match[1] as string, (match[3] as string).toLowerCase());
     }
+
+    it('reads each host color through the variable VS Code gives a webview', () => {
+        for (const def of MARKERS) {
+            if (!def.color) continue;
+            expect(hostVars.get(def.name), `marker.css variable for ${def.name}`).toBe(
+                themeColorVar(def.color.id),
+            );
+        }
+    });
 
     it('declares a fallback alias for every MARKER color', () => {
         const expected = MARKERS.flatMap((m) => (m.color ? [m.name] : [])).sort();

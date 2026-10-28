@@ -24,6 +24,36 @@ tasks:
     cmds:
       - npm run build
 
+  build:cli:
+    desc: Build the tsk command line (dist/cli/tsk.mjs, run through bin/tsk).
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm run build:cli
+
+  typecheck:
+    desc: Type-check every part — the extension, the webview, and the CLI and TUI (each has its own tsconfig; a bare `tsc` checks only the extension).
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm run typecheck
+
+  test:
+    desc: Run the unit tests (vitest).
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm test
+
+  test:e2e:
+    desc: Run the end-to-end tests in a real VS Code (the latest release, under Xvfb when there's no display).
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm run test:e2e
+
+  lint:
+    desc: Lint and format-check with biome.
+    dir: "{{ .TASKFILE_DIR }}"
+    cmds:
+      - npm run lint
+
   package:
     dir: "{{ .TASKFILE_DIR }}"
     deps:

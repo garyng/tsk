@@ -89,6 +89,16 @@ export class WorkspaceFiles {
         }
     }
 
+    /**
+     * Whether {@link all} lists `uri`: not ignored, and not inside a nested
+     * repository or worktree, which git lists as the folder alone. The whole
+     * listing, not a pathspec, for the reasons above.
+     */
+    async includes(uri: vscode.Uri, fallbackGlob: string): Promise<boolean> {
+        const listed = await this.all(fallbackGlob);
+        return listed.some((u) => u.fsPath === uri.fsPath);
+    }
+
     /** `git ls-files -z <args>`, as paths relative to {@link root}. */
     private lsFiles(args: readonly string[]): Promise<string[]> {
         return new Promise((resolve, reject) => {

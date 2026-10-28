@@ -41,7 +41,7 @@ suite('missing-reference diagnostics', () => {
         const orphan = ds.find((d) => d.message.includes('m20-ghost-parent'));
         assert.ok(orphan, 'expected a diagnostic for m20-ghost-parent');
         assert.strictEqual(orphan.severity, vscode.DiagnosticSeverity.Warning);
-        assert.strictEqual(orphan.code, 'broken-ref:parent');
+        assert.strictEqual(orphan.code, 'broken-ref:parent:m20-ghost-parent');
         assert.match(
             orphan.message,
             /^Tsk: @parent references unknown task id "m20-ghost-parent"\.$/,
@@ -52,7 +52,20 @@ suite('missing-reference diagnostics', () => {
         const ds = tskDiagnostics(brokenRefUri);
         const orphan = ds.find((d) => d.message.includes('m20-ghost-depends'));
         assert.ok(orphan, 'expected a diagnostic for m20-ghost-depends');
-        assert.strictEqual(orphan.code, 'broken-ref:dependsOn');
+        assert.strictEqual(orphan.code, 'broken-ref:dependsOn:m20-ghost-depends');
+    });
+
+    test('flags only the unknown id of a @dependsOn list', async () => {
+        const doc = await vscode.workspace.openTextDocument(brokenRefUri);
+        const line = [...Array(doc.lineCount).keys()].find((i) =>
+            doc.lineAt(i).text.includes('@id:m20-list-half-broken'),
+        );
+        assert.ok(line !== undefined, 'fixture row m20-list-half-broken');
+        const onRow = tskDiagnostics(brokenRefUri).filter((d) => d.range.start.line === line);
+        assert.deepStrictEqual(
+            onRow.map((d) => d.code),
+            ['broken-ref:dependsOn:m20-ghost-list'],
+        );
     });
 
     test('emits one diagnostic per broken key on a triple-broken task', async () => {
@@ -73,9 +86,9 @@ suite('missing-reference diagnostics', () => {
         );
         const codes = triple.map((d) => d.code).sort();
         assert.deepStrictEqual(codes, [
-            'broken-ref:dependsOn',
-            'broken-ref:parent',
-            'broken-ref:relatedTo',
+            'broken-ref:dependsOn:m20-ghost-d',
+            'broken-ref:parent:m20-ghost-p',
+            'broken-ref:relatedTo:m20-ghost-r',
         ]);
     });
 
@@ -101,7 +114,7 @@ suite('missing-reference diagnostics', () => {
         const dangling = ds.find((d) => d.message.includes('e2e-moved-gone'));
         assert.ok(dangling, 'expected a broken-ref diagnostic for the dangling @movedTo');
         assert.strictEqual(dangling.severity, vscode.DiagnosticSeverity.Warning);
-        assert.strictEqual(dangling.code, 'broken-ref:movedTo');
+        assert.strictEqual(dangling.code, 'broken-ref:movedTo:e2e-moved-gone');
         assert.match(
             dangling.message,
             /^Tsk: @movedTo references unknown task id "e2e-moved-gone"\.$/,

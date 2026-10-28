@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { CacheWarning } from './lib/cache';
 import type { BrokenEdgeReport, DuplicateIdReport } from './lib/graph';
+import { brokenRefCode } from './lib/relationships';
 import type { DanglingWikiLink } from './lib/wiki-link';
 
 /**
@@ -16,7 +17,7 @@ import type { DanglingWikiLink } from './lib/wiki-link';
  *     conflicting file gets squiggled, not just the loser as the cache
  *     would do per-rescan.
  *   - **Broken forward-edge reports** from
- *     `GraphService.getBrokenForwardEdges` (M20/B). One diagnostic per
+ *     `GraphService.getBrokenForwardEdges`. One diagnostic per
  *     `(sourceLine, key)` pair — a task with three broken refs gets
  *     three squiggles, each carrying the offending key name.
  *   - **Dangling `[[wiki link]]` warnings** from `wiki-link-provider.ts` —
@@ -160,7 +161,9 @@ export class DiagnosticsManager {
                     // Exact span — the brackets and nothing else, unlike the
                     // whole-line ranges the other sources are stuck with.
                     new vscode.Range(link.line, link.startCol, link.line, link.endCol),
-                    `No file found for "${link.path}".`,
+                    link.problem === 'no-heading'
+                        ? `No heading "#${link.fragment}" in "${link.path}".`
+                        : `No file found for "${link.path}".`,
                     vscode.DiagnosticSeverity.Warning,
                 ),
             );
@@ -196,9 +199,10 @@ export class DiagnosticsManager {
                 `Tsk: @${ref.key} references unknown task id "${ref.targetId}".`,
                 vscode.DiagnosticSeverity.Warning,
             );
-            // Surface the broken-ref key so the M20/C code action can match
-            // on it without re-parsing the message.
-            diagnostic.code = `broken-ref:${ref.key}`;
+            // Surface the key and the target so the code action can act on
+            // that one id (a `@dependsOn` list can hold several) without
+            // re-parsing the message.
+            diagnostic.code = brokenRefCode(ref.key, ref.targetId);
             diagnostics.push(diagnostic);
         }
 

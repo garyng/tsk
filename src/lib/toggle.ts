@@ -1,6 +1,7 @@
 import { MARKERS, type Marker } from './markers';
 import { replaceMetadata } from './metadata';
 import { parseBullet, parseLine } from './parser';
+import { formatIdList, parseIdList } from './relationships';
 
 /**
  * Marker → canonical write-back symbol (the first entry in `symbols`).
@@ -176,6 +177,41 @@ export function removeMetadataEntry(line: string, key: string): string {
     return replaceMetadata(line, (meta) => {
         meta.delete(key);
     });
+}
+
+/**
+ * Edit the ids of a list-valued key (`@dependsOn:a,b`, see `relationships.ts`)
+ * on a task line: `edit` gets the current ids and returns the new ones. An
+ * empty result drops the key; an unchanged one leaves the line byte-for-byte.
+ * Non-task lines pass through.
+ */
+function editIdList(line: string, key: string, edit: (ids: string[]) => string[]): string {
+    const parsed = parseLine(line);
+    if (parsed === null) return line;
+    const before = parseIdList(parsed.metadata.get(key));
+    const after = edit([...before]);
+    if (formatIdList(after) === formatIdList(before)) return line;
+    return replaceMetadata(line, (meta) => {
+        if (after.length === 0) meta.delete(key);
+        else meta.set(key, formatIdList(after));
+    });
+}
+
+/** Append `id` to a list-valued key, unless it's already there. */
+export function addListEntry(line: string, key: string, id: string): string {
+    return editIdList(line, key, (ids) => (ids.includes(id) ? ids : [...ids, id]));
+}
+
+/** Remove `id` from a list-valued key; the key goes when its last id does. */
+export function removeListEntry(line: string, key: string, id: string): string {
+    return editIdList(line, key, (ids) => ids.filter((x) => x !== id));
+}
+
+/** Replace `from` with `to` in a list-valued key, in place (or drop `from` if `to` is already listed). */
+export function replaceListEntry(line: string, key: string, from: string, to: string): string {
+    return editIdList(line, key, (ids) =>
+        ids.includes(to) ? ids.filter((x) => x !== from) : ids.map((x) => (x === from ? to : x)),
+    );
 }
 
 /**

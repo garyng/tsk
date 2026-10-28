@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findTagDeclarationLine, tagSpanAt } from './tag-span';
+import { findTagDeclarationLine, tagSpanAt, tagSpans } from './tag-span';
 
 describe('tagSpanAt', () => {
     const line = '- [ ] ship it #p/tsk #idea <!-- @id:abc -->';
@@ -39,6 +39,16 @@ describe('tagSpanAt', () => {
 
     it('keeps hyphens and underscores, stops at other punctuation', () => {
         expect(tagSpanAt('- [ ] #a-b_c, rest', 8)?.tag).toBe('a-b_c');
+    });
+});
+
+describe('tagSpans', () => {
+    it('finds every tag left to right, but not a # inside a word', () => {
+        expect(tagSpans('#p/tsk fix it #urgent, not a#b')).toEqual([
+            { startCol: 0, endCol: 6, tag: 'p/tsk' },
+            { startCol: 14, endCol: 21, tag: 'urgent' },
+        ]);
+        expect(tagSpans('no tags')).toEqual([]);
     });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskRecord } from './db';
-import { sanitizeClipboardForId, taskToPickItem } from './picker-logic';
+import { dependsOnMenu, sanitizeClipboardForId, taskToPickItem } from './picker-logic';
 
 describe('sanitizeClipboardForId', () => {
     it('strips surrounding whitespace', () => {
@@ -50,5 +50,35 @@ describe('taskToPickItem', () => {
     it('substitutes "(no content)" when content is whitespace only', () => {
         const item = taskToPickItem({ ...baseRecord, content: '   ' });
         expect(item.label).toBe('(no content)');
+    });
+});
+
+describe('dependsOnMenu', () => {
+    const content = (id: string) => ({ a: 'book the venue', b: '' })[id];
+
+    it('offers add, a remove per dependency named by its text, then remove all', () => {
+        expect(dependsOnMenu(['a', 'b', 'gone'], content)).toEqual([
+            { label: '$(add) Add another dependency…', choice: { kind: 'add' } },
+            {
+                label: '$(close) Remove a',
+                description: 'book the venue',
+                choice: { kind: 'remove', id: 'a' },
+            },
+            {
+                label: '$(close) Remove b',
+                description: '(no content)',
+                choice: { kind: 'remove', id: 'b' },
+            },
+            {
+                label: '$(close) Remove gone',
+                description: '(missing)',
+                choice: { kind: 'remove', id: 'gone' },
+            },
+            { label: '$(trash) Remove all dependencies', choice: { kind: 'removeAll' } },
+        ]);
+    });
+
+    it('has no remove-all for a single dependency', () => {
+        expect(dependsOnMenu(['a'], content).map((i) => i.choice.kind)).toEqual(['add', 'remove']);
     });
 });

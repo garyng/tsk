@@ -197,6 +197,16 @@ describe('CacheService — removeFile', () => {
     });
 });
 
+describe('CacheService — listFileUris', () => {
+    it('lists every cached file, and forgets a removed one', () => {
+        cache.rescanFile(URI_B, '- [ ] b <!-- @id:bbb -->', 100);
+        cache.rescanFile(URI_A, '- [ ] a <!-- @id:aaa -->', 100);
+        expect(cache.listFileUris()).toEqual([URI_A, URI_B].sort());
+        cache.removeFile(URI_A);
+        expect(cache.listFileUris()).toEqual([URI_B]);
+    });
+});
+
 describe('CacheService — purge', () => {
     it('clears all files, tasks, and tags', () => {
         cache.rescanFile(URI_A, '- [ ] a #x <!-- @id:a -->', 1);

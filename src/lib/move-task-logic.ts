@@ -19,7 +19,7 @@ const isBlank = (line: string): boolean => line.trim() === '';
  * the next `tabSize` multiple; stops at the first non-whitespace char. Comparing
  * by column (not raw char count) keeps tab- and space-indented files honest.
  */
-function indentColumn(line: string, tabSize: number): number {
+export function indentColumn(line: string, tabSize: number): number {
     let col = 0;
     for (const ch of line) {
         if (ch === ' ') col += 1;

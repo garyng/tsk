@@ -8,7 +8,8 @@ const EXTENSION_ID = 'garyng.tsk';
  * — driving that from `@vscode/test-cli` would require simulating key
  * presses, which is brittle, so add-mode is validated manually via the
  * dev host. The deterministic *remove* mode (when the metadata key is
- * already present) doesn't open the picker and is fair game for e2e.
+ * already present) doesn't open the picker and is fair game for e2e, and
+ * so is `Alt+D`'s menu on a task with dependencies (`showQuickPick`, stubbed).
  */
 suite('toggle relationship + moved commands', () => {
     suiteSetup(async () => {
@@ -34,12 +35,56 @@ suite('toggle relationship + moved commands', () => {
         assert.strictEqual(line, '- [ ] thing');
     });
 
-    test('toggleDependsOn removes @dependsOn when present (no picker)', async () => {
-        const line = await runOnLine(
-            '- [ ] thing <!-- @dependsOn:abc123 -->',
-            'tsk.toggleDependsOn',
+    /**
+     * `Alt+D` on a task with dependencies opens a menu (`showQuickPick`), stubbed
+     * here to pick the item whose label starts with `pick` — or to dismiss it.
+     */
+    async function withMenuChoice<T>(
+        pick: string | undefined,
+        run: () => Promise<T>,
+    ): Promise<{ result: T; labels: string[] }> {
+        const win = vscode.window as unknown as { showQuickPick: unknown };
+        const orig = win.showQuickPick;
+        let labels: string[] = [];
+        win.showQuickPick = async (items: ReadonlyArray<{ label: string }>) => {
+            labels = items.map((i) => i.label);
+            return pick === undefined ? undefined : items.find((i) => i.label.startsWith(pick));
+        };
+        try {
+            return { result: await run(), labels };
+        } finally {
+            win.showQuickPick = orig;
+        }
+    }
+
+    test('toggleDependsOn on a task with dependencies offers add, each remove, and remove all', async () => {
+        const { labels } = await withMenuChoice(undefined, () =>
+            runOnLine('- [ ] thing <!-- @dependsOn:abc123,def456 -->', 'tsk.toggleDependsOn'),
         );
-        assert.strictEqual(line, '- [ ] thing');
+        assert.deepStrictEqual(labels, [
+            '$(add) Add another dependency…',
+            '$(close) Remove abc123',
+            '$(close) Remove def456',
+            '$(trash) Remove all dependencies',
+        ]);
+    });
+
+    test('toggleDependsOn → Remove <id> drops just that dependency', async () => {
+        const { result } = await withMenuChoice('$(close) Remove abc123', () =>
+            runOnLine('- [ ] thing <!-- @dependsOn:abc123,def456 -->', 'tsk.toggleDependsOn'),
+        );
+        assert.strictEqual(result, '- [ ] thing <!-- @dependsOn:def456 -->');
+    });
+
+    test('toggleDependsOn → Remove all drops the key; dismissing the menu changes nothing', async () => {
+        const all = await withMenuChoice('$(trash)', () =>
+            runOnLine('- [ ] thing <!-- @dependsOn:abc123,def456 -->', 'tsk.toggleDependsOn'),
+        );
+        assert.strictEqual(all.result, '- [ ] thing');
+        const dismissed = await withMenuChoice(undefined, () =>
+            runOnLine('- [ ] thing <!-- @dependsOn:abc123 -->', 'tsk.toggleDependsOn'),
+        );
+        assert.strictEqual(dismissed.result, '- [ ] thing <!-- @dependsOn:abc123 -->');
     });
 
     test('toggleParent removes @parent when present (no picker)', async () => {

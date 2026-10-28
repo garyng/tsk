@@ -22,6 +22,10 @@
  *   that doesn't exist anywhere, the source node's `forward.parent`
  *   still carries that id — the consumer (M9/C codelens) can render a
  *   "(missing)" hint instead of silently dropping the edge.
+ * - **`@dependsOn` is a list** (`@dependsOn:a,b`, `relationships.ts`): the
+ *   input carries the raw value, `forward.dependsOn` the parsed ids, and each
+ *   one gains a `dependents` entry. {@link forwardTargets} reads any key as a
+ *   list, for the consumers that walk every key.
  * - **Cycles are allowed.** Builder records what the metadata says; if
  *   tasks form a cycle (A.parent = B, B.parent = A), both forward and
  *   inverse edges populate normally.
@@ -31,7 +35,7 @@
  *   `occurrences` array is sorted by `(fileUri, line)`.
  */
 
-import type { RelationshipKey } from './relationships';
+import { parseIdList, type RelationshipKey } from './relationships';
 
 /**
  * The minimal per-task projection the builder needs. The wiring layer
@@ -43,6 +47,7 @@ export interface TaskRelationshipInput {
     readonly fileUri: string;
     readonly line: number;
     readonly parent?: string;
+    /** The raw value — a comma list of ids. */
     readonly dependsOn?: string;
     readonly relatedTo?: string;
     readonly movedTo?: string;
@@ -60,7 +65,8 @@ export interface GraphNode {
      */
     readonly forward: {
         readonly parent?: string;
-        readonly dependsOn?: string;
+        /** Every id the task waits on, in written order; absent when it lists none. */
+        readonly dependsOn?: readonly string[];
         readonly relatedTo?: string;
         readonly movedTo?: string;
     };
@@ -151,7 +157,7 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
     // Pass 4: seed nodes with forward edges and empty inverse buckets.
     interface MutableForward {
         parent?: string;
-        dependsOn?: string;
+        dependsOn?: readonly string[];
         relatedTo?: string;
         movedTo?: string;
     }
@@ -167,7 +173,8 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
     for (const [id, entry] of orderedEntries) {
         const forward: MutableForward = {};
         if (entry.canonical.parent !== undefined) forward.parent = entry.canonical.parent;
-        if (entry.canonical.dependsOn !== undefined) forward.dependsOn = entry.canonical.dependsOn;
+        const dependsOn = parseIdList(entry.canonical.dependsOn);
+        if (dependsOn.length > 0) forward.dependsOn = dependsOn;
         if (entry.canonical.relatedTo !== undefined) forward.relatedTo = entry.canonical.relatedTo;
         if (entry.canonical.movedTo !== undefined) forward.movedTo = entry.canonical.movedTo;
         const inverse: MutableInverse = {
@@ -189,8 +196,8 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
             const targetBucket = inverseBuckets.get(forward.parent);
             if (targetBucket) targetBucket.children.push(sourceId);
         }
-        if (forward.dependsOn !== undefined) {
-            const targetBucket = inverseBuckets.get(forward.dependsOn);
+        for (const target of forward.dependsOn ?? []) {
+            const targetBucket = inverseBuckets.get(target);
             if (targetBucket) targetBucket.dependents.push(sourceId);
         }
         if (forward.relatedTo !== undefined) {
@@ -232,6 +239,13 @@ export function buildGraph(tasks: readonly TaskRelationshipInput[]): BuildGraphR
     duplicates.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
     return { graph, duplicates };
+}
+
+/** A node's targets for `key`, as a list whether the key holds one id or several. */
+export function forwardTargets(node: GraphNode, key: RelationshipKey): readonly string[] {
+    const value = node.forward[key];
+    if (value === undefined) return [];
+    return typeof value === 'string' ? [value] : value;
 }
 
 function compareOccurrence(a: TaskRelationshipInput, b: TaskRelationshipInput): number {

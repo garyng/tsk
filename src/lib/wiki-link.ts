@@ -6,8 +6,9 @@
  * `vscode.DocumentLink`s and does the I/O, the same split
  * `lib/autolinks.ts` ↔ `autolinks-provider.ts` uses.
  *
- * The syntax is a workspace-relative path and nothing else:
- * `[[notes/2026-01-15_kickoff.md]]`. There is deliberately no display-text
+ * The syntax is a workspace-relative path, optionally with a heading:
+ * `[[notes/2026-01-15_kickoff.md]]`, `[[plans/x.md#phase-1]]` (the anchor
+ * GitHub gives the heading, or its text). There is deliberately no display-text
  * form (`[[path|label]]`) and no `@id` form — task-to-task references are
  * `@parent` / `@relatedTo` / `@dependsOn`, which already have codelens
  * navigation, and giving `[[…]]` a second meaning would make "where does this
@@ -22,8 +23,10 @@ export interface WikiLinkSpan {
     startCol: number;
     /** Column just past the final `]`. */
     endCol: number;
-    /** The text between the brackets, trimmed. Never empty. */
+    /** The text between the brackets up to any `#`, trimmed. Never empty. */
     path: string;
+    /** What follows the `#`, trimmed: the heading the link names. Absent when there's none. */
+    fragment?: string;
 }
 
 /**
@@ -37,13 +40,19 @@ const WIKI_LINK_RE = /\[\[([^[\]\n]+)\]\]/g;
 export function wikiLinkSpans(lineText: string): WikiLinkSpan[] {
     const spans: WikiLinkSpan[] = [];
     for (const match of lineText.matchAll(WIKI_LINK_RE)) {
-        const path = (match[1] as string).trim();
-        if (path === '') continue; // `[[   ]]` — brackets with nothing in them.
-        spans.push({
+        const [rawPath = '', ...rest] = (match[1] as string).split('#');
+        const path = rawPath.trim();
+        // `[[   ]]` has nothing to resolve; nor has `[[#heading]]`, a `.tsk`
+        // file having no headings of its own.
+        if (path === '') continue;
+        const span: WikiLinkSpan = {
             startCol: match.index,
             endCol: match.index + match[0].length,
             path,
-        });
+        };
+        const fragment = rest.join('#').trim();
+        if (fragment !== '') span.fragment = fragment;
+        spans.push(span);
     }
     return spans;
 }
@@ -72,6 +81,27 @@ export function wikiLinkPrefixAt(lineText: string, character: number): WikiLinkP
     // so the cursor is outside it: `[[a]] |` must not complete.
     if (inner.includes('[') || inner.includes(']')) return null;
     return { startCol: open + 2, prefix: inner };
+}
+
+/** A heading being typed after the `#` of an unclosed `[[path#…`. */
+export interface WikiLinkHeadingPrefix {
+    /** The text before the `#`, trimmed as a link's path is. May be empty (`[[#…`). */
+    path: string;
+    /** Column just after the `#` — where a heading completion starts replacing. */
+    startCol: number;
+    /** The heading typed so far: everything after the first `#`, as a link's fragment is. */
+    prefix: string;
+}
+
+/** `open` split at its first `#`, once one has been typed; `undefined` while the path still is. */
+export function headingPrefixOf(open: WikiLinkPrefix): WikiLinkHeadingPrefix | undefined {
+    const hash = open.prefix.indexOf('#');
+    if (hash === -1) return undefined;
+    return {
+        path: open.prefix.slice(0, hash).trim(),
+        startCol: open.startCol + hash + 1,
+        prefix: open.prefix.slice(hash + 1),
+    };
 }
 
 /**
@@ -127,35 +157,35 @@ export function buildWikiLinkInsert(
     };
 }
 
+/** What a `[[…]]` lacks: the file, or (the file found) the heading it names. */
+export type WikiLinkProblem = 'no-file' | 'no-heading';
+
 /** One `[[…]]` whose target couldn't be resolved, located for a squiggle. */
 export interface DanglingWikiLink {
     line: number;
     startCol: number;
     endCol: number;
-    /** The unresolvable path, for the message. */
+    /** The link's path and heading, for the message. */
     path: string;
+    fragment?: string;
+    problem: WikiLinkProblem;
 }
 
 /**
- * Every unresolvable `[[…]]` in `lines`. `resolves` is injected so this stays
+ * Every unresolvable `[[…]]` in `lines`. `problemOf` is injected so this stays
  * pure — the caller closes over the workspace root, the document's directory
  * and the filesystem. Unlike the cache's scan warnings (whole-line ranges),
  * the span is exact, so the squiggle sits on the brackets and nothing else.
  */
 export function danglingWikiLinks(
     lines: readonly string[],
-    resolves: (path: string) => boolean,
+    problemOf: (span: WikiLinkSpan) => WikiLinkProblem | undefined,
 ): DanglingWikiLink[] {
     const dangling: DanglingWikiLink[] = [];
     lines.forEach((text, line) => {
         for (const span of wikiLinkSpans(text)) {
-            if (resolves(span.path)) continue;
-            dangling.push({
-                line,
-                startCol: span.startCol,
-                endCol: span.endCol,
-                path: span.path,
-            });
+            const problem = problemOf(span);
+            if (problem !== undefined) dangling.push({ line, ...span, problem });
         }
     });
     return dangling;

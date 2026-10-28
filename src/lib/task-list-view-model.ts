@@ -1,5 +1,6 @@
 import { MARKERS, type Marker } from './markers';
 import { countTasksByMarker } from './markers-find-logic';
+import { SESSION_KEY, shortSessionId } from './session-focus';
 import type { TaskCount, TaskListView, TaskRow } from './task-list-protocol';
 
 /** Display basename of a file URI — last path segment, percent-decoded. */
@@ -71,9 +72,11 @@ export function buildTaskListView(
 
     const createdByTask = new Map<string, string>();
     const priorityByTask = new Map<string, number>();
+    const sessionByTask = new Map<string, string>();
     for (const { taskId, key, value } of metadata) {
         if (value == null) continue;
         if (key === CREATED_KEY) createdByTask.set(taskId, value);
+        else if (key === SESSION_KEY) sessionByTask.set(taskId, shortSessionId(value));
         else if (key === PRIORITY_KEY) {
             const level = Number(value);
             if (level === 1 || level === 2 || level === 3) priorityByTask.set(taskId, level);
@@ -90,6 +93,7 @@ export function buildTaskListView(
         tags: tagsByTask.get(t.id) ?? [],
         created: createdByTask.get(t.id),
         priority: priorityByTask.get(t.id),
+        session: sessionByTask.get(t.id),
     }));
     const byMarker = countTasksByMarker(list);
     const counts: TaskCount[] = MARKERS.map((def) => ({

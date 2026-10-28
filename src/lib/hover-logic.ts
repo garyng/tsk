@@ -2,6 +2,7 @@ import { formatDistance } from 'date-fns';
 import type { TaskRecord } from './db';
 import type { GraphNode } from './graph';
 import { MARKERS, type Marker } from './markers';
+import { LIST_KEY, parseIdList } from './relationships';
 
 /**
  * Shape of one task projected for hover rendering. Subset of `ParsedTask`
@@ -107,28 +108,24 @@ export function buildTaskHoverMarkdown(task: HoverTaskInput, deps: HoverDeps): s
         parts.push(`**Tags:** ${tagBits.join(' · ')}`);
     }
 
-    // Forward refs.
-    const forwardRefs: Array<[string, string, string]> = [];
+    // Forward refs — one row per key; `@dependsOn` can name several ids.
     for (const [label, key] of [
         ['parent', 'parent'],
         ['depends on', 'dependsOn'],
         ['related to', 'relatedTo'],
     ] as const) {
-        const targetId = task.metadata.get(key);
-        if (typeof targetId !== 'string' || targetId === '') continue;
-        forwardRefs.push([label, 'tsk.goToParent', targetId]);
-    }
-    for (const [label, command, targetId] of forwardRefs) {
-        const target = deps.lookupTask(targetId);
-        if (target) {
+        const value = task.metadata.get(key);
+        if (typeof value !== 'string' || value === '') continue;
+        const targetIds = key === LIST_KEY ? parseIdList(value) : [value];
+        if (targetIds.length === 0) continue;
+        const refs = targetIds.map((targetId) => {
+            const target = deps.lookupTask(targetId);
+            if (!target) return `\`(${targetId})\` *— missing in workspace*`;
             const labelText = target.content === '' ? '*(empty)*' : escapeMarkdown(target.content);
-            const link = commandLink(command, [targetId], labelText);
-            parts.push('');
-            parts.push(`**${label}:** ${link} \`(${targetId})\``);
-        } else {
-            parts.push('');
-            parts.push(`**${label}:** \`(${targetId})\` *— missing in workspace*`);
-        }
+            return `${commandLink('tsk.goToParent', [targetId], labelText)} \`(${targetId})\``;
+        });
+        parts.push('');
+        parts.push(`**${label}:** ${refs.join(' · ')}`);
     }
 
     // Inverse refs (require @id + a graph node).

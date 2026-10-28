@@ -139,6 +139,38 @@ suite('codelens', () => {
         assert.deepStrictEqual(movedHereLens.command?.arguments?.[2], ['e2e-moved-src']);
     });
 
+    test('a @dependsOn list gets a lens per dependency, and each target a dependents lens', async () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder);
+        const brokenUri = vscode.Uri.joinPath(folder.uri, 'broken-ref.tsk');
+        const doc = await vscode.workspace.openTextDocument(brokenUri);
+        await vscode.window.showTextDocument(doc);
+        const lenses = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+            'vscode.executeCodeLensProvider',
+            brokenUri,
+        );
+        assert.ok(lenses, 'codelens provider returned lenses');
+        const listLine = [...Array(doc.lineCount).keys()].find((i) =>
+            doc.lineAt(i).text.includes('@id:m20-list-half-broken'),
+        );
+        const onList = lenses
+            .filter((l) => l.range.start.line === listLine)
+            .map((l) => [l.command?.title, l.command?.command]);
+        assert.deepStrictEqual(onList, [
+            [`$(${CODICONS.dependsOn}) dependsOn: m20-orphan-parent`, 'tsk.goToDependsOn'],
+            [`$(${CODICONS.missing}) dependsOn: m20-ghost-list (missing)`, 'tsk.codelens.missing'],
+            [`$(${CODICONS.dependsOn}) dependsOn: m20-orphan-depends`, 'tsk.goToDependsOn'],
+        ]);
+        const dependents = lenses.filter(
+            (l) => l.command?.title === `$(${CODICONS.dependents}) dependents: 1`,
+        );
+        assert.strictEqual(
+            dependents.length,
+            2,
+            'each known target counts the list as a dependent',
+        );
+    });
+
     test('tsk.goToMovedTo opens the target file at the target line', async () => {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
         await new Promise((resolve) => setImmediate(resolve));

@@ -272,6 +272,18 @@ describe('GraphService — broken forward edges', () => {
         }
     });
 
+    it('reports each unknown id of a @dependsOn list, and not the known ones', () => {
+        const svc = new GraphService();
+        svc.applyFileTasks('a.tsk', [
+            task('list', 'a.tsk', 0, { dependsOn: 'ghost-1,known,ghost-2' }),
+            task('known', 'a.tsk', 1),
+        ]);
+        expect(svc.getBrokenForwardEdges().map((r) => [r.key, r.targetId])).toEqual([
+            ['dependsOn', 'ghost-1'],
+            ['dependsOn', 'ghost-2'],
+        ]);
+    });
+
     it('does NOT report an edge once the target is added by another file', () => {
         const svc = new GraphService();
         svc.applyFileTasks('a.tsk', [task('child', 'a.tsk', 1, { parent: 'p' })]);

@@ -47,6 +47,7 @@ const VIEW = {
             tags: ['infra', 'perf'],
             created: '2026-06-07T11:50:00+00:00',
             priority: 1,
+            session: 'fa9660c6',
         },
         {
             id: 't2',
@@ -58,6 +59,7 @@ const VIEW = {
             tags: ['infra'],
             created: '2026-06-05T09:00:00+00:00',
             priority: 2,
+            session: 'fa9660c6',
         },
         {
             id: 't3',
@@ -69,6 +71,7 @@ const VIEW = {
             tags: [],
             created: '2026-05-20T09:00:00+00:00',
             priority: 3,
+            session: '84894abc',
         },
         {
             id: 't4',
@@ -167,6 +170,27 @@ test('the priority header dropdown filters by P-level', async ({ page }) => {
     await menu.getByText(/^P1/).click(); // "P1 · High"
     await expect(page.locator('.tsk-row')).toHaveCount(1); // only t1 is P1
     await expect(page.locator('.tsk-row')).toContainText('refactor the cache');
+});
+
+test('the session header dropdown filters to one session’s tasks', async ({ page }) => {
+    await mount(page);
+    await page.locator('.tsk-th[data-col="session"] .tsk-th__filter').click();
+    const menu = page.locator('.tsk-filter');
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('.tsk-filter__item', { hasText: 'fa9660c6' })).toContainText('2');
+    await menu.getByText('84894abc').click();
+    await expect(page.locator('.tsk-row')).toHaveCount(1);
+    await expect(page.locator('.tsk-row')).toContainText('ship phase 7');
+});
+
+test('without any @session the session column stays out of the way', async ({ page }) => {
+    await mount(page, {
+        ...VIEW,
+        rows: VIEW.rows.map(({ session: _, ...row }) => row),
+    });
+    await expect(page.locator('.tsk-th[data-col="priority"]')).toBeVisible();
+    await expect(page.locator('.tsk-th[data-col="session"]')).toHaveCount(0);
+    await expect(page.locator('.tsk-cell[data-col="session"]')).toHaveCount(0);
 });
 
 test('the status header dropdown shares its filter with the chips', async ({ page }) => {

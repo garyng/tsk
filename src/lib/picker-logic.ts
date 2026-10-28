@@ -41,3 +41,42 @@ export function taskToPickItem(task: TaskRecord): TaskPickItem {
         id: task.id,
     };
 }
+
+/** What `Alt+D` does on a task that already waits on something. */
+export type DependsOnChoice =
+    | { readonly kind: 'add' }
+    | { readonly kind: 'remove'; readonly id: string }
+    | { readonly kind: 'removeAll' };
+
+export interface DependsOnMenuItem {
+    label: string;
+    description?: string;
+    choice: DependsOnChoice;
+}
+
+/**
+ * The menu `Alt+D` opens when the task already has dependencies: add another,
+ * remove one (each named by its text when the workspace knows it), or — with
+ * more than one — remove them all. Pure, so the menu's shape is unit-tested;
+ * `contentOf` is the cache lookup.
+ */
+export function dependsOnMenu(
+    ids: readonly string[],
+    contentOf: (id: string) => string | undefined,
+): DependsOnMenuItem[] {
+    const items: DependsOnMenuItem[] = [
+        { label: '$(add) Add another dependency…', choice: { kind: 'add' } },
+    ];
+    for (const id of ids) {
+        const content = contentOf(id);
+        items.push({
+            label: `$(close) Remove ${id}`,
+            description: content === undefined ? '(missing)' : content || '(no content)',
+            choice: { kind: 'remove', id },
+        });
+    }
+    if (ids.length > 1) {
+        items.push({ label: '$(trash) Remove all dependencies', choice: { kind: 'removeAll' } });
+    }
+    return items;
+}

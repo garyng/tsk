@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGraph, type TaskRelationshipInput } from './graph';
+import { buildGraph, forwardTargets, type TaskRelationshipInput } from './graph';
 
 function task(
     id: string,
@@ -47,10 +47,31 @@ describe('buildGraph — basics', () => {
         const node = graph.get('a');
         expect(node?.forward).toEqual({
             parent: 'p',
-            dependsOn: 'd',
+            dependsOn: ['d'],
             relatedTo: 'r',
             movedTo: 'm',
         });
+    });
+
+    it('reads @dependsOn as a comma list, in written order, without repeats or empties', () => {
+        const { graph } = buildGraph([task('a', 'f.tsk', 1, { dependsOn: 'y, x,,y' })]);
+        expect(graph.get('a')?.forward.dependsOn).toEqual(['y', 'x']);
+    });
+
+    it('leaves out an empty @dependsOn', () => {
+        const { graph } = buildGraph([task('a', 'f.tsk', 1, { dependsOn: '' })]);
+        expect(graph.get('a')?.forward).toEqual({});
+    });
+});
+
+describe('forwardTargets', () => {
+    it('reads every key as a list', () => {
+        const { graph } = buildGraph([task('a', 'f.tsk', 1, { parent: 'p', dependsOn: 'x,y' })]);
+        const a = graph.get('a');
+        if (!a) throw new Error('no node a');
+        expect(forwardTargets(a, 'parent')).toEqual(['p']);
+        expect(forwardTargets(a, 'dependsOn')).toEqual(['x', 'y']);
+        expect(forwardTargets(a, 'relatedTo')).toEqual([]);
     });
 });
 
@@ -94,6 +115,16 @@ describe('buildGraph — inverse edges', () => {
         expect(target?.inverse.dependents).toEqual(['a', 'b']);
         expect(target?.inverse.related).toEqual(['c']);
         expect(target?.inverse.children).toEqual([]);
+    });
+
+    it('gives each target of a @dependsOn list its own dependent', () => {
+        const { graph } = buildGraph([
+            task('a', 'f.tsk', 1, { dependsOn: 'x,y' }),
+            task('x', 'f.tsk', 2),
+            task('y', 'f.tsk', 3, { dependsOn: 'x' }),
+        ]);
+        expect(graph.get('x')?.inverse.dependents).toEqual(['a', 'y']);
+        expect(graph.get('y')?.inverse.dependents).toEqual(['a']);
     });
 
     it('populates `movedHereFrom` for the movedTo target, sorted + independent', () => {
@@ -197,7 +228,7 @@ describe('buildGraph — duplicates + canonical winner', () => {
             task('y', 'b.tsk', 2),
         ]);
         // dup's canonical occurrence is (a.tsk, 1) → dependsOn = x.
-        expect(graph.get('dup')?.forward.dependsOn).toBe('x');
+        expect(graph.get('dup')?.forward.dependsOn).toEqual(['x']);
         expect(graph.get('x')?.inverse.dependents).toEqual(['dup']);
         expect(graph.get('y')?.inverse.dependents).toEqual([]);
     });

@@ -135,6 +135,22 @@ describe('buildTaskListView', () => {
         expect(b?.created).toBeUndefined();
         expect(b?.priority).toBeUndefined(); // '9' is not 1–3
     });
+
+    it('carries the @session that last took the task on, as its short id', () => {
+        const view = buildTaskListView(
+            [
+                { id: 'a', marker: 'inprogress', content: 'x', fileUri: 'file:///a.tsk', line: 0 },
+                { id: 'b', marker: 'todo', content: 'y', fileUri: 'file:///a.tsk', line: 1 },
+                { id: 'c', marker: 'todo', content: 'z', fileUri: 'file:///a.tsk', line: 2 },
+            ] satisfies TaskInput[],
+            [],
+            [
+                { taskId: 'a', key: 'session', value: 'fa9660c6' },
+                { taskId: 'b', key: 'session', value: 'fa9660c6-db46-46d1-b2a6-de7abcd7cded' },
+            ],
+        );
+        expect(view.rows.map((r) => r.session)).toEqual(['fa9660c6', 'fa9660c6', undefined]);
+    });
 });
 
 describe('pickActiveFile (last-tsk-wins)', () => {

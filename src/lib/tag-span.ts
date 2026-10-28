@@ -33,17 +33,18 @@ export interface TagSpan {
  * of the word.
  */
 export function tagSpanAt(lineText: string, character: number): TagSpan | null {
-    for (const match of lineText.matchAll(TAG_RE)) {
+    return tagSpans(lineText).find((s) => character >= s.startCol && character <= s.endCol) ?? null;
+}
+
+/** Every `#tag` on `lineText`, left to right. */
+export function tagSpans(lineText: string): TagSpan[] {
+    return [...lineText.matchAll(TAG_RE)].map((match) => {
         const name = match[1] as string;
         // match[0] may carry the leading whitespace the lookbehind-free
         // pattern has to consume, so find the `#` inside it.
         const startCol = match.index + match[0].indexOf('#');
-        const endCol = startCol + 1 + name.length;
-        if (character >= startCol && character <= endCol) {
-            return { startCol, endCol, tag: name };
-        }
-    }
-    return null;
+        return { startCol, endCol: startCol + 1 + name.length, tag: name };
+    });
 }
 
 /**

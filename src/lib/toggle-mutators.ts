@@ -64,7 +64,7 @@ function makeCreationToggle(targetMarker: Marker) {
 }
 
 /** The lifecycle markers that carry a timestamp (a subset of {@link Marker}). */
-type StateMarker = 'inprogress' | 'completed' | 'cancelled';
+export type StateMarker = 'inprogress' | 'completed' | 'cancelled';
 
 /**
  * Lifecycle marker → its timestamp metadata key. The single source for the
@@ -156,9 +156,19 @@ export const toggleCancelledMutator = makeStateToggle('cancelled');
  * so there is no set-behaviour to mirror in that case.)
  */
 export function enterInprogress(line: string, deps: ToggleDeps): string {
+    return enterState(line, 'inprogress', deps);
+}
+
+/**
+ * Idempotently move a task INTO a lifecycle state — the set-only twin of the
+ * state toggles, for callers that must never toggle back (the `tsk` command
+ * line's `done` / `cancel`). A non-task line, or a task already in `marker`,
+ * is returned unchanged, keeping its original timestamp.
+ */
+export function enterState(line: string, marker: StateMarker, deps: ToggleDeps): string {
     const parsed = parseLine(line);
-    if (!parsed || parsed.marker === 'inprogress') return line;
-    return applyState(line, 'inprogress', deps);
+    if (!parsed || parsed.marker === marker) return line;
+    return applyState(line, marker, deps);
 }
 
 /**

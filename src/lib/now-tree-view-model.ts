@@ -1,3 +1,4 @@
+import { type CompactRow, compactSubtree } from './compact-forest';
 import { formatRelativeTime } from './hover-logic';
 import { MISSING_NOW_LABEL, type NowRow, type NowRowView, type ResolveContent } from './now-row';
 import { type NowEntry, type NowTreeState, pathToRoot } from './now-tree';
@@ -24,19 +25,11 @@ export function layoutNowTree(state: NowTreeState): NowRow[] {
     const childrenByParent = groupChildren(state.entries);
     const childrenOf = (id: string | null): NowEntry[] => childrenByParent.get(id) ?? [];
 
-    /** Emit an off-trunk subtree: a linear run stays flat (loop); a fork indents (recurse). */
+    /** Emit an off-trunk subtree: a linear run stays flat; a fork indents (`compactSubtree`). */
     const emitOffshoot = (start: NowEntry, depth: number): void => {
-        let entry: NowEntry | undefined = start;
-        while (entry) {
-            const kids = childrenOf(entry.entryId);
-            rows.push(makeRow(entry, depth, 'branch', kids.length >= 2, false, false));
-            if (kids.length === 1) {
-                entry = kids[0]; // linear → keep the same depth
-            } else {
-                for (const kid of kids) emitOffshoot(kid, depth + 1); // fork → indent
-                entry = undefined;
-            }
-        }
+        const out: CompactRow<NowEntry>[] = [];
+        compactSubtree(start, depth, (e) => childrenOf(e.entryId), out);
+        for (const r of out) rows.push(makeRow(r.node, r.depth, 'branch', r.isFork, false, false));
     };
 
     if (state.currentEntryId === null) {

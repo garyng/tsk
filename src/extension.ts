@@ -1,3 +1,4 @@
+import type MarkdownIt from 'markdown-it';
 import * as vscode from 'vscode';
 import { registerAutoLinksProvider } from './autolinks-provider';
 import { registerBlockCommands } from './block-commands';
@@ -38,6 +39,7 @@ import type { NowTreeState } from './lib/now-tree';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { registerListEditCommands } from './list-edit-commands';
+import { type MarkdownPreviewRefs, registerMarkdownPreviewRefs } from './markdown-preview';
 import { registerMdMigrateCommands } from './md-migrate-commands';
 import { registerMoveTaskCommand, registerSendMarkdownCommands } from './move-task-commands';
 import { NavigationHighlight } from './navigation-highlight';
@@ -46,6 +48,7 @@ import { NowDecoration } from './now-decoration';
 import { registerNowPanel } from './now-panel';
 import { registerNowTreeCommands } from './now-tree-commands';
 import { registerPasteImageProvider } from './paste-image';
+import { registerRevealTask } from './reveal-task';
 import { ScanController } from './scan-controller';
 import { registerSemanticTokens } from './semantic-tokens';
 import { registerStatsPanel } from './stats-panel';
@@ -54,6 +57,8 @@ import { registerTagsCompletionProvider } from './tags-completion';
 import { createTagsLoader, type TagsLoader } from './tags-loader';
 import { registerTagsSyncCommand } from './tags-sync-commands';
 import { registerTaskListPanel } from './task-list-panel';
+import { registerTaskRefs, type TaskRefMark, type TaskRefs } from './task-refs';
+import { registerTerminalLinks, type TaskTerminalLink } from './terminal-links';
 import {
     registerCopyTaskIdCommand,
     registerRelationshipCommands,
@@ -118,6 +123,29 @@ export interface TskExtensionApi {
      * without waiting on the `onDidChangeConfiguration` round-trip.
      */
     refreshAutolinks(): void;
+    /**
+     * Hand `uri` to the `vscode://garyng.tsk/…` URI handler. Exposed for e2e:
+     * the test host can't be relied on to route an outside URI back to itself.
+     */
+    openTaskUri(uri: string): Promise<void>;
+    /**
+     * The `tsk:<id>` markers last drawn in `uri.toString()`'s editor, or
+     * `undefined` when none was drawn there. Exposed for e2e: VS Code can't be
+     * asked for an editor's decorations.
+     */
+    getTaskRefDecorations(uri: string): readonly TaskRefMark[] | undefined;
+    /**
+     * The `tsk:<id>` terminal link provider. Exposed for e2e: VS Code asks it
+     * only for a line under the mouse.
+     */
+    getTerminalLinkProvider(): vscode.TerminalLinkProvider<TaskTerminalLink>;
+    /** `markdown.markdownItPlugins`: VS Code's Markdown extension calls it with its markdown-it. */
+    extendMarkdownIt(md: MarkdownIt): MarkdownIt;
+    /**
+     * Render the open Markdown previews again, as a rescan does; false when
+     * none is open. Exposed for e2e: a preview's content can't be read.
+     */
+    refreshMarkdownPreviews(): boolean;
 }
 
 /**
@@ -201,6 +229,9 @@ async function activateFeatures(
         taskListPanel.openWithDayFilter(ids, label),
     );
     const codelens = registerCodelens(context, graph, navigationHighlight, logger);
+    // Registered after the initial scan; the rescan tail reaches it from then on.
+    let taskRefs: TaskRefs | undefined;
+    let previewRefs: MarkdownPreviewRefs | undefined;
     const scan = new ScanController(
         cache,
         graph,
@@ -213,6 +244,8 @@ async function activateFeatures(
             nowPanel.refresh();
             statsPanel.refresh();
             taskListPanel.refresh();
+            taskRefs?.reapply();
+            previewRefs?.refresh();
         },
     );
 
@@ -238,6 +271,10 @@ async function activateFeatures(
 
     const tagsLoader = await createTagsLoader(context, logger);
     registerAllCommands(context, cache, graph, tagsLoader, logger, nowStore, navigationHighlight);
+    const revealTask = registerRevealTask(context, cache, navigationHighlight, logger);
+    taskRefs = registerTaskRefs(context, cache, logger);
+    const terminalLinks = registerTerminalLinks(context, cache, logger);
+    previewRefs = registerMarkdownPreviewRefs(context, cache, logger);
 
     registerClipboardBridge(context, logger);
     registerInstallClipboardBridgeSkillCommand(context, logger);
@@ -262,6 +299,11 @@ async function activateFeatures(
         getNowTaskId: () => nowStore.getCurrentNowId() ?? undefined,
         getNowDecoration: () => nowDecoration.getCurrent(),
         refreshAutolinks: () => autolinks.refresh(),
+        openTaskUri: (uri) => revealTask.handleUri(vscode.Uri.parse(uri)),
+        getTaskRefDecorations: (uri) => taskRefs?.getMarks(uri),
+        getTerminalLinkProvider: () => terminalLinks,
+        extendMarkdownIt: previewRefs.extendMarkdownIt,
+        refreshMarkdownPreviews: previewRefs.refresh,
     };
 }
 
@@ -349,21 +391,29 @@ function attachConfigListener(context: vscode.ExtensionContext, logger: Logger):
 
 /**
  * Wire the workspace `**\/*.tsk` FileSystemWatcher. Create / change events
- * delegate to the scan controller's `rescanFromFs`; delete clears the URI's
- * cache / graph / diagnostics via `scan.removeFile` and its decoration
- * snapshot via `decorations.evict`.
+ * delegate to the scan controller's `rescanIfListed`, which leaves out what the
+ * initial scan would; delete clears the URI's cache / graph / diagnostics via
+ * `scan.removeFile` and its decoration snapshot via `decorations.evict`. A
+ * deleted folder fires one event, for the folder, which only a watcher on
+ * everything sees: its cached files go with it.
  */
 function attachFileSystemWatcher(context: vscode.ExtensionContext): void {
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.tsk');
+    const deletes = vscode.workspace.createFileSystemWatcher('**', true, true, false);
     context.subscriptions.push(
         watcher,
-        watcher.onDidCreate((uri) => void state?.scan.rescanFromFs(uri)),
-        watcher.onDidChange((uri) => void state?.scan.rescanFromFs(uri)),
+        deletes,
+        watcher.onDidCreate((uri) => void state?.scan.rescanIfListed(uri)),
+        watcher.onDidChange((uri) => void state?.scan.rescanIfListed(uri)),
         watcher.onDidDelete((uri) => {
             if (!state) return;
             const key = uri.toString();
             state.scan.removeFile(key);
             state.decorations.evict(key);
+        }),
+        deletes.onDidDelete((uri) => {
+            if (!state || uri.path.endsWith('.tsk')) return;
+            for (const key of state.scan.removeFolder(uri.toString())) state.decorations.evict(key);
         }),
     );
 }

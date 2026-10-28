@@ -15,6 +15,15 @@ export function localTimestamp(date: Date = new Date()): string {
     return format(date, "yyyy-MM-dd'T'HH:mm:ssxxx");
 }
 
+/**
+ * {@link localTimestamp} to the millisecond (`2026-05-24T15:00:30.123+08:00`),
+ * for stamps that order events rather than date them: two `tsk focus` calls
+ * in the same second must still say which came last.
+ */
+export function localTimestampMs(date: Date = new Date()): string {
+    return format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+}
+
 /** Local calendar date `YYYY-MM-DD` — used for dated header comments (e.g. tags.yml batches). */
 export function localDate(date: Date = new Date()): string {
     return format(date, 'yyyy-MM-dd');

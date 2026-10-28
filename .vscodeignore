@@ -8,6 +8,8 @@ node_modules/**
 coverage/**
 scripts/**
 artifacts/**
+bin/**
+dist/cli/**
 **/.gitignore
 .vscodeignore
 .vscode-test.mjs

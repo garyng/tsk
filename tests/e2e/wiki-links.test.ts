@@ -34,7 +34,7 @@ suite('wiki links', () => {
         writeFileSync(nested, '# deep\n');
 
         dir = mkdtempSync(join(tmpdir(), 'tsk-links-e2e-'));
-        writeFileSync(join(dir, 'target.md'), '# the target\n');
+        writeFileSync(join(dir, 'target.md'), '# the target\n\nintro\n\n## Phase 1\n\ntext\n');
         writeFileSync(
             join(dir, 'notes.tsk'),
             [
@@ -42,6 +42,10 @@ suite('wiki links', () => {
                 '- [n] workspace-relative [[sample.tsk]]',
                 '- [n] dangling [[nope.md]]',
                 '- [n] typing [[sam',
+                '- [n] anchored [[target.md#phase-1]]',
+                '- [n] bad anchor [[target.md#nope]]',
+                '- [n] typing a heading [[target.md#',
+                '- [n] a heading of nothing [[nope.md#',
                 '',
             ].join('\n'),
         );
@@ -153,6 +157,49 @@ suite('wiki links', () => {
         );
     });
 
+    /** Everything offered at the end of `line`, as typing `#` there asks. */
+    const offeredAt = async (line: number): Promise<vscode.CompletionItem[]> => {
+        const list = await vscode.commands.executeCommand<vscode.CompletionList>(
+            'vscode.executeCompletionItemProvider',
+            doc.uri,
+            new vscode.Position(line, doc.lineAt(line).text.length),
+            '#',
+        );
+        return list?.items ?? [];
+    };
+    const headingsIn = (items: vscode.CompletionItem[]) =>
+        items
+            .filter((i) => i.kind === vscode.CompletionItemKind.Reference)
+            .sort((a, b) => (a.sortText ?? '').localeCompare(b.sortText ?? ''));
+
+    test('# after a path offers its headings: the text as label, the anchor inserted, in order', async () => {
+        const line = 6; // '- [n] typing a heading [[target.md#'
+        const items = await offeredAt(line);
+        const headings = headingsIn(items);
+        assert.deepStrictEqual(
+            headings.map((i) => [i.label, i.insertText, i.detail]),
+            [
+                ['the target', 'the-target', '#the-target'],
+                ['Phase 1', 'phase-1', '#phase-1'],
+            ],
+        );
+        assert.strictEqual(headings[1]?.filterText, 'phase-1 Phase 1');
+        const range = headings[1]?.range as vscode.Range;
+        assert.strictEqual(
+            range.start.character,
+            doc.lineAt(line).text.length,
+            'replacing after the #',
+        );
+        assert.ok(
+            !items.some((i) => i.kind === vscode.CompletionItemKind.Value),
+            'no tag completions inside a link',
+        );
+    });
+
+    test('# after a path that resolves to nothing offers no headings', async () => {
+        assert.deepStrictEqual(headingsIn(await offeredAt(7)), []); // '[[nope.md#'
+    });
+
     test('a dangling link is squiggled, with the span on the brackets only', async () => {
         // The diagnostic is computed when the document opens, so it is already
         // there by now (suiteSetup opened it).
@@ -193,5 +240,45 @@ suite('wiki links', () => {
     test('the insert command is registered', async () => {
         const commands = await vscode.commands.getCommands(true);
         assert.ok(commands.includes('tsk.insertWikiLink'));
+    });
+
+    test('a #heading link targets the heading’s line', async () => {
+        const link = (await links()).find((l) => doc.getText(l.range) === '[[target.md#phase-1]]');
+        assert.ok(link, 'the anchored span should be a link');
+        assert.strictEqual(basename(link.target?.fsPath ?? ''), 'target.md');
+        assert.strictEqual(link.target?.fragment, 'L5', '`## Phase 1` is line 5');
+    });
+
+    test('a missing heading links to the file, says so, and is squiggled', async () => {
+        const link = (await links()).find((l) => doc.getText(l.range) === '[[target.md#nope]]');
+        assert.ok(link, 'the span should still be a link');
+        assert.strictEqual(basename(link.target?.fsPath ?? ''), 'target.md');
+        assert.strictEqual(link.target?.fragment, '');
+        assert.match(link.tooltip ?? '', /no heading "#nope"/);
+        const found = await waitFor(() =>
+            vscode.languages
+                .getDiagnostics(doc.uri)
+                .find((d) => d.message === 'No heading "#nope" in "target.md".'),
+        );
+        assert.ok(found, 'a missing heading should raise a tsk diagnostic');
+        assert.strictEqual(doc.getText(found.range), '[[target.md#nope]]');
+    });
+
+    // Last: following the link moves the active editor off this suite's document.
+    test('following a #heading link opens the file at the heading', async () => {
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selection = new vscode.Selection(4, 20, 4, 20);
+        await vscode.commands.executeCommand('editor.action.openLink');
+        const landed = await waitFor(() => {
+            const active = vscode.window.activeTextEditor;
+            return basename(active?.document.uri.fsPath ?? '') === 'target.md' &&
+                active?.selection.active.line === 4
+                ? active
+                : undefined;
+        });
+        assert.ok(
+            landed,
+            `expected target.md at line 4, got ${vscode.window.activeTextEditor?.document.uri.fsPath}:${vscode.window.activeTextEditor?.selection.active.line}`,
+        );
     });
 });

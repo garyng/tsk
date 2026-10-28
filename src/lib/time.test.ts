@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localTimestamp } from './time';
+import { localTimestamp, localTimestampMs } from './time';
 
 /**
  * Compute the timezone-offset substring the formatter would produce for a
@@ -38,5 +38,17 @@ describe('localTimestamp', () => {
     it('uses current time when no date is provided', () => {
         const now = new Date();
         expect(localTimestamp()).toBe(localTimestamp(now));
+    });
+});
+
+describe('localTimestampMs', () => {
+    it('is localTimestamp with zero-padded milliseconds before the offset', () => {
+        const d = new Date(2026, 0, 2, 12, 45, 30, 7);
+        expect(localTimestampMs(d)).toBe(`2026-01-02T12:45:30.007${expectedOffset(d)}`);
+    });
+
+    it('parses back to the same instant', () => {
+        const d = new Date(2026, 9, 23, 5, 6, 7, 891);
+        expect(Date.parse(localTimestampMs(d))).toBe(d.getTime());
     });
 });

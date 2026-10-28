@@ -102,7 +102,7 @@ suite('code actions — Add missing id + created', () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         const diagnostics = vscode.languages.getDiagnostics(brokenUri).filter((d) => {
-            return typeof d.code === 'string' && d.code === 'broken-ref:parent';
+            return d.code === 'broken-ref:parent:m20-ghost-parent';
         });
         const parentDiag = diagnostics.find((d) => d.message.includes('m20-ghost-parent'));
         assert.ok(parentDiag, 'expected a broken-ref:parent diagnostic on the fixture');
@@ -132,7 +132,7 @@ suite('code actions — Add missing id + created', () => {
         const replace = (actions ?? []).find((a) => a.title === 'Tsk: Replace @parent via picker…');
         assert.ok(replace?.command, 'Replace action should be backed by a command');
         assert.strictEqual(replace.command.command, 'tsk.replaceBrokenReference');
-        assert.deepStrictEqual(replace.command.arguments?.[2], 'parent');
+        assert.deepStrictEqual(replace.command.arguments?.slice(2), ['parent', 'm20-ghost-parent']);
     });
 
     test('applying the Remove action drops the @parent entry from the line', async () => {
@@ -166,6 +166,42 @@ suite('code actions — Add missing id + created', () => {
         await vscode.commands.executeCommand('undo');
     });
 
+    test('on a @dependsOn list, Remove drops only the unknown id', async () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        assert.ok(folder);
+        const brokenUri = vscode.Uri.joinPath(folder.uri, 'broken-ref.tsk');
+        const doc = await vscode.workspace.openTextDocument(brokenUri);
+        await vscode.window.showTextDocument(doc);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const listDiag = vscode.languages
+            .getDiagnostics(brokenUri)
+            .find((d) => d.code === 'broken-ref:dependsOn:m20-ghost-list');
+        assert.ok(listDiag, 'expected the diagnostic for the list fixture row');
+        const line = listDiag.range.start.line;
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            brokenUri,
+            new vscode.Range(line, 0, line, 0),
+            vscode.CodeActionKind.QuickFix.value,
+        );
+        const titles = (actions ?? []).map((a) => a.title);
+        assert.ok(
+            titles.includes('Tsk: Replace @dependsOn:m20-ghost-list via picker…'),
+            `got: ${titles.join(', ')}`,
+        );
+        const remove = (actions ?? []).find(
+            (a) => a.title === 'Tsk: Remove broken @dependsOn:m20-ghost-list',
+        );
+        assert.ok(remove?.edit, `expected the Remove action; got: ${titles.join(', ')}`);
+        await vscode.workspace.applyEdit(remove.edit);
+        assert.match(
+            doc.lineAt(line).text,
+            / @dependsOn:m20-orphan-parent,m20-orphan-depends -->$/,
+        );
+        await vscode.commands.executeCommand('undo');
+    });
+
     test('offers Remove/Replace quick-fixes on a dangling @movedTo (M8 parity)', async () => {
         const folder = vscode.workspace.workspaceFolders?.[0];
         assert.ok(folder);
@@ -176,7 +212,7 @@ suite('code actions — Add missing id + created', () => {
 
         const movedDiag = vscode.languages
             .getDiagnostics(movedUri)
-            .find((d) => d.code === 'broken-ref:movedTo');
+            .find((d) => d.code === 'broken-ref:movedTo:e2e-moved-gone');
         assert.ok(movedDiag, 'expected the dangling @movedTo diagnostic');
 
         const line = movedDiag.range.start.line;
@@ -197,6 +233,7 @@ suite('code actions — Add missing id + created', () => {
             (a) => a.title === 'Tsk: Replace @movedTo via picker…',
         );
         assert.deepStrictEqual(replace?.command?.arguments?.[2], 'movedTo');
+        assert.deepStrictEqual(replace?.command?.arguments?.[3], 'e2e-moved-gone');
     });
 });
 

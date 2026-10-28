@@ -1,0 +1,10 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "jsx": "react-jsx"
+    },
+    "include": ["src/cli/**/*", "src/tui/**/*"],
+    "exclude": ["node_modules", "dist", "out", "out-test"]
+}

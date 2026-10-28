@@ -171,6 +171,11 @@ export class CacheService {
         return this.db.listAllMetadata();
     }
 
+    /** Every cached file's URI, in order. */
+    listFileUris(): string[] {
+        return this.db.listFiles().map((f) => f.uri);
+    }
+
     /** mtime of a cached file, or `undefined` if not cached. Used to skip
      * unchanged files during initial scan. */
     getFileMtime(uri: string): number | undefined {

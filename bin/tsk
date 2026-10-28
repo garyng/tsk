@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The tsk command line: runs the bundle `npm run build:cli` builds.
+cli="$(dirname "$(readlink -f "$0")")/../dist/cli/tsk.mjs"
+[ -f "$cli" ] || { echo "tsk: $cli isn't built yet — run \`npm run build:cli\` in apps/tsk" >&2; exit 1; }
+exec node "$cli" "$@"

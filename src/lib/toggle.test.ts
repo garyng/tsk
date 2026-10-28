@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+    addListEntry,
     contentCursorCol,
     promoteMissingMetadata,
     refreshTaskIdentity,
+    removeListEntry,
     removeMetadataEntry,
+    replaceListEntry,
     setMetadataEntry,
     swapMarker,
     taskContentRange,
@@ -229,6 +232,46 @@ describe('setMetadataEntry', () => {
 
     it('passes a non-task line through unchanged', () => {
         expect(setMetadataEntry('not a task', 'id', 'abc')).toBe('not a task');
+    });
+});
+
+describe('addListEntry / removeListEntry / replaceListEntry', () => {
+    const line = '- [ ] x <!-- @id:t @dependsOn:a,b @priority:2 -->';
+
+    it('appends an id in place, keeping the other keys where they were', () => {
+        expect(addListEntry(line, 'dependsOn', 'c')).toBe(
+            '- [ ] x <!-- @id:t @dependsOn:a,b,c @priority:2 -->',
+        );
+    });
+
+    it('starts the list when the key is absent', () => {
+        expect(addListEntry('- [ ] x <!-- @id:t -->', 'dependsOn', 'a')).toBe(
+            '- [ ] x <!-- @id:t @dependsOn:a -->',
+        );
+    });
+
+    it('leaves the line untouched when the id is already listed', () => {
+        expect(addListEntry(line, 'dependsOn', 'b')).toBe(line);
+    });
+
+    it('removes one id, and drops the key with the last', () => {
+        const one = removeListEntry(line, 'dependsOn', 'a');
+        expect(one).toBe('- [ ] x <!-- @id:t @dependsOn:b @priority:2 -->');
+        expect(removeListEntry(one, 'dependsOn', 'b')).toBe('- [ ] x <!-- @id:t @priority:2 -->');
+        expect(removeListEntry(line, 'dependsOn', 'zz')).toBe(line);
+    });
+
+    it('replaces one id where it stood, or just drops it when the new one is already there', () => {
+        expect(replaceListEntry(line, 'dependsOn', 'a', 'z')).toBe(
+            '- [ ] x <!-- @id:t @dependsOn:z,b @priority:2 -->',
+        );
+        expect(replaceListEntry(line, 'dependsOn', 'a', 'b')).toBe(
+            '- [ ] x <!-- @id:t @dependsOn:b @priority:2 -->',
+        );
+    });
+
+    it('passes a non-task line through unchanged', () => {
+        expect(addListEntry('not a task', 'dependsOn', 'a')).toBe('not a task');
     });
 });
 

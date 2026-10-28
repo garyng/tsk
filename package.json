@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -16,14 +16,20 @@
         "vscode": "^1.112.0"
     },
     "main": "./dist/host/extension.cjs",
+    "bin": {
+        "tsk": "bin/tsk"
+    },
     "activationEvents": [
         "onLanguage:tsk",
+        "onLanguage:markdown",
         "workspaceContains:**/*.tsk",
         "onWebviewPanel:tsk.nowStack",
         "onWebviewPanel:tsk.stats",
-        "onWebviewPanel:tsk.taskList"
+        "onWebviewPanel:tsk.taskList",
+        "onUri"
     ],
     "contributes": {
+        "markdown.markdownItPlugins": true,
         "languages": [
             {
                 "id": "tsk",
@@ -105,6 +111,11 @@
             {
                 "command": "tsk.rebuildCache",
                 "title": "Rebuild Cache",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.revealTask",
+                "title": "Reveal Task by ID",
                 "category": "Tsk"
             },
             {
@@ -708,11 +719,12 @@
     "scripts": {
         "build:host": "vite build -c vite.config.host.ts",
         "build:webview": "vite build -c vite.config.webview.ts",
-        "build": "npm run build:host && npm run build:webview",
+        "build:cli": "vite build -c vite.config.cli.ts",
+        "build": "npm run build:host && npm run build:webview && npm run build:cli",
         "dev:host": "vite build -c vite.config.host.ts --watch --mode development",
         "dev:webview": "vite build -c vite.config.webview.ts --watch --mode development",
         "dev:all": "concurrently -n host,webview -c blue,magenta npm:dev:host npm:dev:webview",
-        "typecheck": "tsc && tsc -p tsconfig.webview.json",
+        "typecheck": "tsc && tsc -p tsconfig.webview.json && tsc -p tsconfig.cli.json",
         "compile:tests": "tsc -p tests/tsconfig.json",
         "test": "vitest run",
         "prepare:e2e": "npm run compile:tests && npm run build",
@@ -729,19 +741,24 @@
         "@biomejs/biome": "^2.4.15",
         "@grida/tree-view": "0.1.0",
         "@playwright/test": "^1.64.0",
+        "@types/markdown-it": "^14.2.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.19.19",
-        "@types/react": "^18.3.30",
-        "@types/react-dom": "^18.3.7",
+        "@types/proper-lockfile": "^4.1.4",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
         "@types/vscode": "~1.110.0",
+        "@types/write-file-atomic": "^4.0.3",
         "@vitest/coverage-v8": "^4.1.7",
         "@vscode/codicons": "0.0.45",
         "@vscode/test-cli": "^0.0.12",
         "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.9.1",
         "concurrently": "^10.0.3",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1",
+        "ink-testing-library": "^4.0.0",
+        "markdown-it": "^14.3.3",
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1",
         "typescript": "^6.0.3",
         "vite": "^8.0.14",
         "vitest": "^4.1.7",
@@ -753,9 +770,18 @@
         "@tanstack/react-table": "^8.21.3",
         "@tanstack/react-virtual": "^3.14.2",
         "date-fns": "^4.3.0",
+        "escape-string-regexp": "^5.0.0",
+        "github-slugger": "^2.0.0",
+        "ink": "^8.0.0",
+        "marked": "^18.1.0",
         "nanoid": "^5.1.11",
         "pathe": "^2.0.3",
+        "proper-lockfile": "^4.1.2",
         "react-activity-calendar": "^3.2.0",
+        "signal-exit": "^4.1.0",
+        "string-width": "^8.3.0",
+        "wrap-ansi": "^10.0.2",
+        "write-file-atomic": "^8.0.0",
         "yaml": "^2.9.0"
     }
 }

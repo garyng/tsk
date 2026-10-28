@@ -12,6 +12,10 @@
        status (icon-only) · content (2fr) · priority · tags (1fr) · created. */
     --tsk-cols: 2.2rem minmax(0, 2fr) 4.2rem minmax(0, 1fr) 5rem;
 }
+/* With a Session column (shown once any task has an `@session`), before Created. */
+.tsk-tasks--sessions {
+    --tsk-cols: 2.2rem minmax(0, 2fr) 4.2rem minmax(0, 1fr) 5.4rem 5rem;
+}
 .tsk-tasks__empty {
     padding: 10px 14px;
     color: var(--vscode-descriptionForeground, #8c8c8c);
@@ -162,6 +166,11 @@
 }
 .tsk-cell[data-col="created"] {
     color: var(--vscode-descriptionForeground, #8c8c8c);
+    font-size: 0.9em;
+}
+.tsk-cell[data-col="session"] {
+    color: var(--vscode-descriptionForeground, #8c8c8c);
+    font-family: var(--vscode-editor-font-family, monospace);
     font-size: 0.9em;
 }
 .tsk-cell[data-col="tags"] {

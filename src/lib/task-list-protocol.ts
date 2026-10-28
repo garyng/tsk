@@ -30,6 +30,8 @@ export interface TaskRow {
     created?: string;
     /** `@priority` level (1 High · 2 Medium · 3 Low); undefined when unset or out of range. */
     priority?: number;
+    /** The short id of the `@session` that last took the task on (the `tsk` command line); undefined when none did. */
+    session?: string;
 }
 
 /** Per-status count, for a filter chip. */

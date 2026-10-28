@@ -48,8 +48,8 @@ const post = (message: TaskListWebviewToHost): void => vscode.postMessage(messag
 
 const ROW_HEIGHT = 28;
 /** Columns whose header carries an Excel-style filter dropdown. */
-type FilterCol = 'marker' | 'tags' | 'priority';
-const FILTERABLE = new Set<string>(['marker', 'tags', 'priority']);
+type FilterCol = 'marker' | 'tags' | 'priority' | 'session';
+const FILTERABLE = new Set<string>(['marker', 'tags', 'priority', 'session']);
 /** Popover width (px) — used to clamp it on-screen. Keep in sync with `.tsk-filter`. */
 const POPOVER_WIDTH = 220;
 
@@ -82,6 +82,14 @@ const priorityInSet: FilterFn<TaskRow> = (row, columnId, value) => {
     if (!selected.length) return true;
     const level = row.getValue<number | undefined>(columnId);
     return level !== undefined && selected.includes(String(level));
+};
+
+/** A row matches if its `@session` is among the selected ones. */
+const sessionInSet: FilterFn<TaskRow> = (row, columnId, value) => {
+    const selected = value as string[];
+    if (!selected.length) return true;
+    const session = row.getValue<string | undefined>(columnId);
+    return session !== undefined && selected.includes(session);
 };
 
 /** Created sort key — parse to epoch; an unstamped row sorts oldest (bottom in desc). */
@@ -206,6 +214,19 @@ function TaskList() {
                 cell: ({ row }) => row.original.tags.map((t) => `#${t}`).join(' '),
             },
             {
+                // The session that last took the task on through `tsk`; hidden
+                // while no row has one, so a workspace without Claude sessions
+                // keeps its width for the task text.
+                id: 'session',
+                accessorKey: 'session',
+                header: 'Session',
+                enableGlobalFilter: false,
+                enableSorting: false,
+                filterFn: sessionInSet,
+                getUniqueValues: (row) => (row.session ? [row.session] : []),
+                cell: ({ row }) => row.original.session ?? '',
+            },
+            {
                 id: 'created',
                 accessorKey: 'created',
                 header: 'Created',
@@ -236,10 +257,12 @@ function TaskList() {
         return all;
     }, [view, dayFilter, fileFilterOn, activeFile]);
 
+    const hasSessions = useMemo(() => view?.rows.some((r) => r.session) ?? false, [view]);
+
     const table = useReactTable({
         data,
         columns,
-        state: { globalFilter, columnFilters, sorting },
+        state: { globalFilter, columnFilters, sorting, columnVisibility: { session: hasSessions } },
         globalFilterFn: fuzzy,
         onGlobalFilterChange: setGlobalFilter,
         onColumnFiltersChange: setColumnFilters,
@@ -295,8 +318,21 @@ function TaskList() {
                 .sort((a, b) => a.value.localeCompare(b.value)),
         [priorityFacets],
     );
-    const optionsFor = (col: FilterCol): FilterOption[] =>
-        col === 'marker' ? markerOptions : col === 'tags' ? tagOptions : priorityOptions;
+    const sessionFacets = table.getColumn('session')?.getFacetedUniqueValues();
+    const sessionOptions: FilterOption[] = useMemo(
+        () =>
+            [...(sessionFacets?.entries() ?? [])]
+                .map(([value, count]) => ({ value: String(value), label: String(value), count }))
+                .sort((a, b) => a.value.localeCompare(b.value)),
+        [sessionFacets],
+    );
+    const OPTIONS: Record<FilterCol, FilterOption[]> = {
+        marker: markerOptions,
+        tags: tagOptions,
+        priority: priorityOptions,
+        session: sessionOptions,
+    };
+    const optionsFor = (col: FilterCol): FilterOption[] => OPTIONS[col];
 
     const openMenu = (col: FilterCol, e: MouseEvent<HTMLButtonElement>): void => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -313,7 +349,7 @@ function TaskList() {
     };
 
     return (
-        <main className="tsk-tasks">
+        <main className={hasSessions ? 'tsk-tasks tsk-tasks--sessions' : 'tsk-tasks'}>
             {view && (
                 <div className="tsk-table__toolbar">
                     <input

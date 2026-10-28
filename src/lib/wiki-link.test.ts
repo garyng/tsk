@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
     buildWikiLinkInsert,
     danglingWikiLinks,
+    headingPrefixOf,
+    type WikiLinkProblem,
+    type WikiLinkSpan,
     wikiLinkPrefixAt,
     wikiLinkSpans,
     wikiPathCandidates,
@@ -61,6 +64,25 @@ describe('wikiLinkSpans', () => {
         // A trailing dot — a real-world typo that resolves to nothing.
         expect(wikiLinkSpans('[[notes/kickoff.md.]]')[0]?.path).toBe('notes/kickoff.md.');
     });
+
+    it('splits a #fragment off the path, the span still the whole link', () => {
+        expect(wikiLinkSpans('see [[plans/x.md#phase-1]]')).toEqual([
+            { startCol: 4, endCol: 26, path: 'plans/x.md', fragment: 'phase-1' },
+        ]);
+        expect(wikiLinkSpans('[[a.md # Phase 1 ]]')[0]).toMatchObject({
+            path: 'a.md',
+            fragment: 'Phase 1',
+        });
+    });
+
+    it('has no fragment without a #, or with nothing after it', () => {
+        expect(wikiLinkSpans('[[a.md]]')[0]).not.toHaveProperty('fragment');
+        expect(wikiLinkSpans('[[a.md#]]')[0]).toEqual({ startCol: 0, endCol: 9, path: 'a.md' });
+    });
+
+    it('skips a link that is only a fragment — a .tsk file has no headings of its own to name', () => {
+        expect(wikiLinkSpans('[[#phase-1]]')).toEqual([]);
+    });
 });
 
 describe('wikiLinkPrefixAt', () => {
@@ -95,6 +117,38 @@ describe('wikiLinkPrefixAt', () => {
 
     it('is null when the cursor sits before the brackets', () => {
         expect(wikiLinkPrefixAt('x [[a', 1)).toBeNull();
+    });
+});
+
+describe('headingPrefixOf', () => {
+    const at = (line: string) => {
+        const open = wikiLinkPrefixAt(line, line.length);
+        if (open === null) throw new Error(`no open [[ in ${line}`);
+        return headingPrefixOf(open);
+    };
+
+    it('splits the path from the heading typed so far, which starts after the #', () => {
+        expect(at('- [ ] see [[plans/x.md#pha')).toEqual({
+            path: 'plans/x.md',
+            startCol: 23,
+            prefix: 'pha',
+        });
+    });
+
+    it('starts an empty heading right after the #', () => {
+        expect(at('[[x.md#')).toEqual({ path: 'x.md', startCol: 7, prefix: '' });
+    });
+
+    it('trims the path, as a link does', () => {
+        expect(at('[[ x.md #a')?.path).toBe('x.md');
+    });
+
+    it('keeps a later # in the heading, as a link does', () => {
+        expect(at('[[x.md#c#-sharp')?.prefix).toBe('c#-sharp');
+    });
+
+    it('is undefined before a # — the path is still being typed', () => {
+        expect(at('[[plans/x.md')).toBeUndefined();
     });
 });
 
@@ -166,28 +220,38 @@ describe('buildWikiLinkInsert', () => {
 
 describe('danglingWikiLinks', () => {
     const lines = [
-        '- [n] good [[a.md]]',
+        '- [n] good [[a.md]] and [[a.md#there]]',
         '- [n] bad [[missing.md]]',
-        '- [n] two bad [[x.md]] and [[y.md]]',
+        '- [n] two bad [[x.md]] and [[a.md#nowhere]]',
         '- [ ] no links here',
     ];
-    const resolves = (path: string): boolean => path === 'a.md';
+    const problemOf = (span: WikiLinkSpan): WikiLinkProblem | undefined => {
+        if (span.path !== 'a.md') return 'no-file';
+        return span.fragment === undefined || span.fragment === 'there' ? undefined : 'no-heading';
+    };
 
-    it('reports only the unresolvable ones, with exact spans', () => {
-        expect(danglingWikiLinks(lines, resolves)).toEqual([
-            { line: 1, startCol: 10, endCol: 24, path: 'missing.md' },
-            { line: 2, startCol: 14, endCol: 22, path: 'x.md' },
-            { line: 2, startCol: 27, endCol: 35, path: 'y.md' },
+    it('reports only the unresolvable ones, with exact spans and what is missing', () => {
+        expect(danglingWikiLinks(lines, problemOf)).toEqual([
+            { line: 1, startCol: 10, endCol: 24, path: 'missing.md', problem: 'no-file' },
+            { line: 2, startCol: 14, endCol: 22, path: 'x.md', problem: 'no-file' },
+            {
+                line: 2,
+                startCol: 27,
+                endCol: 43,
+                path: 'a.md',
+                fragment: 'nowhere',
+                problem: 'no-heading',
+            },
         ]);
     });
 
     it('the span covers the brackets and nothing else', () => {
-        const [first] = danglingWikiLinks([lines[1] as string], resolves);
+        const [first] = danglingWikiLinks([lines[1] as string], problemOf);
         expect((lines[1] as string).slice(first?.startCol, first?.endCol)).toBe('[[missing.md]]');
     });
 
     it('is empty when everything resolves, and for a file with no links', () => {
-        expect(danglingWikiLinks(lines, () => true)).toEqual([]);
-        expect(danglingWikiLinks(['- [ ] plain'], resolves)).toEqual([]);
+        expect(danglingWikiLinks(lines, () => undefined)).toEqual([]);
+        expect(danglingWikiLinks(['- [ ] plain'], problemOf)).toEqual([]);
     });
 });

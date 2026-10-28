@@ -6,9 +6,14 @@ import type { DiagnosticsManager } from './diagnostics-manager';
 import { isTskDocument } from './editor-guards';
 import { cancelDebounced, scheduleDebounced } from './lib/debounce';
 import type { Logger } from './lib/logger';
+import { headingLine, markdownHeadings } from './lib/md-headings';
 import {
     buildWikiLinkInsert,
     danglingWikiLinks,
+    headingPrefixOf,
+    type WikiLinkHeadingPrefix,
+    type WikiLinkProblem,
+    type WikiLinkSpan,
     wikiLinkPrefixAt,
     wikiLinkSpans,
     wikiPathCandidates,
@@ -16,9 +21,10 @@ import {
 import type { WorkspaceFiles } from './workspace-files';
 
 /**
- * The VS Code layer for `[[wiki links]]`: ctrl+click to open, `[`-triggered
- * path completion, and `tsk.insertWikiLink` (pick a file, get a link). The
- * pure matching lives in `lib/wiki-link.ts`.
+ * The VS Code layer for `[[wiki links]]`: ctrl+click to open, completion of
+ * the path after `[[` and of the heading after its `#`, and
+ * `tsk.insertWikiLink` (pick a file, get a link). The pure matching lives in
+ * `lib/wiki-link.ts`.
  *
  * Unlike `autolinks-provider.ts`, this provider needs no dispose+re-register
  * lifecycle: a wiki link's target depends on no setting, so VS Code's link
@@ -27,7 +33,10 @@ import type { WorkspaceFiles } from './workspace-files';
  * ignore, recomputed per request.
  */
 
-const TRIGGER_CHARACTER = '[';
+const TRIGGER_CHARACTERS = ['[', '#'];
+
+/** Files whose headings are Markdown's: `marked` would read a `# comment` in a script as one. */
+const HEADED_FILE = /\.(?:md|markdown|tsk)$/i;
 
 /** The first workspace folder's fsPath, or `undefined` (single-file / untitled). */
 function workspaceRoot(): string | undefined {
@@ -80,19 +89,19 @@ export function registerWikiLinks(
     files: WorkspaceFiles | undefined,
     logger: Logger,
 ): void {
-    registerDanglingDiagnostics(context, diagnostics);
+    registerDanglingDiagnostics(context, diagnostics, logger);
     context.subscriptions.push(
         vscode.languages.registerDocumentLinkProvider(
             { language: TSK_LANGUAGE_ID },
-            { provideDocumentLinks: (document) => provideLinks(document) },
+            { provideDocumentLinks: (document) => provideLinks(document, logger) },
         ),
         vscode.languages.registerCompletionItemProvider(
             { language: TSK_LANGUAGE_ID },
             {
                 provideCompletionItems: (document, position) =>
-                    provideCompletions(document, position, files),
+                    provideCompletions(document, position, files, logger),
             },
-            TRIGGER_CHARACTER,
+            ...TRIGGER_CHARACTERS,
         ),
         vscode.commands.registerCommand(COMMANDS.insertWikiLink, () =>
             insertWikiLink(files, logger),
@@ -100,7 +109,42 @@ export function registerWikiLinks(
     );
 }
 
-function provideLinks(document: vscode.TextDocument): vscode.DocumentLink[] {
+/**
+ * The zero-based line of the heading `fragment` names in `file`, or
+ * `undefined` — also when the file can't be read (a directory, a permission),
+ * which is logged. Read on every request, as `existsSync` is: a plan is a few
+ * hundred lines, and a cache would need a watcher over every linked file.
+ */
+function headingIn(file: vscode.Uri, fragment: string, logger: Logger): number | undefined {
+    const markdown = readTarget(file, fragment, logger);
+    return markdown === undefined ? undefined : headingLine(markdown, fragment);
+}
+
+/** A link target's text, or `undefined` (logged) when it can't be read. */
+function readTarget(file: vscode.Uri, fragment: string, logger: Logger): string | undefined {
+    try {
+        return nodeFs.readFileSync(file.fsPath, 'utf8');
+    } catch (err) {
+        logger.warn(`wiki link: can't read ${file.fsPath} for #${fragment}: ${String(err)}`);
+        return undefined;
+    }
+}
+
+/** What `span` lacks: its file, or the heading it names. */
+function problemOf(
+    span: WikiLinkSpan,
+    root: string | undefined,
+    docDir: string | undefined,
+    logger: Logger,
+): WikiLinkProblem | undefined {
+    const target = resolveTarget(span.path, root, docDir);
+    if (target === undefined) return 'no-file';
+    if (span.fragment !== undefined && headingIn(target, span.fragment, logger) === undefined)
+        return 'no-heading';
+    return undefined;
+}
+
+function provideLinks(document: vscode.TextDocument, logger: Logger): vscode.DocumentLink[] {
     const root = workspaceRoot();
     const docDir = documentDir(document);
     const links: vscode.DocumentLink[] = [];
@@ -116,8 +160,22 @@ function provideLinks(document: vscode.TextDocument): vscode.DocumentLink[] {
                 links.push(dangling);
                 continue;
             }
-            const link = new vscode.DocumentLink(range, target);
-            link.tooltip = target.fsPath;
+            if (span.fragment === undefined) {
+                const link = new vscode.DocumentLink(range, target);
+                link.tooltip = target.fsPath;
+                links.push(link);
+                continue;
+            }
+            // `#L<n>` is the fragment VS Code's opener reads as a line to land on.
+            const heading = headingIn(target, span.fragment, logger);
+            const link = new vscode.DocumentLink(
+                range,
+                heading === undefined ? target : target.with({ fragment: `L${heading + 1}` }),
+            );
+            link.tooltip =
+                heading === undefined
+                    ? `tsk: no heading "#${span.fragment}" in ${target.fsPath}`
+                    : `${target.fsPath}#${span.fragment}`;
             links.push(link);
         }
     }
@@ -128,12 +186,16 @@ async function provideCompletions(
     document: vscode.TextDocument,
     position: vscode.Position,
     files: WorkspaceFiles | undefined,
+    logger: Logger,
 ): Promise<vscode.CompletionItem[] | undefined> {
     const line = document.lineAt(position.line).text;
     // The `[` trigger also fires on the first bracket of a pair and inside a
-    // `- [ ]` marker; this is the gate that keeps completions out of both.
+    // `- [ ]` marker, and `#` on every tag; this is the gate that keeps
+    // completions out of all of them.
     const open = wikiLinkPrefixAt(line, position.character);
     if (open === null) return undefined;
+    const heading = headingPrefixOf(open);
+    if (heading !== undefined) return provideHeadings(document, position, heading, logger);
 
     const root = workspaceRoot();
     const replaceRange = new vscode.Range(
@@ -156,6 +218,41 @@ async function provideCompletions(
         items.push(item);
     }
     return items;
+}
+
+/**
+ * The headings of the file before the `#`, in its order: labelled with their
+ * text, inserting the anchor a link resolves. Read on every request, as a
+ * link's target is.
+ */
+function provideHeadings(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    typed: WikiLinkHeadingPrefix,
+    logger: Logger,
+): vscode.CompletionItem[] | undefined {
+    if (!HEADED_FILE.test(typed.path)) return undefined;
+    const target = resolveTarget(typed.path, workspaceRoot(), documentDir(document));
+    if (target === undefined) return undefined;
+    const markdown = readTarget(target, typed.prefix, logger);
+    if (markdown === undefined) return undefined;
+    const range = new vscode.Range(
+        position.line,
+        typed.startCol,
+        position.line,
+        position.character,
+    );
+    return markdownHeadings(markdown).map((heading, index) => {
+        const item = new vscode.CompletionItem(heading.text, vscode.CompletionItemKind.Reference);
+        // A repeated heading's label is the same; its anchor tells them apart.
+        item.detail = `#${heading.anchor}`;
+        item.insertText = heading.anchor;
+        // Whichever a writer types: the anchor, or the heading's words.
+        item.filterText = `${heading.anchor} ${heading.text}`;
+        item.sortText = String(index).padStart(4, '0');
+        item.range = range;
+        return item;
+    });
 }
 
 function basenameOf(relPath: string): string {
@@ -239,6 +336,7 @@ async function insertWikiLink(
 function registerDanglingDiagnostics(
     context: vscode.ExtensionContext,
     diagnostics: DiagnosticsManager,
+    logger: Logger,
 ): void {
     const timers = new Map<string, NodeJS.Timeout>();
 
@@ -249,7 +347,7 @@ function registerDanglingDiagnostics(
         const lines = document.getText().split(/\r?\n/);
         diagnostics.setLinkWarnings(
             document.uri.toString(),
-            danglingWikiLinks(lines, (path) => resolveTarget(path, root, docDir) !== undefined),
+            danglingWikiLinks(lines, (span) => problemOf(span, root, docDir, logger)),
         );
     };
 

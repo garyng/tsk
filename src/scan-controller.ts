@@ -3,6 +3,7 @@ import type { CodelensHandle } from './codelens';
 import type { DiagnosticsManager } from './diagnostics-manager';
 import { readText, statMtime } from './fast-fs';
 import type { CacheService, CacheWarning, RescanResult } from './lib/cache';
+import { filesGone, filesUnder } from './lib/cached-files';
 import { cancelDebounced, scheduleDebounced } from './lib/debounce';
 import type { GraphService } from './lib/graph-service';
 import type { Logger } from './lib/logger';
@@ -56,6 +57,18 @@ export class ScanController {
         const all = (await this.files?.all('**/*.tsk')) ?? [];
         const uris = all.filter((uri: vscode.Uri) => uri.path.endsWith('.tsk'));
         const found = Date.now() - start;
+        // What went while VS Code was away, or came in from outside the listing, goes now.
+        if (this.files) {
+            const gone = filesGone(
+                this.cache.listFileUris(),
+                new Set(uris.map((u) => u.toString())),
+            );
+            for (const uri of gone) this.forget(uri);
+            if (gone.length > 0)
+                this.logger.info(
+                    `initial scan: dropped ${gone.length} cached file(s) the workspace no longer lists: ${gone.join(', ')}.`,
+                );
+        }
         let scanned = 0;
         let skipped = 0;
 
@@ -104,6 +117,21 @@ export class ScanController {
         );
     }
 
+    /**
+     * The watcher's create or change: rescan a file the cache holds, and take
+     * in a new one only if the workspace lists it, as the initial scan would.
+     * Git leaves out ignored files and a nested repository's (an agent's
+     * worktree has the same ids as the real file).
+     */
+    async rescanIfListed(uri: vscode.Uri): Promise<void> {
+        const known = this.cache.getFileMtime(uri.toString()) !== undefined;
+        if (!known && this.files && !(await this.files.includes(uri, '**/*.tsk'))) {
+            this.logger.debug(`not indexed, the workspace doesn't list it: ${uri}`);
+            return;
+        }
+        await this.rescanFromFs(uri);
+    }
+
     /** Re-read `uri` from disk and rescan it (FileSystemWatcher create / change). */
     async rescanFromFs(uri: vscode.Uri): Promise<void> {
         try {
@@ -144,13 +172,31 @@ export class ScanController {
 
     /** Drop a deleted file from the cache + graph + diagnostics, then refresh. */
     removeFile(uriString: string): void {
+        this.forget(uriString);
+        this.refreshDiagnosticsAndLenses();
+    }
+
+    /**
+     * Drop the cached files inside a deleted folder, which reaches the watcher
+     * as one event for the folder. Returns the files dropped.
+     */
+    removeFolder(uriString: string): string[] {
+        const gone = filesUnder(this.cache.listFileUris(), uriString);
+        if (gone.length === 0) return gone;
+        for (const uri of gone) this.forget(uri);
+        this.logger.info(`dropped ${gone.length} file(s) with the deleted ${uriString}.`);
+        this.refreshDiagnosticsAndLenses();
+        return gone;
+    }
+
+    /** A file out of the cache, the graph and the diagnostics, without the refresh. */
+    private forget(uriString: string): void {
         // Revoke any in-flight debounced rescan first; otherwise an edit-then-
         // delete within the debounce window resurrects the just-removed file.
         this.cancelScheduled(uriString);
         this.cache.removeFile(uriString);
         this.graph.removeFile(uriString);
         this.diagnosticsManager.deleteFile(uriString);
-        this.refreshDiagnosticsAndLenses();
     }
 
     /** Purge everything and re-scan from scratch (the `tsk.rebuildCache` command). */

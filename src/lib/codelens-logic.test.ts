@@ -90,7 +90,7 @@ describe('computeLensesForTask — forward edges', () => {
     it('renders all three forward edges in declared order', () => {
         const lookup = lookupFrom([
             node('source', 'a.tsk', 0, {
-                forward: { parent: 'p', dependsOn: 'd', relatedTo: 'r' },
+                forward: { parent: 'p', dependsOn: ['d'], relatedTo: 'r' },
             }),
             node('p', 'a.tsk', 1),
             node('d', 'a.tsk', 2),
@@ -155,7 +155,7 @@ describe('computeLensesForTask — movedTo (forward graph edge)', () => {
     it('renders movedTo last in the forward group, before inverse edges', () => {
         const lookup = lookupFrom([
             node('source', 'a.tsk', 0, {
-                forward: { parent: 'p', dependsOn: 'd', relatedTo: 'r', movedTo: 'dest' },
+                forward: { parent: 'p', dependsOn: ['d'], relatedTo: 'r', movedTo: 'dest' },
                 inverse: { children: ['c'] },
             }),
             node('p', 'a.tsk', 1),
@@ -242,7 +242,7 @@ describe('computeLensesForTask — codicons', () => {
     it('prepends the documented codicon per edge type', () => {
         const lookup = lookupFrom([
             node('source', 'a.tsk', 0, {
-                forward: { parent: 'p', dependsOn: 'd', relatedTo: 'r' },
+                forward: { parent: 'p', dependsOn: ['d'], relatedTo: 'r' },
                 inverse: { children: ['c'], dependents: ['x'], related: ['y'] },
             }),
             node('p', 'a.tsk', 1),
@@ -264,9 +264,31 @@ describe('computeLensesForTask — codicons', () => {
     });
 
     it('uses the warning codicon on dangling forward edges', () => {
-        const lookup = lookupFrom([node('orphan', 'a.tsk', 0, { forward: { dependsOn: 'gone' } })]);
+        const lookup = lookupFrom([
+            node('orphan', 'a.tsk', 0, { forward: { dependsOn: ['gone'] } }),
+        ]);
         const titles = computeLensesForTask(task('orphan', 0), 'a.tsk', lookup).map((l) => l.title);
         expect(titles).toEqual([`$(${CODICONS.missing}) dependsOn: gone (missing)`]);
+    });
+});
+
+describe('computeLensesForTask — a @dependsOn list', () => {
+    it('emits one lens per dependency, in written order, each resolved on its own', () => {
+        const lookup = lookupFrom([
+            node('t', 'a.tsk', 0, { forward: { dependsOn: ['x', 'gone', 'y'] } }),
+            node('x', 'a.tsk', 1),
+            node('y', 'a.tsk', 2),
+        ]);
+        const lenses = computeLensesForTask(task('t', 0), 'a.tsk', lookup);
+        expect(lenses.map((l) => [l.title, l.command, l.args])).toEqual([
+            [`$(${CODICONS.dependsOn}) dependsOn: x`, INTERNAL_COMMANDS.goToDependsOn, ['x']],
+            [
+                `$(${CODICONS.missing}) dependsOn: gone (missing)`,
+                INTERNAL_COMMANDS.codelensMissing,
+                ['gone', 'dependsOn'],
+            ],
+            [`$(${CODICONS.dependsOn}) dependsOn: y`, INTERNAL_COMMANDS.goToDependsOn, ['y']],
+        ]);
     });
 });
 

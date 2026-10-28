@@ -26,11 +26,11 @@ suite('cache', () => {
     test('initial scan indexes the fixture workspace', () => {
         const counts = api.counts();
         // sample.tsk (4 tasks) + dup.tsk (4 tasks, but one is a duplicate-id
-        // that the cache skips → 3 inserted) + broken-ref.tsk (3 tasks; M20/B
-        // fixture) + moved.tsk (3 tasks; M39 movedTo-lens fixture). Tags only
+        // that the cache skips → 3 inserted) + broken-ref.tsk (4 tasks; broken
+        // references) + moved.tsk (3 tasks; movedTo lenses). Tags only
         // come from sample.tsk.
         assert.strictEqual(counts.files, 4, 'expected four fixture files scanned');
-        assert.strictEqual(counts.tasks, 13, 'expected thirteen tasks indexed');
+        assert.strictEqual(counts.tasks, 14, 'expected fourteen tasks indexed');
         assert.ok(counts.tags >= 3, `expected at least three tags, got ${counts.tags}`);
     });
 

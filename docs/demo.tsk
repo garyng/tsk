@@ -63,7 +63,7 @@ Ctrl+click a tag to jump to its entry in `tags.yml` (`F12` and `Alt+F12` work to
 | `Alt+D` | `@dependsOn` |
 | `Alt+R` | `@relatedTo` |
 
-Each opens a picker; the same key removes. Linked tasks grow code lenses (`parent: …`, `children: 2`) — click to jump or peek.
+Each opens a picker; the same key removes — except `Alt+D`, since a task can wait on several: on one that already does, it asks whether to add another or remove one. Linked tasks grow code lenses (`parent: …`, `children: 2`) — click to jump or peek.
 
 Parent + two children — look at the lenses:
 
@@ -75,14 +75,20 @@ Try `Alt+D` here, pick "plan the launch":
 
 - [ ] arrange the catering <!-- @id:link-dep -->
 
+This one waits on both children — one `dependsOn:` lens each. `Alt+D` it to drop one:
+
+- [ ] print the seating plan <!-- @id:link-deps @dependsOn:link-child-1,link-child-2 -->
+
 Those link tasks to each other. To link a task to a **file**, write `[[path]]` — Ctrl+Click opens it. Paths are workspace-relative first, then relative to this file:
 
 - [n] the markdown migration sample: [[migrate-sample.md]] <!-- @id:link-wiki -->
+- [n] straight to a heading in it: [[migrate-sample.md#weekend-list]] <!-- @id:link-wiki-heading -->
 - [n] a file that isn't there is still a link, and says so on hover: [[nope.md]] <!-- @id:link-wiki-dangling -->
 
-Type `[[` and completion drops in — it filters on the whole path, not just the filename, so typing a folder narrows it. `Alt+L` does the same through a quick-pick. Everything in the workspace is offered except what `.gitignore` excludes.
+Type `[[` and completion drops in — it filters on the whole path, not just the filename, so typing a folder narrows it. `Alt+L` does the same through a quick-pick. Everything in the workspace is offered except what `.gitignore` excludes. After the path, `#` offers the file's headings.
 
 - [ ] link me to something with `Alt+L` <!-- @id:link-wiki-try -->
+- [ ] put the cursor before the `]]` and type `#` to pick a heading: [[migrate-sample.md]] <!-- @id:link-wiki-heading-try -->
 
 ## 5. Structure
 
@@ -138,6 +144,14 @@ Coming **from Markdown**? **Tsk: Send All Markdown Tasks to Tsk File…** evacua
 
 - [ ] copy my id <!-- @id:copy-demo -->
 
+Then run **Tsk: Reveal Task by ID** and paste it: it opens the task wherever it is. Outside VS Code, a `vscode://garyng.tsk/open?id=copy-demo` link does the same.
+
+Or name it as a plan would — tsk:copy-demo — and Ctrl+Click: the marker after it follows the task. Tick the task above and watch it change.
+
+A plan's preview shows them too: open [[plan-sample.md]], then its preview (`Ctrl+Shift+V`).
+
+In VS Code's terminal, `echo tsk:copy-demo` and Ctrl+Click what it prints. With `tsk tui --file <this file>` running in a tmux pane of the same window, the click selects the task there too.
+
 ## 10. Paste image
 
 `Ctrl+V` an image → saved to disk + a Markdown link inserted (alt text selected). Select text first to name it (subfolders allowed). `Ctrl+Z` removes the link and the file together.
@@ -188,6 +202,6 @@ A line that reads `-label` followed by dashes is a **divider** — a section bre
 
 ## More
 
-Open **Tsk: Open Stats** for an activity heatmap of your tasks across the year, and **Tsk: Open Task List** for a searchable, sortable table — fuzzy search, Excel-style header filters on status / tags / priority, a **Current file** toggle that scopes the list to the file you're editing, click-to-jump — try them against `many-tasks.tsk`.
+Open **Tsk: Open Stats** for an activity heatmap of your tasks across the year, and **Tsk: Open Task List** for a searchable, sortable table — fuzzy search, Excel-style header filters on status / tags / priority (and session, once a task has an `@session` from the `tsk` command line), a **Current file** toggle that scopes the list to the file you're editing, click-to-jump — try them against `many-tasks.tsk`.
 
 The cache powers tag search and the lenses — run **Tsk: Rebuild Cache** if anything looks stale. Every `tsk.*` setting is documented in the README. It's all plain text you own.

@@ -18,9 +18,56 @@ export type RelationshipKey = (typeof RELATIONSHIP_KEYS)[number];
 
 const RELATIONSHIP_KEY_SET: ReadonlySet<string> = new Set(RELATIONSHIP_KEYS);
 
-/** Narrow an untrusted string (e.g. a `broken-ref:<key>` diagnostic code suffix). */
+/** Narrow an untrusted string (e.g. the key in a {@link brokenRefCode}). */
 export function isRelationshipKey(value: string): value is RelationshipKey {
     return RELATIONSHIP_KEY_SET.has(value);
+}
+
+const BROKEN_REF_PREFIX = 'broken-ref:';
+
+/**
+ * The code of a broken-reference diagnostic: `broken-ref:<key>:<target id>`.
+ * It names the target as well as the key, so a quick fix can drop or replace
+ * that one id of a `@dependsOn` list.
+ */
+export function brokenRefCode(key: RelationshipKey, targetId: string): string {
+    return `${BROKEN_REF_PREFIX}${key}:${targetId}`;
+}
+
+/** Read a {@link brokenRefCode} back; `undefined` for any other diagnostic code. */
+export function parseBrokenRefCode(
+    code: unknown,
+): { key: RelationshipKey; targetId: string } | undefined {
+    if (typeof code !== 'string' || !code.startsWith(BROKEN_REF_PREFIX)) return undefined;
+    const rest = code.slice(BROKEN_REF_PREFIX.length);
+    const colon = rest.indexOf(':');
+    if (colon < 0) return undefined;
+    const key = rest.slice(0, colon);
+    return isRelationshipKey(key) ? { key, targetId: rest.slice(colon + 1) } : undefined;
+}
+
+/**
+ * The relationship key whose value is a comma list of ids (`@dependsOn:a,b`)
+ * rather than one id — a task can wait on several others. One key with a list,
+ * not a repeated key: metadata is a map where the later of two equal keys wins,
+ * so `@dependsOn:a @dependsOn:b` would lose `a` the first time any tool
+ * rewrote the line. Ids never contain a comma (`ids.ts`'s alphabet).
+ */
+export const LIST_KEY = 'dependsOn' satisfies RelationshipKey;
+
+/** The ids in a `@dependsOn` value, in written order: trimmed, empties and repeats dropped. */
+export function parseIdList(value: string | null | undefined): string[] {
+    if (!value) return [];
+    const ids: string[] = [];
+    for (const raw of value.split(',')) {
+        const id = raw.trim();
+        if (id !== '' && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
+}
+
+export function formatIdList(ids: readonly string[]): string {
+    return ids.join(',');
 }
 
 /**

@@ -126,6 +126,19 @@ describe('buildTaskHoverMarkdown', () => {
         expect(md).not.toContain('command:tsk.goToParent');
     });
 
+    it('lists every id of a @dependsOn list on one row, linked or marked missing', () => {
+        const md = buildTaskHoverMarkdown(
+            makeTask({ metadata: new Map([['dependsOn', 'd1,gone']]) }),
+            {
+                ...emptyDeps,
+                lookupTask: (id) => (id === 'd1' ? makeRecord('d1', 'the venue') : undefined),
+            },
+        );
+        expect(md).toMatch(
+            /\*\*depends on:\*\* \[the venue\]\(command:tsk\.goToParent\?[^)]*\) `\(d1\)` · `\(gone\)` \*— missing in workspace\*/,
+        );
+    });
+
     it('renders inverse children with count + links when the graph node has children', () => {
         const node: GraphNode = {
             id: 'parent-1',

@@ -9,3 +9,4 @@ broken-ref squiggle stays on.
 - [ ] orphan-parent <!-- @id:m20-orphan-parent @parent:m20-ghost-parent -->
 - [ ] orphan-depends <!-- @id:m20-orphan-depends @dependsOn:m20-ghost-depends -->
 - [ ] triple-broken <!-- @id:m20-triple-broken @parent:m20-ghost-p @dependsOn:m20-ghost-d @relatedTo:m20-ghost-r -->
+- [ ] list-half-broken <!-- @id:m20-list-half-broken @dependsOn:m20-orphan-parent,m20-ghost-list,m20-orphan-depends -->

@@ -3,6 +3,7 @@ import {
     type BuildGraphResult,
     buildGraph,
     type DuplicateIdReport,
+    forwardTargets,
     type GraphNode,
     type TaskRelationshipInput,
 } from './graph';
@@ -100,24 +101,25 @@ export class GraphService {
      * the workspace. Walks the canonical graph (so dup losers aren't
      * double-reported; their canonical winner is the only source that
      * surfaces a broken edge for the same id). Emits one report per
-     * `(source, key)` pair — a task whose `@parent`, `@dependsOn`,
+     * `(source, key, target)` — a task whose `@parent`, `@dependsOn`,
      * `@relatedTo`, and `@movedTo` all point at unknown ids produces four
-     * reports.
+     * reports, and a `@dependsOn:a,b` naming two unknown ids two of them.
      */
     getBrokenForwardEdges(): readonly BrokenEdgeReport[] {
         const reports: BrokenEdgeReport[] = [];
         for (const node of this.snapshot.graph.values()) {
             for (const key of RELATIONSHIP_KEYS) {
-                const targetId = node.forward[key];
-                if (!targetId) continue;
-                if (this.snapshot.graph.has(targetId)) continue;
-                reports.push({
-                    sourceId: node.id,
-                    sourceFile: node.fileUri,
-                    sourceLine: node.line,
-                    key,
-                    targetId,
-                });
+                for (const targetId of forwardTargets(node, key)) {
+                    if (!targetId) continue;
+                    if (this.snapshot.graph.has(targetId)) continue;
+                    reports.push({
+                        sourceId: node.id,
+                        sourceFile: node.fileUri,
+                        sourceLine: node.line,
+                        key,
+                        targetId,
+                    });
+                }
             }
         }
         return reports;

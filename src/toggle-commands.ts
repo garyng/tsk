@@ -4,7 +4,16 @@ import { isTskDocument, requireTskEditor } from './editor-guards';
 import type { CacheService } from './lib/cache';
 import type { Logger } from './lib/logger';
 import { parseLine } from './lib/parser';
-import { contentCursorCol, removeMetadataEntry, setMetadataEntry, swapMarker } from './lib/toggle';
+import { dependsOnMenu } from './lib/picker-logic';
+import { LIST_KEY, parseIdList } from './lib/relationships';
+import {
+    addListEntry,
+    contentCursorCol,
+    removeListEntry,
+    removeMetadataEntry,
+    setMetadataEntry,
+    swapMarker,
+} from './lib/toggle';
 import {
     defaultToggleDeps,
     type ToggleDeps,
@@ -182,7 +191,10 @@ export function registerCopyTaskIdCommand(context: vscode.ExtensionContext, logg
  *     cursor's line (other cursors' existing values are overwritten — by
  *     design, lets multi-cursor users align several tasks in one keystroke).
  *     If `@<key>` is present on the primary, no picker; just remove the
- *     entry from every task cursor's line.
+ *     entry from every task cursor's line — except `@dependsOn`, a list:
+ *     there a menu offers *Add another…* (picker, then appended to every task
+ *     cursor's line), *Remove `<id>`* per dependency of the primary, and
+ *     *Remove all*.
  *   - **`toggleMoved`** — if the primary task isn't `moved`, picker →
  *     swap marker + `@movedTo:<id>` + `@moved:<localTimestamp>` on every
  *     task cursor. If the primary IS already `moved`, swap back to `todo`
@@ -235,6 +247,18 @@ async function runRelationshipToggle(
 
     const isAdd = !primaryParsed.metadata.has(key);
 
+    if (!isAdd && key === LIST_KEY) {
+        await runDependsOnMenu(
+            commandId,
+            prompt,
+            parseIdList(primaryParsed.metadata.get(key)),
+            editor,
+            cache,
+            logger,
+        );
+        return;
+    }
+
     if (isAdd) {
         const id = await pickTaskId({ prompt, cache });
         if (!id) {
@@ -244,6 +268,39 @@ async function runRelationshipToggle(
         await applyEdit(editor, (line) => setMetadataEntry(line, key, id), logger);
     } else {
         await applyEdit(editor, (line) => removeMetadataEntry(line, key), logger);
+    }
+}
+
+/** `Alt+D` on a task that already has dependencies: add another, remove one, or remove all. */
+async function runDependsOnMenu(
+    commandId: string,
+    prompt: string,
+    ids: readonly string[],
+    editor: vscode.TextEditor,
+    cache: CacheService,
+    logger: Logger,
+): Promise<void> {
+    const items = dependsOnMenu(ids, (id) => cache.lookupById(id)?.content);
+    const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: `Depends on ${ids.join(', ')}`,
+        matchOnDescription: true,
+    });
+    if (!picked) {
+        logger.debug(`${commandId}: menu dismissed`);
+        return;
+    }
+    const { choice } = picked;
+    if (choice.kind === 'add') {
+        const id = await pickTaskId({ prompt, cache });
+        if (!id) {
+            logger.debug(`${commandId}: picker cancelled`);
+            return;
+        }
+        await applyEdit(editor, (line) => addListEntry(line, LIST_KEY, id), logger);
+    } else if (choice.kind === 'remove') {
+        await applyEdit(editor, (line) => removeListEntry(line, LIST_KEY, choice.id), logger);
+    } else {
+        await applyEdit(editor, (line) => removeMetadataEntry(line, LIST_KEY), logger);
     }
 }
 

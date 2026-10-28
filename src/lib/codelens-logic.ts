@@ -140,15 +140,10 @@ export function computeLensesForTask(
             ),
         );
     }
-    if (node.forward.dependsOn !== undefined) {
+    // One lens per dependency (`@dependsOn:a,b`), each navigating or "(missing)" on its own.
+    for (const target of node.forward.dependsOn ?? []) {
         out.push(
-            forwardLens(
-                task.line,
-                'dependsOn',
-                node.forward.dependsOn,
-                INTERNAL_COMMANDS.goToDependsOn,
-                lookup,
-            ),
+            forwardLens(task.line, 'dependsOn', target, INTERNAL_COMMANDS.goToDependsOn, lookup),
         );
     }
     if (node.forward.relatedTo !== undefined) {
@@ -166,9 +161,9 @@ export function computeLensesForTask(
     // `movedTo` is a real forward graph edge (M8): read from `node.forward` like
     // the others, so it gains an inverse "moved here from" bucket and a
     // dangling-target diagnostic. A falsy value (a bare `@movedTo` flag, or
-    // `@movedTo:` with no id) renders nothing — unlike parent/dependsOn/relatedTo,
-    // whose empty values render a "(missing)" lens; the lifecycle pointer stays
-    // silent when target-less.
+    // `@movedTo:` with no id) renders nothing — unlike parent/relatedTo, whose
+    // empty values render a "(missing)" lens; the lifecycle pointer stays silent
+    // when target-less. (An empty `@dependsOn:` lists no ids, so it has no lens.)
     if (node.forward.movedTo) {
         out.push(
             forwardLens(
