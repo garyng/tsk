@@ -153,7 +153,7 @@ export function shortTitle(content: string): string {
  * agent is listed under `agents` only, so it's left out of the subtree.
  */
 export function sessionLines(tree: TaskTree, session: string | undefined): TuiLine[] {
-    if (!session) return [{ kind: 'heading', text: 'no session — pass --session or --follow-pid' }];
+    if (!session) return [{ kind: 'heading', text: 'no session: pass --session or --follow-pid' }];
     const trail = sessionTrail(tree, session);
     const handed = new Set(trail.withAgents);
     const lines: TuiLine[] = [];
@@ -162,7 +162,7 @@ export function sessionLines(tree: TaskTree, session: string | undefined): TuiLi
         const childrenOf = (n: TreeNode) => n.children.filter((c) => !handed.has(c));
         lines.push(...taskLines(tree, [trail.focus], childrenOf, trail.focus));
     } else {
-        lines.push({ kind: 'heading', text: 'no focus — `tsk focus <id>` or `tsk push <text>`' });
+        lines.push({ kind: 'heading', text: 'no focus: `tsk focus <id>` or `tsk push <text>`' });
     }
     const inSubtree = new Set(lines.flatMap((l) => (l.kind === 'task' ? [l.node] : [])));
     const listApart = (
@@ -352,7 +352,7 @@ export function dependencyLines(tree: TaskTree, id: string, focus?: TreeNode): T
 export function layerLines(tree: TaskTree, focus?: TreeNode): TuiLine[] {
     const { steps, cyclic } = dependencyLayers(tree);
     if (steps.length === 0 && cyclic.length === 0) {
-        return [{ kind: 'heading', text: 'no dependencies — `tsk dep <id> --on <id>`' }];
+        return [{ kind: 'heading', text: 'no dependencies: `tsk dep <id> --on <id>`' }];
     }
     const lines: TuiLine[] = [];
     const list = (nodes: readonly TreeNode[]) => {
@@ -366,7 +366,7 @@ export function layerLines(tree: TaskTree, focus?: TreeNode): TuiLine[] {
         list(nodes);
     });
     if (cyclic.length > 0) {
-        lines.push({ kind: 'heading', text: 'in a loop — or waiting on one' });
+        lines.push({ kind: 'heading', text: 'in a loop, or waiting on one' });
         list(cyclic);
     }
     return markLasts(lines);

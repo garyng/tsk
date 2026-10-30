@@ -121,8 +121,7 @@ export async function runTui(opts: TuiOptions): Promise<number> {
                       const f = followPid(opts.followPid as number, configDir);
                       if (!f.alive) return Promise.reject(new Error(f.status));
                       if (!f.socket) {
-                          const why =
-                              'it has no inbox socket (cross-session messaging, Claude Code 2.1.224+)';
+                          const why = 'it has no inbox socket (needs Claude Code 2.1.224+)';
                           return Promise.reject(new Error(why));
                       }
                       const sessionId = f.sessionId;

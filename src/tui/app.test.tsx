@@ -413,7 +413,7 @@ describe('tsk TUI', () => {
         expect(ui.lastFrame()).not.toContain('step b');
         ui.stdin.write(' ');
         await until(() => footer().startsWith('no folding'));
-        expect(footer()).toBe('no folding while filtered — esc clears the filter');
+        expect(footer()).toBe('no folding while filtered; esc clears the filter');
         ui.stdin.write('\x1b');
         await until(() => !strip().includes('/P2'));
         expect(ui.lastFrame()).not.toContain('step a'); // the fold is back

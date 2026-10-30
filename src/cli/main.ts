@@ -51,22 +51,22 @@ import { idsAsRefs } from './terminal-ids';
 /** The file `tsk` looks for, walking up from the working directory, when none is named. */
 export const DEFAULT_FILE_NAME = 'claude.tsk';
 
-export const USAGE = `tsk — track work in a .tsk file (default: the nearest ${DEFAULT_FILE_NAME} above the working directory)
+export const USAGE = `tsk: track work in a .tsk file
 
   tsk trail                         where this session is: root → focus, what's still open
   tsk push <text> [--link <path>]   start a sidetrack under the focus, and focus it
   tsk add <text> [--under <id> | --root] [--link <path>]
                                     queue a task for later (default: under the focus)
-  tsk delegate <id> --to <name>     hand <id> to a subagent or teammate: started, with @agent,
-                                    listed in the trail; the focus stays (--to on push and add too)
+  tsk delegate <id> --to <name>     hand <id> to a subagent or teammate; the focus stays
+                                    (push and add take --to too)
   tsk focus <id>                    work on <id> now (takes it back from an agent)
   tsk done [<id>]                   finish <id> (default: the focus); focus falls back to its parent
   tsk park [<id>]                   put <id> back to [ ] for later (default: the focus)
   tsk cancel <id>
   tsk dep <id> --on <other>…        <id> can't start until <other> is done (repeat --on, or a,b)
   tsk dep <id> --off <other>…       drop those dependencies
-  tsk ready [<id>] [--all]          what can start now: nothing open it (or a task above it) waits on;
-                                    under the focus's top-level task by default, <id>, or the whole file
+  tsk ready [<id>] [--all]          what can start now: under the focus's top-level task, <id>,
+                                    or the whole file (--all)
   tsk link <id> <path>              add a [[path]] link to the task
   tsk reword <id> <text>            change the task's text; its [[links]] and metadata stay
   tsk show <id> [--tui]             a task, the path down to it, and its children
@@ -77,10 +77,10 @@ export const USAGE = `tsk — track work in a .tsk file (default: the nearest ${
   tsk session start                 Claude Code's SessionStart hook (reads the hook input on stdin)
   tsk select-clicked --pane=<%n> --client=<name> --column=<n> --line=<text> [--hyperlink=<uri>]
                                     tmux's Ctrl+Click: select the tsk:<id> under the mouse in the
-                                    TUI beside that pane (a tmux binding passes these)
+                                    TUI beside that pane
 
 options:
-  --file <path>     the .tsk file (or TSK_FILE)
+  --file <path>     the .tsk file (or TSK_FILE; default: the nearest ${DEFAULT_FILE_NAME} above the working directory)
   --session <id>    the session (or TSK_SESSION, else CLAUDE_CODE_SESSION_ID); first 8 characters kept`;
 
 export interface CliIo {
@@ -108,7 +108,7 @@ export function resolveFile(flag: string | undefined, env: CliIo['env'], cwd: st
         if (path.dirname(dir) === dir) break;
     }
     throw new UsageError(
-        `no ${DEFAULT_FILE_NAME} in ${cwd} or above it — create one, or pass --file / set TSK_FILE`,
+        `no ${DEFAULT_FILE_NAME} in ${cwd} or above it; create one, or pass --file or set TSK_FILE`,
     );
 }
 
@@ -179,9 +179,7 @@ export async function main(given: CliIo): Promise<number> {
             const { pane, client, line } = values;
             const column = Number(values.column);
             if (!pane || !client || line === undefined || !Number.isInteger(column)) {
-                throw new UsageError(
-                    'select-clicked: needs --pane, --client, --column and --line, as a tmux binding passes them',
-                );
+                throw new UsageError('select-clicked: needs --pane, --client, --column and --line');
             }
             const click = { pane, client, column, line, hyperlink: values.hyperlink || undefined };
             return await selectClicked(click, io);
@@ -203,7 +201,7 @@ export async function main(given: CliIo): Promise<number> {
         const needSession = (): string => {
             if (!session)
                 throw new UsageError(
-                    'no session — pass --session, set TSK_SESSION, or run inside Claude Code',
+                    'no session; pass --session, set TSK_SESSION, or run inside Claude Code',
                 );
             return session;
         };
@@ -215,7 +213,7 @@ export async function main(given: CliIo): Promise<number> {
         const focusId = (tree: TaskTree): string => {
             const s = needSession();
             const focus = sessionFocus(tree, s);
-            if (!focus?.id) throw new TaskOpError(`no focus for session ${s} — name the task`);
+            if (!focus?.id) throw new TaskOpError(`no focus for session ${s}; name the task`);
             return focus.id;
         };
         /** Run one operation under the lock; report the task, and on request its parent, agent, or the focus after it. */
@@ -395,7 +393,7 @@ export async function main(given: CliIo): Promise<number> {
                 return 0;
             }
             default:
-                throw new UsageError(`unknown command "${command}" — see tsk --help`);
+                throw new UsageError(`unknown command "${command}"; see tsk --help`);
         }
     } catch (e) {
         if (e instanceof UsageError || e instanceof TaskOpError || e instanceof StoreError) {
@@ -406,7 +404,7 @@ export async function main(given: CliIo): Promise<number> {
             e instanceof TypeError &&
             (e as NodeJS.ErrnoException).code?.startsWith('ERR_PARSE_ARGS')
         ) {
-            io.err(`tsk: ${e.message} — see tsk --help`);
+            io.err(`tsk: ${e.message}; see tsk --help`);
             return 1;
         }
         io.err(`tsk: unexpected error: ${(e as Error).stack ?? e}`);

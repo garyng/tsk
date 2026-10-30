@@ -36,7 +36,7 @@ export async function showInTui(
         try {
             checkRuntimeDir(dir);
         } catch (e) {
-            io.err(`tsk: won't ask the TUIs there: ${(e as Error).message}`);
+            io.err(`tsk: won't ask the TUIs: ${(e as Error).message}`);
             return 1;
         }
         live = readRecords(dir).filter(isAlive);

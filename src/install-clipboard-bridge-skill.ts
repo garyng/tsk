@@ -61,7 +61,7 @@ export function registerInstallClipboardBridgeSkillCommand(
 
             const input = await vscode.window.showInputBox({
                 title: 'Install Clipboard Bridge Skill',
-                prompt: 'Where to write the skill — relative to the workspace folder, or an absolute path.',
+                prompt: 'Skill path, relative to the workspace folder or absolute.',
                 value: CLIPBOARD_BRIDGE_SKILL_REL_PATH,
                 validateInput: (v) => (v.trim() === '' ? 'Enter a path.' : undefined),
             });
@@ -95,7 +95,7 @@ export function registerInstallClipboardBridgeSkillCommand(
             } catch (err) {
                 const message = (err as Error).message;
                 logger.error(`${COMMANDS.installClipboardBridgeSkill}: write failed: ${message}`);
-                void vscode.window.showErrorMessage(`Tsk: failed to install skill — ${message}`);
+                void vscode.window.showErrorMessage(`Tsk: failed to install the skill: ${message}`);
                 return;
             }
 

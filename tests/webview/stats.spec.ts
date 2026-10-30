@@ -143,7 +143,7 @@ test('switching metric updates the active chip', async ({ page }) => {
     await expect(page.locator('.tsk-chip--active')).toContainText('Completed');
 });
 
-test('surfaces the best-effort caveat only for a metric with no events', async ({ page }) => {
+test('shows the no-events note only for a metric with no events', async ({ page }) => {
     await mount(page);
     await expect(page.locator('.tsk-stats__note')).toHaveCount(0); // 'all' has events
     await page.getByRole('button', { name: 'Cancelled' }).click();
@@ -187,7 +187,7 @@ test.describe('golden snapshots', () => {
         await expect(page).toHaveScreenshot('stats-populated.png');
     });
 
-    test('an empty-metric view (caveat note)', async ({ page }) => {
+    test('an empty-metric view (no-events note)', async ({ page }) => {
         await mount(page);
         await page.getByRole('button', { name: 'Cancelled' }).click();
         await expect(page.locator('.tsk-stats__note')).toBeVisible();

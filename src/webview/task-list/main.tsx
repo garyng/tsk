@@ -192,7 +192,7 @@ function TaskList() {
                         <span
                             className="tsk-priority"
                             style={{ color: `rgb(${def.rgb[0]}, ${def.rgb[1]}, ${def.rgb[2]})` }}
-                            title={`Priority ${def.level} — ${def.label}`}
+                            title={`Priority ${def.level}: ${def.label}`}
                         >
                             P{def.level}
                         </span>

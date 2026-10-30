@@ -177,8 +177,8 @@ export class DiagnosticsManager {
                 const isCanonical =
                     occ.fileUri === canonical.fileUri && occ.line === canonical.line;
                 const message = isCanonical
-                    ? `Duplicate @id "${dup.id}" — this is the canonical occurrence (${dup.occurrences.length} total).`
-                    : `Duplicate @id "${dup.id}" — first occurrence at ${canonical.fileUri}:${canonical.line + 1} takes precedence.`;
+                    ? `Duplicate @id "${dup.id}": the canonical occurrence of ${dup.occurrences.length}.`
+                    : `Duplicate @id "${dup.id}": the one at ${canonical.fileUri}:${canonical.line + 1} takes precedence.`;
                 const diagnostic = new vscode.Diagnostic(
                     new vscode.Range(occ.line, 0, occ.line, ROW_END),
                     message,

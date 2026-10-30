@@ -190,7 +190,7 @@ export function registerPasteImageProvider(context: vscode.ExtensionContext, log
                 const problem = validateImagePath(selection);
                 if (problem) {
                     void vscode.window.showWarningMessage(
-                        `Tsk: can't use the selection as an image path — ${problem}.`,
+                        `Tsk: can't use the selection as an image path: ${problem}.`,
                     );
                     return undefined;
                 }
@@ -200,7 +200,7 @@ export function registerPasteImageProvider(context: vscode.ExtensionContext, log
                 const input = await promptForPath(
                     fallback,
                     ext,
-                    'Where to save the image — relative to the current file, or an absolute path.',
+                    'Image path, relative to the current file or absolute.',
                 );
                 if (input === undefined) {
                     logger.debug('paste-image: cancelled at path prompt');
@@ -223,9 +223,7 @@ export function registerPasteImageProvider(context: vscode.ExtensionContext, log
                 }
                 relPath = renamed;
                 if (existsSync(resolveTarget(docDir, relPath))) {
-                    void vscode.window.showWarningMessage(
-                        `Tsk: ${relPath} already exists — overwriting.`,
-                    );
+                    void vscode.window.showWarningMessage(`Tsk: overwriting ${relPath}.`);
                 }
             }
 

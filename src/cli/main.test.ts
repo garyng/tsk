@@ -191,7 +191,7 @@ describe('tsk command line', () => {
         expect((await tsk('reword t0000001')).err).toBe('tsk: reword: missing the new text');
         expect(await tsk('reword t0000001 "a <!-- b"')).toMatchObject({
             code: 1,
-            err: 'tsk: the text cannot hold "<!--" — it would open a metadata comment',
+            err: 'tsk: the text cannot hold "<!--"',
         });
         expect((await tsk('reword nope x')).err).toBe('tsk: no task with @id:nope');
     });
@@ -246,7 +246,7 @@ describe('tsk command line', () => {
     });
 
     it('prints the usage for no command and for --help', async () => {
-        expect((await tsk('')).out).toMatch(/^tsk — track work/);
+        expect((await tsk('')).out).toMatch(/^tsk: track work/);
         expect((await tsk('--help')).code).toBe(0);
     });
 });
@@ -383,7 +383,7 @@ describe('tsk show <id> --tui', () => {
         expect(await show('t0000001', { CLAUDE_PID: '999' })).toEqual({
             code: 1,
             out: '',
-            err: 'tsk: no TUI on claude.tsk follows this Claude (pid 999) — tsk tui opens one',
+            err: 'tsk: no TUI on claude.tsk follows this Claude (pid 999); `tsk tui --follow-pid 999` opens one',
         });
         expect(asked).toEqual([]);
     });
@@ -400,7 +400,7 @@ describe('tsk show <id> --tui', () => {
         expect(await show('t0000001', {})).toEqual({
             code: 1,
             out: '',
-            err: 'tsk: no TUI is open on claude.tsk — tsk tui opens one',
+            err: 'tsk: no TUI is open on claude.tsk; `tsk tui` opens one',
         });
         const asked = await tui({ followPid: 4242 }, () => ({
             ok: false,
@@ -505,8 +505,8 @@ describe('tsk select-clicked', () => {
         const asked = await tui('%9');
         const r = await click('tsk:t0000001', 0);
         expect(r.code).toBe(0);
-        expect(r.err).toBe('tsk: no TUI beside this pane; tsk tui opens one');
-        expect(r.tmux.at(-1)).toEqual(told('tsk: no TUI beside this pane; tsk tui opens one'));
+        expect(r.err).toBe('tsk: no TUI beside this pane; `tsk tui` opens one');
+        expect(r.tmux.at(-1)).toEqual(told('tsk: no TUI beside this pane; `tsk tui` opens one'));
         expect(asked).toEqual([]);
     });
 

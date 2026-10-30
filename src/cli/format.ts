@@ -50,7 +50,7 @@ export function formatTrail(trail: Trail, session: string, tree: TaskTree): stri
         );
         for (const n of trail.openChildren) out.push(`    ${label(n)}${waitNote(tree, n)}`);
     } else {
-        out.push(`no focus (session ${session}) — \`tsk focus <id>\` or \`tsk push <text>\``);
+        out.push(`no focus (session ${session}): \`tsk focus <id>\` or \`tsk push <text>\``);
     }
     if (trail.withAgents.length > 0) {
         out.push('with agents:');

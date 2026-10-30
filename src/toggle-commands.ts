@@ -166,7 +166,7 @@ export function registerCopyTaskIdCommand(context: vscode.ExtensionContext, logg
             const line = editor.document.lineAt(editor.selection.active.line).text;
             const parsed = parseLine(line);
             if (!parsed) {
-                void vscode.window.showWarningMessage('Tsk: not on a task line.');
+                void vscode.window.showWarningMessage('Tsk: the cursor is not on a task line.');
                 return;
             }
             const id = parsed.metadata.get('id');

@@ -183,7 +183,7 @@ export const KEY_TABLE: readonly KeyRow[] = [
     },
     {
         keys: 'u/h/esc',
-        help: 'zoom out, leave deps (esc: close these keys, unmark all, then clear the filter, first)',
+        help: 'zoom out, leave deps (esc first closes this list, unmarks, clears the filter)',
         group: 'views',
         // Esc first: a click on the hint does what Esc does.
         bind: [
@@ -247,7 +247,7 @@ export const KEY_TABLE: readonly KeyRow[] = [
     },
     {
         keys: '/',
-        help: 'filter the tree: the tasks that match, in what they sit in (⏎ keeps it, esc clears)',
+        help: 'filter the tree (⏎ keeps it, esc clears)',
         group: 'views',
         bind: [{ action: 'filter', chars: ['/'] }],
         hint: { label: 'filter', order: 42, when: (ctx) => ctx.view === 'tree' },

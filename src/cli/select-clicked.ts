@@ -48,7 +48,7 @@ export async function selectClicked(click: ClickIn, io: SelectClickedIo): Promis
     if (!id) return 0;
     const socket = tmuxSocket(io.env);
     if (!socket) {
-        io.err('tsk: select-clicked is for tmux to run, and TMUX is unset');
+        io.err('tsk: select-clicked: TMUX is unset');
         return 1;
     }
     const tmux = io.tmux ?? runTmux;
@@ -70,7 +70,7 @@ export async function selectClicked(click: ClickIn, io: SelectClickedIo): Promis
     const listed = await tmux(socket, ['list-panes', '-t', click.pane, '-F', '#{pane_id}']);
     const window = new Set(listed.split('\n').map((l) => l.trim()));
     const beside = live.filter((r) => r.tmux?.socket === socket && window.has(r.tmux.pane));
-    if (beside.length === 0) return tell('no TUI beside this pane; tsk tui opens one');
+    if (beside.length === 0) return tell('no TUI beside this pane; `tsk tui` opens one');
     const why: string[] = [];
     for (const r of beside) {
         const reply = await askTui(dir, r.pid, id).catch((e: Error) => ({

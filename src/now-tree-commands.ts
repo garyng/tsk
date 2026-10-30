@@ -109,10 +109,7 @@ export function registerNowTreeCommands(
     async function clear(): Promise<void> {
         const state = nowStore.getState();
         if (state.entries.length === 0 && state.currentEntryId === null) return;
-        const choice = await vscode.window.showWarningMessage(
-            'Clear the entire "now" history? Your tasks are not affected.',
-            'Clear',
-        );
+        const choice = await vscode.window.showWarningMessage('Clear the "now" history?', 'Clear');
         if (choice === 'Clear') nowStore.clear();
     }
 

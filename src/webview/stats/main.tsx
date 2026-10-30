@@ -221,10 +221,8 @@ function Stats() {
                 />
                 {!hasEvents && (
                     <p className="tsk-stats__note">
-                        No <strong>{METRIC_LABEL[metric].toLowerCase()}</strong> events stamped in
-                        the last year. Status timestamps are written when you toggle a task’s status
-                        (or move it) or mark it now — a hand-typed marker isn’t recorded, so this
-                        reflects tasks currently bearing each stamp, not a full history.
+                        No <strong>{METRIC_LABEL[metric].toLowerCase()}</strong> events in the last
+                        year.
                     </p>
                 )}
             </section>

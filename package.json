@@ -1,8 +1,8 @@
 {
     "name": "tsk",
     "displayName": "tsk",
-    "description": "A markdown-based task manager: enrich .tsk files with inline metadata, tags, relationship graphs, code lenses, and a queryable cache.",
-    "version": "0.10.0",
+    "description": "A Markdown-based task manager for .tsk files.",
+    "version": "0.10.1",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -56,11 +56,11 @@
             },
             {
                 "id": "taskMetadata",
-                "description": "A tsk task's inline <!-- ... --> metadata block, dimmed so it recedes."
+                "description": "A tsk task's inline <!-- ... --> metadata block."
             },
             {
                 "id": "taskDivider",
-                "description": "The trailing dash run of a divider line, dimmed so the section label reads as a heading."
+                "description": "The trailing dash run of a divider line."
             }
         ],
         "semanticTokenModifiers": [
@@ -520,7 +520,7 @@
             },
             {
                 "id": "tsk.now.highlight",
-                "description": "Border color of the current \"now\" task line (marked via Tsk: Mark Now). Persistent — distinct from the tsk.navigation.highlight navigate tint and from the priority line-background fill. Defaults to the in-progress blue so \"now\" reads as a box around the line on light and dark themes; override via workbench.colorCustomizations.",
+                "description": "Border color of the current \"now\" task line (Tsk: Mark Now).",
                 "defaults": {
                     "light": "#3794ffcc",
                     "dark": "#3794ffcc"
@@ -578,7 +578,7 @@
                     "default": 300,
                     "minimum": 0,
                     "maximum": 5000,
-                    "description": "Debounce (ms) before re-decorating and rescanning a .tsk document after a text change. Lower feels snappier; higher coalesces typing bursts on large files."
+                    "description": "Debounce (ms) before re-decorating and rescanning a .tsk document after a text change."
                 },
                 "tsk.decorations.priority.opacity": {
                     "type": "number",
@@ -590,7 +590,7 @@
                 "tsk.clipboard.bridgeEnabled": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Watch the clipboard-bridge file and copy its contents to the host clipboard on change. Off by default. Useful inside devcontainers where no host clipboard tool (xclip / wl-copy / clip.exe / pbcopy) is reachable — any process that can write the file can push text to the host clipboard."
+                    "description": "Watch the clipboard-bridge file and copy its contents to the host clipboard on change, for devcontainers with no host clipboard tool. Any process that can write the file can set the host clipboard."
                 },
                 "tsk.clipboard.bridgePath": {
                     "type": "string",
@@ -605,22 +605,22 @@
                 "tsk.state.path": {
                     "type": "string",
                     "default": "${workspaceFolder}/.vscode/tsk/state.db",
-                    "description": "Path to the on-disk SQLite state database holding the \"now\" undo-tree. Kept separate from the rebuildable cache, so Tsk: Rebuild Cache never touches it. Supports ${workspaceFolder} substitution. When no workspace folder is open, the now-tree is in-memory and lost when the window closes."
+                    "description": "Path to the on-disk SQLite state database holding the \"now\" undo-tree. Supports ${workspaceFolder} substitution. When no workspace folder is open, the now-tree is in-memory and lost when the window closes."
                 },
                 "tsk.now.autoInProgress": {
                     "type": "boolean",
                     "default": true,
-                    "description": "When marking a task as \"now\" (via Tsk: Mark Now), also set its marker to [/] in-progress. Turn off to keep \"now\" purely a tree operation that never changes the task's status marker."
+                    "description": "When marking a task as \"now\" (via Tsk: Mark Now), also set its marker to [/] in-progress."
                 },
                 "tsk.doubleClickSelectsBlock": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Double-click a task's marker, bullet, or indentation in a .tsk editor to select its whole block (the task plus its indented sub-items). Double-clicking the task's text still selects a single word. Turn off to leave double-click as VS Code's default word-select everywhere."
+                    "description": "Double-click a task's marker, bullet, or indentation in a .tsk editor to select its whole block (the task plus its indented sub-items). Double-clicking its text selects a word."
                 },
                 "tsk.blockTrailingNewline": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Include the trailing newline when operating on a whole task block: copying / cutting it to the clipboard (Ctrl+C / Ctrl+X with nothing selected), and selecting it (double-click a marker, or Tsk: Select Task Block) extend through the line break. So the block is a self-contained unit on its own line. Off → block operations end at the block's last character."
+                    "description": "Include the trailing newline when copying, cutting or selecting a whole task block."
                 },
                 "tsk.panel.nowStack.openDirection": {
                     "type": "string",
@@ -639,7 +639,7 @@
                         "In a group below the editor.",
                         "As a tab in the editor's own group."
                     ],
-                    "markdownDescription": "Where the Now Stack panel opens. Applied when the panel is created, not when an already-open one is revealed — so a panel you have dragged elsewhere stays put. The default is where this panel opened before the setting existed."
+                    "markdownDescription": "Where the Now Stack panel opens when it is created."
                 },
                 "tsk.panel.stats.openDirection": {
                     "type": "string",
@@ -658,7 +658,7 @@
                         "In a group below the editor.",
                         "As a tab in the editor's own group."
                     ],
-                    "markdownDescription": "Where the Stats panel opens. Applied when the panel is created, not when an already-open one is revealed — so a panel you have dragged elsewhere stays put. The default is where this panel opened before the setting existed."
+                    "markdownDescription": "Where the Stats panel opens when it is created."
                 },
                 "tsk.panel.taskList.openDirection": {
                     "type": "string",
@@ -677,18 +677,18 @@
                         "In a group below the editor.",
                         "As a tab in the editor's own group."
                     ],
-                    "markdownDescription": "Where the Task List panel opens. Applied when the panel is created, not when an already-open one is revealed — so a panel you have dragged elsewhere stays put. The default is where this panel opened before the setting existed."
+                    "markdownDescription": "Where the Task List panel opens when it is created."
                 },
                 "tsk.divider.width": {
                     "type": "number",
                     "default": 100,
                     "minimum": 8,
-                    "markdownDescription": "Column width `Tsk: Insert Divider…` pads a divider line to. Only affects newly written dividers — an existing one of any length still folds and styles."
+                    "markdownDescription": "Column width `Tsk: Insert Divider…` pads a new divider line to."
                 },
                 "tsk.autolinks": {
                     "type": "array",
                     "default": [],
-                    "markdownDescription": "Turn text matching a regular expression into a clickable link in `.tsk` editors. Each rule's `pattern` is tested against every line (the `g` flag is always applied); each match becomes a link whose URL is `target` with capture groups substituted via JavaScript `String.replace` semantics — `$1`/`$2` (numbered), `$<name>` (named `(?<name>…)`), `$&` (whole match), `$$` (literal `$`). Example: `{ \"pattern\": \"([A-Z]+)-([0-9]+)\", \"target\": \"https://jira.example.com/$1-$2\" }` links `JIRAID-123`. Earlier rules win where matches overlap. A pattern using look-behind/look-ahead positions the link correctly but won't substitute (the URL falls back to the raw match).",
+                    "markdownDescription": "Turn text matching a regular expression into a clickable link in `.tsk` editors. Each rule's `pattern` is tested against every line (the `g` flag is always applied); each match becomes a link whose URL is `target` with capture groups substituted via JavaScript `String.replace` semantics: `$1`/`$2` (numbered), `$<name>` (named `(?<name>…)`), `$&` (whole match), `$$` (literal `$`). Example: `{ \"pattern\": \"([A-Z]+)-([0-9]+)\", \"target\": \"https://jira.example.com/$1-$2\" }` links `JIRAID-123`. Earlier rules win where matches overlap. A pattern using look-behind/look-ahead positions the link correctly but won't substitute (the URL falls back to the raw match).",
                     "items": {
                         "type": "object",
                         "required": [
@@ -699,7 +699,7 @@
                         "properties": {
                             "pattern": {
                                 "type": "string",
-                                "markdownDescription": "JavaScript regular-expression source, matched against every line. Use capture groups — including named `(?<name>…)` — to feed `target`."
+                                "markdownDescription": "JavaScript regular-expression source, matched against every line. Capture groups feed `target`."
                             },
                             "target": {
                                 "type": "string",
@@ -708,7 +708,7 @@
                             "flags": {
                                 "type": "string",
                                 "pattern": "^[imsu]*$",
-                                "markdownDescription": "Optional extra regex flags — any of `i` `m` `s` `u`. The `g` flag is always applied automatically."
+                                "markdownDescription": "Extra regex flags: any of `i` `m` `s` `u`. `g` is always applied."
                             }
                         }
                     }

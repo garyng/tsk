@@ -63,7 +63,7 @@ export function registerRevealTask(
         const expected = `${vscode.env.uriScheme}://${context.extension.id}${OPEN_TASK_PATH}?id=<id>`;
         logger.warn(`URI not understood: ${uri.toString(true)} (expected ${expected}).`);
         void vscode.window.showWarningMessage(
-            `Tsk: can't open ${uri.toString(true)} — expected ${expected}.`,
+            `Tsk: can't open ${uri.toString(true)}; expected ${expected}.`,
         );
     }
 

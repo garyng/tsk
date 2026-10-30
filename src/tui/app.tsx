@@ -153,8 +153,8 @@ const NOTE_ROWS = 5;
 /** The note's hints, longest first: the footer shows the first that leaves room to type. */
 const NOTE_HINTS = ['⏎ send · ⇧⏎ new line · esc cancel ', '⏎ send · esc cancel '];
 /** What `space`, `z` and `Z` say outside the tree view, and while it's filtered. */
-const FOLD_ELSEWHERE = 'folding works in the tree view — 2';
-const FOLD_FILTERED = 'no folding while filtered — esc clears the filter';
+const FOLD_ELSEWHERE = 'folding works in the tree view: 2';
+const FOLD_FILTERED = 'no folding while filtered; esc clears the filter';
 /** The `/` filter's prompt, before the query. */
 const FILTER_LEAD = ' / ';
 /** No terms to highlight. */

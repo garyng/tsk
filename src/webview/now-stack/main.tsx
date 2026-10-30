@@ -83,7 +83,7 @@ function NowStack() {
             {empty ? (
                 // `null` (pre-handshake) and `[]` (empty tree) both render empty.
                 <p className="now-stack__empty">
-                    No task marked as "now" — run <strong>Tsk: Mark Now</strong> on a task.
+                    No "now" task. Run <strong>Tsk: Mark Now</strong> on a task.
                 </p>
             ) : (
                 <NowTree rows={rows} />

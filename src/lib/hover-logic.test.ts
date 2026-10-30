@@ -122,7 +122,7 @@ describe('buildTaskHoverMarkdown', () => {
             makeTask({ metadata: new Map([['parent', 'gone']]) }),
             emptyDeps,
         );
-        expect(md).toContain('**parent:** `(gone)` *— missing in workspace*');
+        expect(md).toContain('**parent:** `(gone)` *missing in workspace*');
         expect(md).not.toContain('command:tsk.goToParent');
     });
 
@@ -135,7 +135,7 @@ describe('buildTaskHoverMarkdown', () => {
             },
         );
         expect(md).toMatch(
-            /\*\*depends on:\*\* \[the venue\]\(command:tsk\.goToParent\?[^)]*\) `\(d1\)` · `\(gone\)` \*— missing in workspace\*/,
+            /\*\*depends on:\*\* \[the venue\]\(command:tsk\.goToParent\?[^)]*\) `\(d1\)` · `\(gone\)` \*missing in workspace\*/,
         );
     });
 

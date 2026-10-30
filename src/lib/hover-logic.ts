@@ -61,7 +61,7 @@ const MARKER_LABEL = Object.fromEntries(MARKERS.map((m) => [m.name, m.label])) a
  * "Tags: " line, no zero-row table).
  *
  * **Forward refs** to ids the workspace doesn't know are rendered as
- * `*— missing in workspace*` — redundant with the M20/B diagnostic
+ * `*missing in workspace*` — redundant with the broken-reference diagnostic
  * squiggle, but the hover is what users read at the point of curiosity.
  *
  * **Inverse-ref navigation** uses `tsk.goToParent` regardless of
@@ -120,7 +120,7 @@ export function buildTaskHoverMarkdown(task: HoverTaskInput, deps: HoverDeps): s
         if (targetIds.length === 0) continue;
         const refs = targetIds.map((targetId) => {
             const target = deps.lookupTask(targetId);
-            if (!target) return `\`(${targetId})\` *— missing in workspace*`;
+            if (!target) return `\`(${targetId})\` *missing in workspace*`;
             const labelText = target.content === '' ? '*(empty)*' : escapeMarkdown(target.content);
             return `${commandLink('tsk.goToParent', [targetId], labelText)} \`(${targetId})\``;
         });

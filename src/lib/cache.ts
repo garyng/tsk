@@ -77,8 +77,7 @@ export class CacheService {
                         fileUri: uri,
                         line: task.line,
                         columnEnd: task.raw.length,
-                        message:
-                            "Task has no @id — won't participate in codelens, tag-find, or graph lookups until one is added.",
+                        message: 'Task has no @id.',
                     });
                     skipped++;
                     continue;

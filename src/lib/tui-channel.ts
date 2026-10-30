@@ -199,6 +199,11 @@ export function describeTui(r: TuiRecord, session: string | undefined): string {
     return shows.length > 0 ? `pid ${r.pid} (${shows.join(', ')})` : `pid ${r.pid}`;
 }
 
+/** The command that opens a TUI `tsk show <id> --tui` would ask, for this asker. */
+function opener(asker: Asker): string {
+    return asker.claudePid !== undefined ? `tsk tui --follow-pid ${asker.claudePid}` : 'tsk tui';
+}
+
 /**
  * Which live TUIs `tsk show <id> --tui` asks: only ones on the asker's file.
  * From a Claude's shell, the one following that Claude and no other, so one
@@ -212,12 +217,13 @@ export function pickTuis(
 ): { tuis: TuiRecord[] } | { why: string } {
     const name = path.basename(asker.file);
     const onFile = live.filter((r) => r.file === asker.file);
-    if (onFile.length === 0) return { why: `no TUI is open on ${name} — tsk tui opens one` };
+    if (onFile.length === 0)
+        return { why: `no TUI is open on ${name}; \`${opener(asker)}\` opens one` };
     if (asker.claudePid !== undefined) {
         const tuis = onFile.filter((r) => r.followPid === asker.claudePid);
         if (tuis.length > 0) return { tuis };
         return {
-            why: `no TUI on ${name} follows this Claude (pid ${asker.claudePid}) — tsk tui opens one`,
+            why: `no TUI on ${name} follows this Claude (pid ${asker.claudePid}); \`${opener(asker)}\` opens one`,
         };
     }
     if (asker.session !== undefined) {

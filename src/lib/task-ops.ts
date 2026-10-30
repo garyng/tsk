@@ -88,7 +88,7 @@ const AGENT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 function checkAgentName(name: string): string {
     if (!AGENT_NAME_RE.test(name)) {
         throw new TaskOpError(
-            `"${name}" isn't an agent name — one word of letters, digits, '.', '_' or '-'`,
+            `agent name "${name}" must be one word of letters, digits, '.', '_' or '-'`,
         );
     }
     return name;
@@ -219,7 +219,7 @@ export function parkTask(lines: readonly string[], id: string): OpResult {
         if (node.task.marker === 'todo') return line;
         if (node.task.marker !== 'inprogress') {
             throw new TaskOpError(
-                `@id:${id} is [${GLYPH[node.task.marker]}], not in progress — only an in-progress task can be parked`,
+                `@id:${id} is [${GLYPH[node.task.marker]}]; only an in-progress task can be parked`,
             );
         }
         const todo = removeMetadataEntry(swapMarker(line, 'todo'), 'started');
@@ -318,11 +318,10 @@ export function linkTask(lines: readonly string[], id: string, path: string): Op
  * replaces them.
  */
 export function rewordTask(lines: readonly string[], id: string, text: string): OpResult {
-    if (/[\r\n]/.test(text)) throw new TaskOpError('a task is one line — the text has a newline');
+    if (/[\r\n]/.test(text)) throw new TaskOpError('the text cannot hold a newline');
     const words = text.replace(/\s+/g, ' ').trim();
     if (words === '') throw new TaskOpError('a task needs some text');
-    if (words.includes('<!--'))
-        throw new TaskOpError('the text cannot hold "<!--" — it would open a metadata comment');
+    if (words.includes('<!--')) throw new TaskOpError('the text cannot hold "<!--"');
     return editLine(lines, id, (line) => {
         const range = taskContentRange(line);
         if (!range) return line;
@@ -337,7 +336,7 @@ export function rewordTask(lines: readonly string[], id: string, text: string): 
         // Text glued to the marker, or more text after the comment, would be cut or kept wrongly.
         if (parseLine(after)?.content !== content) {
             throw new TaskOpError(
-                `@id:${id} isn't written "- [ ] text <!-- … -->" — change its text in an editor`,
+                `@id:${id} isn't written "- [ ] text <!-- … -->"; change its text in an editor`,
             );
         }
         return after;

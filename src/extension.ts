@@ -195,9 +195,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TskExt
     } catch (err) {
         const error = err as Error;
         logger.error(`activation failed: ${error.message}\n${error.stack ?? '(no stack)'}`);
-        void vscode.window.showErrorMessage(
-            'Tsk: activation failed — see the tsk Output channel for details.',
-        );
+        void vscode.window.showErrorMessage('Tsk: activation failed. See the tsk Output channel.');
         throw err;
     }
 }

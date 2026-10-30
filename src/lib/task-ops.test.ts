@@ -193,7 +193,7 @@ describe('focus, finish and park', () => {
         expect(parked.lines[1]).toBe('  - [ ] c <!-- @id:c @session:s -->');
         expect(parkTask(parked.lines, 'c').changed).toBe(false);
         expect(() => parkTask(finishTask(start, 'c', 'completed', deps).lines, 'c')).toThrow(
-            /\[x\], not in progress/,
+            /\[x\]; only an in-progress task can be parked/,
         );
     });
 });
@@ -336,7 +336,7 @@ describe('rewordTask', () => {
         const lines = ['- [ ] a <!-- @id:a -->'];
         expect(() => rewordTask(lines, 'nope', 'x')).toThrow(/no task with @id:nope/);
         expect(() => rewordTask(lines, 'a', ' \t ')).toThrow(/needs some text/);
-        expect(() => rewordTask(lines, 'a', 'two\nlines')).toThrow(/has a newline/);
+        expect(() => rewordTask(lines, 'a', 'two\nlines')).toThrow(/cannot hold a newline/);
         expect(() => rewordTask(lines, 'a', 'x <!-- @id:b')).toThrow(/cannot hold "<!--"/);
     });
 

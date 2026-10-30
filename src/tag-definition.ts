@@ -131,7 +131,6 @@ async function defineTag(loader: TagsLoader, logger: Logger, tag?: string): Prom
 
     const description = await vscode.window.showInputBox({
         prompt: `Description for #${resolved}`,
-        placeHolder: 'what this tag is for',
     });
     if (description === undefined) {
         logger.debug(`${COMMANDS.defineTag}: cancelled`);

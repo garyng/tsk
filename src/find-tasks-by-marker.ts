@@ -38,7 +38,7 @@ export function registerFindAllTasksByStatusCommand(
             const items = markersToPickItems(counts);
             const picked = await vscode.window.showQuickPick(items, {
                 title: 'Tsk: Find All Tasks by Status',
-                placeHolder: 'Pick a status marker to find every task carrying it…',
+                placeHolder: 'Pick a status',
                 matchOnDescription: true,
             });
             if (!picked) return;

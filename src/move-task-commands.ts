@@ -395,7 +395,7 @@ function warnPassedThrough(count: number): void {
     // Worded prospectively — this fires before applyEdit (and, for move /
     // send-one, before the target pick), which the user can still cancel.
     void vscode.window.showWarningMessage(
-        `Tsk: ${count} bracketed line(s) match neither the markdown marker map nor tsk — they move as-is.`,
+        `Tsk: ${count} bracketed line(s) match neither tsk nor tsk.migrate.markers and move unchanged.`,
     );
 }
 

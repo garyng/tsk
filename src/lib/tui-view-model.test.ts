@@ -73,7 +73,7 @@ describe('sessionLines', () => {
     it('says so when the session has no focus or there is no session', () => {
         const t = buildTaskTree(['- [ ] queued <!-- @id:q @session:s -->']);
         expect(show(sessionLines(t, 's'))).toEqual([
-            '[no focus — `tsk focus <id>` or `tsk push <text>`]',
+            '[no focus: `tsk focus <id>` or `tsk push <text>`]',
             '[also open]',
             '0 q',
         ]);
@@ -382,7 +382,7 @@ describe('layerLines', () => {
             '- [ ] a <!-- @id:a @dependsOn:b -->',
             '- [ ] b <!-- @id:b @dependsOn:a -->',
         ]);
-        expect(show(layerLines(loop))).toEqual(['[in a loop — or waiting on one]', '0 a', '0 b']);
+        expect(show(layerLines(loop))).toEqual(['[in a loop, or waiting on one]', '0 a', '0 b']);
         expect(layerLines(fixture())[0]).toMatchObject({ kind: 'heading' });
     });
 });

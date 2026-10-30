@@ -51,7 +51,7 @@ export function DetailPane({
     const shown = lines.slice(win.top, win.top + win.fileRows);
     const fileRule = (): DetailSpan[] => {
         if (!marker) return [{ text: 'nothing selected', tone: 'muted' }];
-        if (!doc) return [{ text: 'no plan linked — tsk link <id> <path>', tone: 'muted' }];
+        if (!doc) return [{ text: 'no plan linked: tsk link <id> <path>', tone: 'muted' }];
         if (doc.error) return [{ text: `couldn't read ${doc.path}: ${doc.error}`, tone: 'error' }];
         const at = shown.find((l) => l.source !== undefined)?.source;
         const name = `── ${posix.basename(doc.path)}${at !== undefined ? `:${at + 1}` : ''} `;

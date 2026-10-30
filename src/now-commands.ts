@@ -44,7 +44,7 @@ export function registerNowCommands(
             const lineNo = editor.selection.active.line;
             const before = editor.document.lineAt(lineNo).text;
             if (!parseLine(before)) {
-                void vscode.window.showInformationMessage('Tsk: not on a task line.');
+                void vscode.window.showInformationMessage('Tsk: the cursor is not on a task line.');
                 return;
             }
 

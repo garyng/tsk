@@ -152,7 +152,10 @@ describe('pickTuis', () => {
 
     it("asks only TUIs on the asker's file", () => {
         expect(pickTuis([elsewhere], { file }, sessionOf)).toEqual({
-            why: 'no TUI is open on claude.tsk — tsk tui opens one',
+            why: 'no TUI is open on claude.tsk; `tsk tui` opens one',
+        });
+        expect(pickTuis([elsewhere], { file, claudePid: 10 }, sessionOf)).toEqual({
+            why: 'no TUI is open on claude.tsk; `tsk tui --follow-pid 10` opens one',
         });
     });
 
@@ -161,7 +164,7 @@ describe('pickTuis', () => {
             tuis: [a],
         });
         expect(pickTuis([b], { file, claudePid: 10, session: 'bbbbbbbb' }, sessionOf)).toEqual({
-            why: 'no TUI on claude.tsk follows this Claude (pid 10) — tsk tui opens one',
+            why: 'no TUI on claude.tsk follows this Claude (pid 10); `tsk tui --follow-pid 10` opens one',
         });
     });
 
