@@ -150,13 +150,13 @@ describe('tsk TUI', () => {
         expect(position()).toBe('2/5'); // still phase one, now under the plan
     });
 
-    it('changes nothing in the file on the keys that used to: s, S, c and x', async () => {
+    it('changes nothing in the file on the keys that used to: S, c and x', async () => {
         const f = fakeIo();
         ui = render(<App io={f.io} />);
         const before = f.text();
         ui.stdin.write('j'); // step a
         await tick();
-        ui.stdin.write('sScx');
+        ui.stdin.write('Scx');
         await tick();
         expect(f.text()).toBe(before);
         expect(position()).toBe('2/4');
@@ -471,6 +471,46 @@ describe('tsk TUI', () => {
         ui.stdin.write('d');
         await tick();
         expect(footer()).toMatch(/^esc back {2}d deps /);
+    });
+
+    it("switches to the Claude on the task's session on s, offered on another session's task", async () => {
+        const asked: string[] = [];
+        const running = new Set(['s', 'bbbb0001']);
+        const io: TuiIo = {
+            ...fakeIo({ session: 's' }, [
+                '- [ ] mine <!-- @id:m1 @session:s -->',
+                '- [ ] theirs <!-- @id:t1 @session:bbbb0001 -->',
+                '  - [ ] by hand',
+                '- [ ] gone <!-- @id:g1 @session:cccc0001 -->',
+            ]).io,
+            switchTo: async (session) => {
+                asked.push(session);
+                return running.has(session) ? undefined : `no Claude has session ${session} open`;
+            },
+        };
+        ui = render(<App io={io} />);
+        ui.stdin.write('2');
+        ui.stdin.write('g');
+        await tick();
+        expect(footer()).not.toContain('s switch');
+        ui.stdin.write('j');
+        await until(() => footer().includes('s switch'));
+        ui.stdin.write('s');
+        await until(() => asked.length === 1);
+        ui.stdin.write('j'); // a line written by hand: its parent's session
+        await tick();
+        expect(footer()).toContain('s switch');
+        ui.stdin.write('s');
+        await until(() => asked.length === 2);
+        ui.stdin.write('j'); // no Claude is on it: s says so
+        await tick();
+        expect(footer()).toContain('s switch');
+        ui.stdin.write('s');
+        await until(() => footer() === 'no Claude has session cccc0001 open');
+        ui.stdin.write('gs'); // the followed session's own: no hint, and s goes to its Claude
+        await until(() => asked.length === 4);
+        expect(footer()).not.toContain('s switch');
+        expect(asked).toEqual(['bbbb0001', 'bbbb0001', 'cccc0001', 's']);
     });
 
     it('keeps "? keys" when the hints have to shrink', () => {

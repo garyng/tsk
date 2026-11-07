@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { agentOf, sessionFocus, sessionTrail, shortSessionId } from './session-focus';
+import {
+    agentOf,
+    owningSession,
+    sessionFocus,
+    sessionTrail,
+    shortSessionId,
+} from './session-focus';
 import { buildTaskTree } from './task-tree';
 
 const ids = (nodes: readonly { id: string | undefined }[]) => nodes.map((n) => n.id);
@@ -105,6 +111,21 @@ describe('agentOf', () => {
         ]).nodes;
         expect(a && agentOf(a)).toBe('alpha');
         expect(b && agentOf(b)).toBeUndefined();
+    });
+});
+
+describe('owningSession', () => {
+    it("is the task's own session, else its nearest ancestor's", () => {
+        const [root, mid, kid, loose] = buildTaskTree([
+            '- [ ] root <!-- @id:r @session:aaaa0001 -->',
+            '  - [ ] mid <!-- @id:m @session:bbbb0001 -->',
+            '    - [ ] by hand',
+            '- [ ] loose',
+        ]).nodes;
+        expect(root && owningSession(root)).toBe('aaaa0001');
+        expect(mid && owningSession(mid)).toBe('bbbb0001');
+        expect(kid && owningSession(kid)).toBe('bbbb0001');
+        expect(loose && owningSession(loose)).toBeUndefined();
     });
 });
 

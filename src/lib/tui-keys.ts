@@ -34,6 +34,7 @@ export type TuiAction =
     | 'message'
     | 'mark'
     | 'open'
+    | 'switch'
     | 'states'
     | 'fold'
     | 'foldAll'
@@ -87,6 +88,8 @@ export interface KeyContext {
     readonly filtered?: boolean;
     /** A Claude session is followed, so `m` has someone to message. */
     readonly canTell?: boolean;
+    /** The selected task is another session's than the one followed, and tmux can switch to it. */
+    readonly canSwitch?: boolean;
     /** The selected task is in a file beside this one, which the tree doesn't show. */
     readonly outside?: boolean;
     /** The selected task is marked for the next message. */
@@ -276,6 +279,13 @@ export const KEY_TABLE: readonly KeyRow[] = [
         group: 'task',
         bind: [{ action: 'open', chars: ['e'] }],
         hint: { label: 'open', order: 60, when: hasTask },
+    },
+    {
+        keys: 's',
+        help: "switch tmux to its session's Claude",
+        group: 'task',
+        bind: [{ action: 'switch', chars: ['s'] }],
+        hint: { label: 'switch', order: 62, when: (ctx) => hasTask(ctx) && ctx.canSwitch === true },
     },
     {
         keys: 'p',

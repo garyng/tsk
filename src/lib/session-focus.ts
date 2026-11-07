@@ -40,6 +40,15 @@ export function sessionOf(node: TreeNode): string | undefined {
     return node.task.metadata.get(SESSION_KEY) ?? undefined;
 }
 
+/** The session a task belongs to: its own `@session`, else its nearest ancestor's (a line written by hand). */
+export function owningSession(node: TreeNode): string | undefined {
+    for (let n: TreeNode | undefined = node; n; n = n.parent) {
+        const session = sessionOf(n);
+        if (session) return session;
+    }
+    return undefined;
+}
+
 /** The agent the task was handed to, if any. */
 export function agentOf(node: TreeNode): string | undefined {
     return node.task.metadata.get(AGENT_KEY) ?? undefined;

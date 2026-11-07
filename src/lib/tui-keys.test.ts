@@ -44,9 +44,10 @@ describe('keysToActions', () => {
         expect(keysToActions('', { tab: true, shift: true })).toEqual(['prevView']);
     });
 
-    it('maps m to a message, and nothing to the keys that used to change a task', () => {
+    it('maps m to a message, s to a switch, and nothing to the keys that used to change a task', () => {
+        expect(keysToActions('s', {})).toEqual(['switch']);
         expect(keysToActions('mv', {})).toEqual(['message', 'mark']);
-        expect(keysToActions('sScx', {})).toEqual([]);
+        expect(keysToActions('Scx', {})).toEqual([]);
     });
 
     it('maps the detail pane: p shows it, J/K and PgDn/PgUp scroll it, o opens its file', () => {
@@ -87,6 +88,7 @@ describe('the key table', () => {
         'message',
         'mark',
         'open',
+        'switch',
         'states',
         'fold',
         'foldAll',
@@ -171,6 +173,14 @@ describe('hintsFor', () => {
         expect(show(hintsFor({ ...ctx, marked: true, marks: 2 }))).toContain('v unmark');
         expect(show(hintsFor({ ...ctx, marks: 2, filtered: true }))[0]).toBe('esc unmark all');
         expect(show(hintsFor(ctx))).not.toContain('esc unmark all');
+    });
+
+    it("offers s switch on another session's task, after e open", () => {
+        const ctx = { view: 'layers' as const, marker: 'todo' as const };
+        const shown = show(hintsFor({ ...ctx, canSwitch: true }));
+        expect(shown.indexOf('s switch')).toBe(shown.indexOf('e open') + 1);
+        expect(show(hintsFor(ctx))).not.toContain('s switch');
+        expect(show(hintsFor({ view: 'layers', canSwitch: true }))).not.toContain('s switch');
     });
 
     it('offers only ? keys when nothing is selected', () => {

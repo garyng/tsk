@@ -5,7 +5,7 @@ import stringWidth from 'string-width';
 import { anchorIndex, markdownLines } from '../lib/markdown-lines';
 import type { Marker } from '../lib/markers';
 import { headingFor, type MarkdownHeading, markdownHeadings } from '../lib/md-headings';
-import { sessionFocus } from '../lib/session-focus';
+import { owningSession, sessionFocus } from '../lib/session-focus';
 import { lookupId, outsideFileOf, type TaskTree, type TreeNode } from '../lib/task-tree';
 import { type Delivery, elapsed, type MessageSubject, messageText } from '../lib/tui-ask';
 import type { SelectReply } from '../lib/tui-channel';
@@ -98,6 +98,8 @@ export interface TuiIo {
     readonly pollMs: number;
     /** Open the task in an editor; a message on failure. */
     open(node: TreeNode): Promise<string | undefined>;
+    /** Switch tmux to the pane of the Claude on `session`; a message on failure. */
+    switchTo?(session: string): Promise<string | undefined>;
     /** Draw in colour; false under `NO_COLOR`. Default true. */
     readonly color?: boolean;
     /** The terminal's background, for the selection's tint and light or dark colours. Default dark. */
@@ -397,6 +399,7 @@ export function App({ io }: { io: TuiIo }) {
     const who_ = session
         ? `${session}${who.note ? ` · ${who.note}` : ''}`
         : (who.note ?? 'no session');
+    const owner = selected && owningSession(selected.node);
     const keyContext: KeyContext = {
         view,
         marker: selected?.node.task.marker,
@@ -405,6 +408,7 @@ export function App({ io }: { io: TuiIo }) {
         filtered: view === 'tree' && filter !== undefined,
         canTell: io.tell !== undefined,
         outside: selected !== undefined && elsewhere(selected.node) !== undefined,
+        canSwitch: owner !== undefined && owner !== session && io.switchTo !== undefined,
         marked: selected?.node.id !== undefined && marks.has(selected.node.id),
         marks: marked.length,
         help,
@@ -837,6 +841,17 @@ export function App({ io }: { io: TuiIo }) {
                 opened.then((err) =>
                     err ? complain(err) : say(`opened ${node.id ?? 'line'} in VS Code`),
                 );
+                return at;
+            }
+            case 'switch': {
+                if (!node) return at;
+                const to = owningSession(node);
+                if (!to) {
+                    complain('no session on this task');
+                    return at;
+                }
+                const switched = io.switchTo?.(to) ?? Promise.resolve('not in tmux');
+                switched.then((err) => err && complain(err));
                 return at;
             }
         }

@@ -6,6 +6,7 @@ import { readDoc, readOutside, treeWithOutside } from '../cli/store';
 import { runtimeDir, tmuxOf } from '../lib/tui-channel';
 import { wikiPathCandidates } from '../lib/wiki-link';
 import { App, type TuiIo, type Who } from './app';
+import { runningSessions, switchToClaude } from './claude-panes';
 import { claudeConfigDir, followPid } from './follow';
 import { tellSession, transcriptPath } from './inbox';
 import { listenForRequests } from './listen';
@@ -89,6 +90,11 @@ export async function runTui(opts: TuiOptions): Promise<number> {
         },
         pollMs: FOLLOW_POLL_MS,
         open: (node) => openInVsCode(opts.file, node.task.line, opts.env),
+        switchTo: (session) => {
+            const pid = runningSessions(configDir).get(session);
+            if (pid === undefined) return Promise.resolve(`no Claude has session ${session} open`);
+            return switchToClaude(pid, { env: opts.env });
+        },
         readLinked: (link) => {
             const candidates = linkCandidates(link, opts.file);
             const file = candidates.find((c) => fs.existsSync(c));
