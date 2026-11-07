@@ -35,6 +35,7 @@ import {
     type TaskTree,
     type TreeNode,
 } from '../lib/task-tree';
+import { commitTaskFile } from './commit';
 import { formatList, formatReady, formatShow, formatTrail, label } from './format';
 import { selectClicked, type Tmux } from './select-clicked';
 import { sessionStart } from './session-hook';
@@ -72,6 +73,7 @@ export const USAGE = `tsk: track work in a .tsk file
   tsk show <id> [--tui]             a task, the path down to it, and its children
                                     (--tui: select it in the TUI beside this Claude instead)
   tsk ls [--all]                    this session's tasks in their tree (--all: every task)
+  tsk commit                        commit the file whole, the message naming each session's changes
   tsk tui [--follow-pid <pid>]      a live view in the terminal; follows a Claude Code process's session
           [--no-mouse]              leave the mouse to the terminal (or TSK_NO_MOUSE)
   tsk session start                 Claude Code's SessionStart hook (reads the hook input on stdin)
@@ -244,6 +246,8 @@ export async function main(given: CliIo): Promise<number> {
         };
 
         switch (command) {
+            case 'commit':
+                return commitTaskFile(file, io);
             case 'trail': {
                 const s = needSession();
                 const tree = load();

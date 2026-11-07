@@ -332,7 +332,7 @@ describe('tsk TUI', () => {
         await typeFilter('step b', /1 match/);
         ui.stdin.write('\r');
         await until(() => strip().includes('/step b'));
-        expect(strip()).toMatch(/Steps {2}· \/step b +claude\.tsk {2}3\/3 ?$/);
+        expect(strip()).toMatch(/Steps {2}· ○◐ · \/step b +claude\.tsk {2}3\/3 ?$/);
         expect(footer()).toMatch(/^esc clear /);
         ui.stdin.write('j'); // the keys are the tree's again
         await tick();
@@ -602,46 +602,92 @@ describe('tsk TUI, the states the tree shows', () => {
     /** The tab strip, the first row. */
     const strip = () => ui?.lastFrame()?.split('\n')[0] ?? '';
 
-    it('a opens the list, h and l move, space ticks, Enter keeps it, and the tab strip says what shows', async () => {
+    it('opens on open tasks, and a picks a preset by its letter', async () => {
         ui = render(<App io={fakeIo({ session: 's' }, start).io} />);
-        ui.stdin.write('a'); // from the session view: the tree, and the list
+        ui.stdin.write('2');
+        await until(() => (ui?.lastFrame() ?? '').includes('step a'));
+        expect(strip()).toContain('· ○◐');
+        expect(ui.lastFrame()).not.toContain('shipped');
+        ui.stdin.write('a');
+        await until(() => footer().startsWith('show'));
+        expect(footer()).toMatch(
+            /^show {2}open {2}in progress {2}closed {2}all {2}pick… +⏎ keep · esc$/,
+        );
+        ui.stdin.write('a');
+        await until(() => (ui?.lastFrame() ?? '').includes('shipped'));
+        expect(strip()).not.toContain('·');
+        expect(footer()).toContain('a states');
+        ui.stdin.write('a');
+        await until(() => footer().startsWith('show'));
+        ui.stdin.write('c');
+        await until(() => strip().includes('· ✓✕→'));
+        expect(ui.lastFrame()).toContain('shipped');
+        expect(ui.lastFrame()).not.toContain('step a');
+        ui.stdin.write('a');
+        await until(() => footer().startsWith('show'));
+        ui.stdin.write('o');
+        await until(() => strip().includes('· ○◐'));
+        expect(ui.lastFrame()).not.toContain('shipped');
+    });
+
+    it('a from another view opens the Tree with the presets; h, l and Enter pick, Esc leaves it', async () => {
+        ui = render(<App io={fakeIo({ session: 's' }, start).io} />);
+        ui.stdin.write('a');
         await until(() => footer().startsWith('show'));
         expect(strip()).toMatch(/Tree/);
-        expect(footer()).toMatch(/^show {2}■ ○ todo {2}■ ◐ in progress {2}■ ✓ done /);
-        expect(ui.lastFrame()).toContain('shipped');
+        ui.stdin.write('l');
+        await tick();
+        ui.stdin.write('\r');
+        await until(() => strip().includes('· ◐ '));
+        expect(ui.lastFrame()).not.toContain('step a');
+        ui.stdin.write('a');
+        await until(() => footer().startsWith('show'));
+        ui.stdin.write('h');
+        await tick();
+        ui.stdin.write('\x1b');
+        await until(() => !footer().startsWith('show'));
+        expect(strip()).toContain('· ◐ ');
+    });
+
+    it('pick… opens the tick list from the states in view: h and l move, space ticks, Enter keeps it', async () => {
+        ui = render(<App io={fakeIo({ session: 's' }, start).io} />);
+        ui.stdin.write('a');
+        await until(() => footer().startsWith('show'));
+        ui.stdin.write('p');
+        await until(() => footer().startsWith('show  ■'));
+        expect(footer()).toMatch(/^show {2}■ ○ todo {2}■ ◐ in progress {2}□ ✓ done /);
         ui.stdin.write('ll');
         await tick();
         ui.stdin.write(' ');
-        await until(() => footer().includes('□ ✓ done'));
-        expect(ui.lastFrame()).toContain('shipped'); // nothing changes until Enter
+        await until(() => footer().includes('■ ✓ done'));
+        expect(ui.lastFrame()).not.toContain('shipped'); // nothing changes until Enter
         ui.stdin.write('\r');
-        await until(() => !(ui?.lastFrame() ?? '').includes('shipped'));
-        expect(strip()).toContain('· ○◐✕→•');
-        expect(footer()).toContain('a states');
+        await until(() => (ui?.lastFrame() ?? '').includes('shipped'));
+        expect(strip()).toContain('· ○◐✓');
     });
 
-    it('Esc leaves the states as they were, and an empty list is refused', async () => {
+    it('Esc leaves the tick list as it was, and an empty one is refused', async () => {
         ui = render(<App io={fakeIo({ session: 's' }, start).io} />);
-        ui.stdin.write('2');
-        await tick();
-        ui.stdin.write('a');
-        await until(() => footer().startsWith('show'));
+        const pick = async () => {
+            ui?.stdin.write('a');
+            await until(() => footer().startsWith('show'));
+            ui?.stdin.write('p');
+            await until(() => footer().startsWith('show  ■'));
+        };
+        await pick();
         ui.stdin.write(' l l');
         await tick();
         ui.stdin.write('\x1b');
         await until(() => !footer().startsWith('show'));
         expect(ui.lastFrame()).toContain('step a');
-        expect(strip()).not.toContain('·');
-        ui.stdin.write('a');
-        await until(() => footer().startsWith('show'));
-        for (const keys of [' ', 'l ', 'l ', 'l ', 'l ', 'l ']) {
-            ui.stdin.write(keys);
-            await tick();
-        }
-        expect(footer()).not.toContain('■');
+        expect(strip()).toContain('· ○◐ ');
+        await pick();
+        ui.stdin.write(' ');
+        await tick();
+        ui.stdin.write('l ');
+        await until(() => !footer().includes('■'));
         ui.stdin.write('\r');
         await until(() => footer() === 'tick a state to show');
-        expect(footer()).toBe('tick a state to show');
         expect(ui.lastFrame()).toContain('step a');
         ui.stdin.write('l'); // the list is still open, and the key clears the message
         await until(() => footer().startsWith('show'));
@@ -989,6 +1035,16 @@ describe('tsk TUI, asked from outside to select a task', () => {
         expect(r.ask('zz')).toEqual({ ok: false, why: 'no task zz in claude.tsk' });
         await tick();
         expect(position()).toBe(at);
+    });
+
+    it('refuses while the presets or the tick list is open', async () => {
+        const r = asked();
+        ui?.stdin.write('a');
+        await until(() => footer().startsWith('show'));
+        expect(r.ask('b')).toEqual({ ok: false, why: 'busy: the list of states is open' });
+        ui?.stdin.write('p');
+        await until(() => footer().startsWith('show  ■'));
+        expect(r.ask('b')).toEqual({ ok: false, why: 'busy: the list of states is open' });
     });
 
     it('stops taking requests when it closes', () => {

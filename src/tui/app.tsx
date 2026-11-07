@@ -45,7 +45,16 @@ import {
     viewWindow,
 } from '../lib/tui-layout';
 import { cursorRow, ESC_AGAIN_MS, noteEscape, noteRows, verticalMove } from '../lib/tui-note';
-import { STATES, shownStates, stateRow, statesGlyphs } from '../lib/tui-states';
+import {
+    OPEN_STATES,
+    PRESETS,
+    presetOf,
+    presetRow,
+    STATES,
+    shownStates,
+    stateRow,
+    statesGlyphs,
+} from '../lib/tui-states';
 import {
     crumbParts,
     dependencyLines,
@@ -178,9 +187,14 @@ export function App({ io }: { io: TuiIo }) {
     const [depsOf, setDepsOf] = useState<string>();
     const [back, setBack] = useState<View>('session');
     /** The states the tree shows; every one when undefined. */
-    const [states, setStates] = useState<ReadonlySet<Marker>>();
-    /** The list `a` opens, while it's open: what's ticked, and where its cursor is. */
-    const [picking, setPicking] = useState<{ ticked: ReadonlySet<Marker>; at: number }>();
+    const [states, setStates] = useState<ReadonlySet<Marker> | undefined>(OPEN_STATES);
+    /**
+     * What `a` opens, while it's open: the presets, or the tick list `pick…`
+     * opens (what's ticked); where its cursor is.
+     */
+    const [picking, setPicking] = useState<
+        { kind: 'presets'; at: number } | { kind: 'ticks'; ticked: ReadonlySet<Marker>; at: number }
+    >();
     /** The tree view's folds, by `@id`: this pane's own, never written to the shared file. */
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
     /**
@@ -661,7 +675,7 @@ export function App({ io }: { io: TuiIo }) {
                 return at;
             case 'states':
                 if (view !== 'tree') showView('tree');
-                setPicking({ ticked: states ?? new Set(STATES), at: 0 });
+                setPicking({ kind: 'presets', at: presetOf(states) });
                 return at;
             case 'filter':
                 if (view !== 'tree') showView('tree');
@@ -823,7 +837,39 @@ export function App({ io }: { io: TuiIo }) {
             if (key.escape) escapeNote();
             return;
         }
-        // So with the list of states: h and l move, space ticks, Enter keeps, Esc leaves it as it was.
+        // So with the presets: h and l move, a preset's letter or Enter picks, Esc leaves it as it was.
+        if (picking?.kind === 'presets') {
+            setMessage(undefined);
+            if (key.escape) {
+                setPicking(undefined);
+                return;
+            }
+            let { at } = picking;
+            let chosen = key.return ? at : undefined;
+            if (key.leftArrow) at--;
+            else if (key.rightArrow) at++;
+            else
+                for (const ch of input) {
+                    if (ch === 'h') at--;
+                    else if (ch === 'l') at++;
+                    else {
+                        const i = ch === '\r' ? at : PRESETS.findIndex((p) => p.key === ch);
+                        if (i >= 0) chosen = i;
+                    }
+                    if (chosen !== undefined) break;
+                }
+            at = Math.max(0, Math.min(at, PRESETS.length - 1));
+            const preset = chosen === undefined ? undefined : PRESETS[chosen];
+            if (!preset) setPicking({ kind: 'presets', at });
+            else if ('pick' in preset)
+                setPicking({ kind: 'ticks', ticked: states ?? new Set(STATES), at: 0 });
+            else {
+                setPicking(undefined);
+                setStates(preset.states);
+            }
+            return;
+        }
+        // So with the tick list: h and l move, space ticks, Enter keeps, Esc leaves it as it was.
         if (picking) {
             setMessage(undefined);
             if (key.escape) {
@@ -846,9 +892,9 @@ export function App({ io }: { io: TuiIo }) {
                     }
                 }
             at = Math.max(0, Math.min(at, STATES.length - 1));
-            if (!keep) setPicking({ ticked, at });
+            if (!keep) setPicking({ kind: 'ticks', ticked, at });
             else if (ticked.size === 0) {
-                setPicking({ ticked, at });
+                setPicking({ kind: 'ticks', ticked, at });
                 complain('tick a state to show');
             } else {
                 setPicking(undefined);
@@ -1071,12 +1117,15 @@ export function App({ io }: { io: TuiIo }) {
         const x = lead + stringWidth(filter.text.slice(shown.start, filter.cursor));
         filterCursor = { x, y: height - 1 };
     }
-    /** The list of states, in place of the hints while it's open. */
+    /** The presets or the tick list, in place of the hints while it's open. */
     const statesBar: Piece[] | undefined = picking
-        ? stateRow(picking.ticked, picking.at, width).map((p) => ({
+        ? (picking.kind === 'presets'
+              ? presetRow(picking.at, width)
+              : stateRow(picking.ticked, picking.at, width)
+          ).map((p) => ({
               text: p.text,
               style:
-                  p.tone === 'lead'
+                  p.tone === 'lead' || p.tone === 'key'
                       ? theme.key
                       : p.tone === 'current'
                         ? theme.cursor

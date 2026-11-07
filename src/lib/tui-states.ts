@@ -18,7 +18,7 @@ export const STATES: readonly Marker[] = [
     'notes',
 ];
 
-/** What the old open-only showed: todo and in progress. */
+/** Todo and in progress: what the Tree opens on. */
 export const OPEN_STATES: ReadonlySet<Marker> = new Set<Marker>(['todo', 'inprogress']);
 
 export const STATE_LABEL: Readonly<Record<Marker, string>> = {
@@ -42,10 +42,10 @@ export function statesGlyphs(states: ReadonlySet<Marker>): string {
         .join('');
 }
 
-/** A piece of the list's row: plain, the one under the cursor, or the dim hint. */
+/** A piece of the list's row: plain, the one under the cursor, a key, or the dim hint. */
 export interface StatePiece {
     readonly text: string;
-    readonly tone: 'lead' | 'plain' | 'current' | 'hint';
+    readonly tone: 'lead' | 'plain' | 'current' | 'key' | 'hint';
 }
 
 export const STATES_LEAD = ' show  ';
@@ -58,6 +58,29 @@ export const TICKED = '■';
 export const UNTICKED = '□';
 /** The keys, longest first: the first that fits is shown. */
 const HINTS = ['space tick · ⏎ keep · esc', '⏎ keep · esc'];
+const PRESET_HINTS = ['⏎ keep · esc', '⏎ · esc'];
+
+/** The pieces' width. */
+const widthOf = (ps: readonly StatePiece[]) => ps.reduce((w, p) => w + stringWidth(p.text), 0);
+
+/** `ps` with the longest of `hints` that fits right-aligned in `width`; undefined when none does. */
+function withHint(
+    ps: StatePiece[],
+    hints: readonly string[],
+    width: number,
+): StatePiece[] | undefined {
+    const used = widthOf(ps);
+    for (const hint of hints) {
+        const gap = width - used - stringWidth(hint) - 1;
+        if (gap >= 2)
+            return [
+                ...ps,
+                { text: ' '.repeat(gap), tone: 'plain' },
+                { text: `${hint} `, tone: 'hint' },
+            ];
+    }
+    return undefined;
+}
 
 /**
  * The list in `width` columns: each state as `■ ○ todo`, the cursor's
@@ -77,21 +100,70 @@ export function stateRow(ticked: ReadonlySet<Marker>, at: number, width: number)
         ]),
         ...(tail ? [{ text: tail, tone: 'plain' as const }] : []),
     ];
-    const widthOf = (ps: readonly StatePiece[]) => ps.reduce((w, p) => w + stringWidth(p.text), 0);
-    const withHint = (ps: StatePiece[]): StatePiece[] | undefined => {
-        const used = widthOf(ps);
-        for (const hint of HINTS) {
-            const gap = width - used - stringWidth(hint) - 1;
-            if (gap >= 2)
-                return [
-                    ...ps,
-                    { text: ' '.repeat(gap), tone: 'plain' },
-                    { text: `${hint} `, tone: 'hint' },
-                ];
-        }
-        return undefined;
-    };
     const wide = pieces(full, '  ');
     const narrow = pieces(short, ' ', `  ${STATE_LABEL[current]}`);
-    return withHint(wide) ?? (widthOf(wide) <= width ? wide : (withHint(narrow) ?? narrow));
+    return (
+        withHint(wide, HINTS, width) ??
+        (widthOf(wide) <= width ? wide : (withHint(narrow, HINTS, width) ?? narrow))
+    );
+}
+
+/**
+ * A set of states `a` offers by name, `key` (its label's first letter)
+ * picking it at once; `pick…` opens the tick list instead.
+ */
+export type Preset = { readonly key: string; readonly label: string } & (
+    | { readonly states: ReadonlySet<Marker> | undefined }
+    | { readonly pick: true }
+);
+
+export const PRESETS: readonly Preset[] = [
+    { key: 'o', label: 'open', states: OPEN_STATES },
+    { key: 'i', label: 'in progress', states: new Set<Marker>(['inprogress']) },
+    { key: 'c', label: 'closed', states: new Set<Marker>(['completed', 'cancelled', 'moved']) },
+    { key: 'a', label: 'all', states: undefined },
+    { key: 'p', label: 'pick…', pick: true },
+];
+
+/** Where the row's cursor starts: the preset that is `states`, else `pick…`. */
+export function presetOf(states: ReadonlySet<Marker> | undefined): number {
+    const same = (a: ReadonlySet<Marker> | undefined) =>
+        a === undefined || states === undefined
+            ? a === states
+            : a.size === states.size && [...a].every((s) => states.has(s));
+    const at = PRESETS.findIndex((p) => 'states' in p && same(p.states));
+    return at >= 0 ? at : PRESETS.findIndex((p) => 'pick' in p);
+}
+
+/**
+ * The presets in `width` columns: each by name, its first letter a key, the
+ * cursor's picked out, the longest hint that fits on the right. Too narrow
+ * for the names, each is its letter and the cursor's name follows the row.
+ */
+export function presetRow(at: number, width: number): StatePiece[] {
+    const lead: StatePiece = { text: STATES_LEAD, tone: 'lead' };
+    const wide: StatePiece[] = [
+        lead,
+        ...PRESETS.flatMap((p, i): StatePiece[] => [
+            ...(i > 0 ? [{ text: '  ', tone: 'plain' as const }] : []),
+            ...(i === at
+                ? [{ text: p.label, tone: 'current' as const }]
+                : [
+                      { text: p.key, tone: 'key' as const },
+                      { text: p.label.slice(p.key.length), tone: 'plain' as const },
+                  ]),
+        ]),
+    ];
+    const narrow: StatePiece[] = [
+        lead,
+        ...PRESETS.flatMap((p, i): StatePiece[] => [
+            ...(i > 0 ? [{ text: ' ', tone: 'plain' as const }] : []),
+            { text: p.key, tone: i === at ? 'current' : 'key' },
+        ]),
+        { text: `  ${PRESETS[at]?.label ?? ''}`, tone: 'plain' },
+    ];
+    return (
+        withHint(wide, PRESET_HINTS, width) ??
+        (widthOf(wide) <= width ? wide : (withHint(narrow, PRESET_HINTS, width) ?? narrow))
+    );
 }

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { Marker } from './markers';
 import {
     OPEN_STATES,
+    PRESETS,
+    presetOf,
+    presetRow,
     STATES,
     shownStates,
     stateRow,
@@ -46,5 +49,45 @@ describe('stateRow', () => {
         expect(text(row)).toMatch(/^ show {2}■○ ■◐ □✓ □✕ □→ □• {2}in progress {2,}⏎ keep · esc $/);
         expect(text(stateRow(OPEN_STATES, 1, 64)).length).toBe(64);
         expect(text(stateRow(OPEN_STATES, 0, 40))).toBe(' show  ■○ ■◐ □✓ □✕ □→ □•  todo');
+    });
+});
+
+describe('the presets', () => {
+    it('each start with their key, no two the same', () => {
+        for (const p of PRESETS) expect(p.label.startsWith(p.key)).toBe(true);
+        expect(new Set(PRESETS.map((p) => p.key)).size).toBe(PRESETS.length);
+    });
+
+    it('put the cursor on the set in view, or on pick… when none is it', () => {
+        const label = (states: ReadonlySet<Marker> | undefined) => PRESETS[presetOf(states)]?.label;
+        expect(label(new Set<Marker>(['inprogress', 'todo']))).toBe('open');
+        expect(label(new Set<Marker>(['moved', 'completed', 'cancelled']))).toBe('closed');
+        expect(label(undefined)).toBe('all');
+        expect(label(new Set<Marker>(['todo']))).toBe('pick…');
+    });
+});
+
+describe('presetRow', () => {
+    it('names each preset, its first letter a key, the cursor picked out, the hint on the right', () => {
+        const row = presetRow(1, 80);
+        expect(text(row)).toMatch(
+            /^ show {2}open {2}in progress {2}closed {2}all {2}pick… +⏎ keep · esc $/,
+        );
+        expect(text(row).length).toBe(80);
+        expect(row.filter((p) => p.tone === 'current').map((p) => p.text)).toEqual(['in progress']);
+        expect(row.filter((p) => p.tone === 'key').map((p) => p.text)).toEqual([
+            'o',
+            'c',
+            'a',
+            'p',
+        ]);
+    });
+
+    it('takes the short hint, then drops it, then shows the letters alone', () => {
+        expect(text(presetRow(0, 54))).toMatch(/^ show {2}open .* pick… +⏎ · esc $/);
+        expect(text(presetRow(0, 44))).toBe(' show  open  in progress  closed  all  pick…');
+        expect(text(presetRow(3, 40))).toMatch(/^ show {2}o i c a p {2}all +⏎ keep · esc $/);
+        expect(text(presetRow(3, 32))).toMatch(/^ show {2}o i c a p {2}all +⏎ · esc $/);
+        expect(text(presetRow(3, 22))).toBe(' show  o i c a p  all');
     });
 });

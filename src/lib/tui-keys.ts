@@ -220,7 +220,7 @@ export const KEY_TABLE: readonly KeyRow[] = [
     },
     {
         keys: 'a',
-        help: 'which states the tree shows: space ticks, ⏎ keeps',
+        help: 'which states the tree shows: o open, i in progress, c closed, a all, p pick',
         group: 'views',
         bind: [{ action: 'states', chars: ['a'] }],
         hint: { label: 'states', order: 70, when: (ctx) => ctx.view === 'tree' },

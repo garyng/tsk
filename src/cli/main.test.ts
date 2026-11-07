@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,13 +38,13 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-async function tsk(cmd: string, session = 'sess0001-uuid') {
+async function tsk(cmd: string, session = 'sess0001-uuid', env: Record<string, string> = {}) {
     const out: string[] = [];
     const err: string[] = [];
     const argv = cmd.match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"|"$/g, '')) ?? [];
     const code = await main({
         argv,
-        env: { CLAUDE_CODE_SESSION_ID: session },
+        env: { CLAUDE_CODE_SESSION_ID: session, ...env },
         cwd: dir,
         out: (s) => out.push(s),
         err: (s) => err.push(s),
@@ -537,6 +538,91 @@ describe('tsk select-clicked', () => {
             err: () => {},
         });
         expect(outside).toBe(1);
+    });
+});
+
+describe('tsk commit', () => {
+    /** git with no config from outside the test: no signing, no global hooks. */
+    let gitEnv: Record<string, string>;
+    const git = (...args: string[]) =>
+        execFileSync('git', args, { cwd: dir, env: gitEnv, encoding: 'utf8' });
+    const commit = (session = 'sess0001-uuid') => tsk('commit', session, gitEnv);
+
+    beforeEach(() => {
+        gitEnv = {
+            PATH: process.env.PATH ?? '',
+            HOME: dir,
+            GIT_CONFIG_NOSYSTEM: '1',
+            GIT_CEILING_DIRECTORIES: path.dirname(dir),
+            GIT_AUTHOR_NAME: 't',
+            GIT_AUTHOR_EMAIL: 't@example.com',
+            GIT_COMMITTER_NAME: 't',
+            GIT_COMMITTER_EMAIL: 't@example.com',
+        };
+        git('init', '-q');
+        fs.writeFileSync(path.join(dir, 'other.txt'), 'one\n');
+        git('add', 'claude.tsk', 'other.txt');
+        git('commit', '-q', '-m', 'start');
+    });
+
+    it("commits the file whole, every session's tasks, and nothing else that's staged", async () => {
+        await tsk('add "mine" --root', 'sess0001-uuid');
+        await tsk('add "theirs" --root', 'sess0002-uuid');
+        fs.writeFileSync(path.join(dir, 'other.txt'), 'two\n');
+        git('add', 'other.txt');
+
+        const done = await commit();
+        expect(done.code).toBe(0);
+        expect(done.out).toMatch(
+            /^committed claude\.tsk as [0-9a-f]+: chore: claude\.tsk from sess0001, sess0002$/,
+        );
+        expect(git('show', '--name-only', '--format=', 'HEAD').trim()).toBe('claude.tsk');
+        expect(git('log', '-1', '--format=%B')).toContain(
+            'sess0001:\n  added tsk:t0000001 mine\nsess0002:\n  added tsk:t0000002 theirs',
+        );
+        expect(git('show', 'HEAD:claude.tsk')).toBe(fs.readFileSync(file, 'utf8'));
+        // What someone else staged is still staged; the committed file isn't left looking staged.
+        expect(git('status', '--porcelain').trim()).toBe('M  other.txt');
+    });
+
+    it('with nothing changed since HEAD, says so and commits nothing', async () => {
+        const head = git('rev-parse', 'HEAD');
+        const done = await commit();
+        expect(done).toMatchObject({ code: 0, out: 'nothing to commit: claude.tsk matches HEAD' });
+        expect(git('rev-parse', 'HEAD')).toBe(head);
+    });
+
+    it('commits a file git has not seen yet', async () => {
+        git('rm', '-q', '--cached', 'claude.tsk');
+        git('commit', '-q', '-m', 'untrack');
+        await tsk('add "first" --root');
+        const done = await commit();
+        expect(done.code).toBe(0);
+        expect(git('log', '-1', '--format=%B')).toContain('added tsk:t0000001 first');
+        expect(git('status', '--porcelain', '--', 'claude.tsk')).toBe('');
+    });
+
+    it("stops at a hook that refuses, with git's words, and leaves HEAD where it was", async () => {
+        const hook = path.join(dir, '.git', 'hooks', 'pre-commit');
+        fs.writeFileSync(hook, '#!/bin/sh\necho "not today" >&2\nexit 1\n', { mode: 0o755 });
+        await tsk('add "mine" --root');
+        const head = git('rev-parse', 'HEAD');
+        const done = await commit();
+        expect(done.code).toBe(1);
+        expect(done.err).toContain('tsk: git commit failed: not today');
+        expect(git('rev-parse', 'HEAD')).toBe(head);
+        expect(git('status', '--porcelain', '--', 'claude.tsk')).toBe(' M claude.tsk\n');
+    });
+
+    it('refuses a file outside a repository, or one git ignores', async () => {
+        // git ignores only what it doesn't track.
+        git('rm', '-q', '--cached', 'claude.tsk');
+        fs.writeFileSync(path.join(dir, '.gitignore'), 'claude.tsk\n');
+        expect((await commit()).err).toBe('tsk: git ignores claude.tsk');
+        fs.rmSync(path.join(dir, '.git'), { recursive: true });
+        const outside = await commit();
+        expect(outside.code).toBe(1);
+        expect(outside.err).toMatch(/isn't in a git repository$/);
     });
 });
 
