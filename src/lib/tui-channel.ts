@@ -108,6 +108,13 @@ export function readRecords(dir: string): TuiRecord[] {
     });
 }
 
+/** The records of the TUIs running now; none without `dir`, and a throw when `dir` isn't only ours. */
+export function liveRecords(dir: string): TuiRecord[] {
+    if (!fs.existsSync(dir)) return [];
+    checkRuntimeDir(dir);
+    return readRecords(dir).filter(isAlive);
+}
+
 /** Whether the TUI that wrote `r` is still running. */
 export function isAlive(r: TuiRecord): boolean {
     if (r.procStart !== undefined) return processStart(r.pid) === r.procStart;

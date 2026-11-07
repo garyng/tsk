@@ -15,6 +15,7 @@ void main({
     err: (text) => process.stderr.write(`${text}\n`),
     readStdin,
     terminal: process.stdout.isTTY === true,
+    self: [process.execPath, ...process.argv.slice(1, 2)],
 }).then((code) => {
     process.exitCode = code;
 });

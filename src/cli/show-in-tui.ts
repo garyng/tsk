@@ -2,11 +2,9 @@ import fs from 'node:fs';
 import type { TreeNode } from '../lib/task-tree';
 import {
     askTui,
-    checkRuntimeDir,
     describeTui,
-    isAlive,
+    liveRecords,
     pickTuis,
-    readRecords,
     runtimeDir,
     type TuiRecord,
 } from '../lib/tui-channel';
@@ -31,15 +29,12 @@ export async function showInTui(
     io: ShowInTuiIo,
 ): Promise<number> {
     const dir = runtimeDir(io.env);
-    let live: TuiRecord[] = [];
-    if (fs.existsSync(dir)) {
-        try {
-            checkRuntimeDir(dir);
-        } catch (e) {
-            io.err(`tsk: won't ask the TUIs: ${(e as Error).message}`);
-            return 1;
-        }
-        live = readRecords(dir).filter(isAlive);
+    let live: TuiRecord[];
+    try {
+        live = liveRecords(dir);
+    } catch (e) {
+        io.err(`tsk: won't ask the TUIs: ${(e as Error).message}`);
+        return 1;
     }
     const configDir = claudeConfigDir(io.env);
     const sessionOf = (r: TuiRecord) =>

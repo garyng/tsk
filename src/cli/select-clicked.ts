@@ -1,24 +1,14 @@
 import { execFile } from 'node:child_process';
-import fs from 'node:fs';
 import { promisify } from 'node:util';
 import { type Click, clickedTaskId } from '../lib/clicked-task';
-import {
-    askTui,
-    checkRuntimeDir,
-    isAlive,
-    readRecords,
-    runtimeDir,
-    type TuiRecord,
-    tmuxSocket,
-} from '../lib/tui-channel';
+import { askTui, liveRecords, runtimeDir, type TuiRecord, tmuxSocket } from '../lib/tui-channel';
+import { TMUX_TIMEOUT_MS } from '../tui/claude-panes';
 
 /** Runs tmux against the server at `socket`; resolves to what it printed. */
 export type Tmux = (socket: string, args: readonly string[]) => Promise<string>;
 
 const run = promisify(execFile);
-/** tmux answers at once; one that doesn't isn't worth holding the click for. */
-const TMUX_TIMEOUT_MS = 1000;
-const runTmux: Tmux = (socket, args) =>
+export const runTmux: Tmux = (socket, args) =>
     run('tmux', ['-S', socket, ...args], { timeout: TMUX_TIMEOUT_MS }).then((r) => r.stdout);
 
 export interface ClickIn extends Click {
@@ -58,19 +48,16 @@ export async function selectClicked(click: ClickIn, io: SelectClickedIo): Promis
         return 0;
     };
     const dir = runtimeDir(io.env);
-    let live: TuiRecord[] = [];
-    if (fs.existsSync(dir)) {
-        try {
-            checkRuntimeDir(dir);
-        } catch (e) {
-            return tell(`won't ask the TUIs: ${(e as Error).message}`);
-        }
-        live = readRecords(dir).filter(isAlive);
+    let live: TuiRecord[];
+    try {
+        live = liveRecords(dir);
+    } catch (e) {
+        return tell(`won't ask the TUIs: ${(e as Error).message}`);
     }
     const listed = await tmux(socket, ['list-panes', '-t', click.pane, '-F', '#{pane_id}']);
     const window = new Set(listed.split('\n').map((l) => l.trim()));
     const beside = live.filter((r) => r.tmux?.socket === socket && window.has(r.tmux.pane));
-    if (beside.length === 0) return tell('no TUI beside this pane; `tsk tui` opens one');
+    if (beside.length === 0) return tell('no TUI beside this pane; `tsk tmux-pane` opens one');
     const why: string[] = [];
     for (const r of beside) {
         const reply = await askTui(dir, r.pid, id).catch((e: Error) => ({

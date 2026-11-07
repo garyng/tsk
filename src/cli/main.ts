@@ -42,6 +42,7 @@ import { sessionStart } from './session-hook';
 import { showInTui } from './show-in-tui';
 import { readDoc, readOutside, StoreError, treeWithOutside, updateDoc } from './store';
 import { idsAsRefs } from './terminal-ids';
+import { tmuxPane } from './tmux-pane';
 
 /**
  * `tsk` — the command line that agent sessions (and people) use to track work
@@ -76,6 +77,9 @@ export const USAGE = `tsk: track work in a .tsk file
   tsk commit                        commit the file whole, the message naming each session's changes
   tsk tui [--follow-pid <pid>]      a live view in the terminal; follows a Claude Code process's session
           [--no-mouse]              leave the mouse to the terminal (or TSK_NO_MOUSE)
+  tsk tmux-pane [--here]            the live view in a tmux pane beside this Claude ($CLAUDE_PID), else
+                                    beside the window's (the active pane's, else the last pane's, else
+                                    the only one); --here: in this pane
   tsk session start                 Claude Code's SessionStart hook (reads the hook input on stdin)
   tsk select-clicked --pane=<%n> --client=<name> --column=<n> --line=<text> [--hyperlink=<uri>]
                                     tmux's Ctrl+Click: select the tsk:<id> under the mouse in the
@@ -95,8 +99,10 @@ export interface CliIo {
     readonly deps?: OpsDeps;
     /** The output is a terminal: each task's id is printed as a coloured `tsk:<id>` (`terminal-ids.ts`). */
     readonly terminal?: boolean;
-    /** Runs tmux, for `select-clicked`; tests stand one in. */
+    /** Runs tmux, for `select-clicked` and `tmux-pane`; tests stand one in. */
     readonly tmux?: Tmux;
+    /** How to run this tsk again (node and the bundle), for the pane `tmux-pane` opens. */
+    readonly self?: readonly string[];
 }
 
 class UsageError extends Error {}
@@ -143,6 +149,7 @@ export async function main(given: CliIo): Promise<number> {
                 'follow-pid': { type: 'string' },
                 'no-mouse': { type: 'boolean' },
                 tui: { type: 'boolean' },
+                here: { type: 'boolean' },
                 pane: { type: 'string' },
                 client: { type: 'string' },
                 column: { type: 'string' },
@@ -217,6 +224,13 @@ export async function main(given: CliIo): Promise<number> {
             const focus = sessionFocus(tree, s);
             if (!focus?.id) throw new TaskOpError(`no focus for session ${s}; name the task`);
             return focus.id;
+        };
+        // Any value but an empty one opts out, as NO_COLOR does.
+        const mouse = !values['no-mouse'] && !io.env.TSK_NO_MOUSE;
+        const tui = async (followPid: number | undefined, pinned: string | undefined) => {
+            // Loaded on demand, so the other commands don't pay for Ink and React at start-up.
+            const { runTui } = await import('../tui/run');
+            return runTui({ file, followPid, session: pinned, mouse, env: { ...io.env } });
         };
         /** Run one operation under the lock; report the task, and on request its parent, agent, or the focus after it. */
         const change = async (
@@ -367,18 +381,20 @@ export async function main(given: CliIo): Promise<number> {
                 if (followPid !== undefined && !Number.isInteger(followPid)) {
                     throw new UsageError(`tui: --follow-pid needs a process id, not "${raw}"`);
                 }
-                // Loaded on demand, so the other commands don't pay for Ink and React at start-up.
-                const { runTui } = await import('../tui/run');
                 const pinned = values.session ? resolveSession(values.session, {}) : undefined;
-                return await runTui({
-                    file,
-                    followPid,
-                    session: pinned ?? (followPid ? undefined : session),
-                    // Any value but an empty one opts out, as NO_COLOR does.
-                    mouse: !values['no-mouse'] && !io.env.TSK_NO_MOUSE,
-                    env: { ...io.env },
-                });
+                return await tui(followPid, pinned ?? (followPid ? undefined : session));
             }
+            case 'tmux-pane':
+                return await tmuxPane(
+                    {
+                        file,
+                        here: values.here === true,
+                        mouse,
+                        self: io.self ?? ['tsk'],
+                        runTui: (pid) => tui(pid, undefined),
+                    },
+                    io,
+                );
             case 'show': {
                 const id = arg(0, 'the task id');
                 const tree = load();

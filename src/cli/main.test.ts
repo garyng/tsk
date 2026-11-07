@@ -506,8 +506,10 @@ describe('tsk select-clicked', () => {
         const asked = await tui('%9');
         const r = await click('tsk:t0000001', 0);
         expect(r.code).toBe(0);
-        expect(r.err).toBe('tsk: no TUI beside this pane; `tsk tui` opens one');
-        expect(r.tmux.at(-1)).toEqual(told('tsk: no TUI beside this pane; `tsk tui` opens one'));
+        expect(r.err).toBe('tsk: no TUI beside this pane; `tsk tmux-pane` opens one');
+        expect(r.tmux.at(-1)).toEqual(
+            told('tsk: no TUI beside this pane; `tsk tmux-pane` opens one'),
+        );
         expect(asked).toEqual([]);
     });
 
@@ -637,5 +639,38 @@ describe('resolveFile', () => {
         expect(resolveFile(undefined, {}, nested)).toBe(file);
         fs.rmSync(file);
         expect(() => resolveFile(undefined, {}, nested)).toThrow(/no claude.tsk/);
+    });
+});
+
+describe('tsk tmux-pane', () => {
+    it('opens the TUI on the file it found, run by the same tsk', async () => {
+        // This process stands in for the Claude: its pane is the one on its stdin.
+        const tty = fs.readlinkSync('/proc/self/fd/0');
+        const calls: string[][] = [];
+        const out: string[] = [];
+        const code = await main({
+            argv: ['tmux-pane'],
+            env: {
+                TMUX: '/tmp/tmux-test/default,123,0',
+                CLAUDE_PID: String(process.pid),
+                TSK_RUNTIME_DIR: path.join(dir, 'rt'),
+            },
+            cwd: dir,
+            out: (t) => out.push(t),
+            err: (t) => out.push(t),
+            self: ['/usr/bin/node', '/opt/tsk/tsk.mjs'],
+            tmux: async (_socket, args) => {
+                calls.push([...args]);
+                return args[0] === 'split-window' ? '%9\n' : `%1 ${tty}\n`;
+            },
+        });
+        expect(out).toEqual([
+            `opened tsk tui in pane %9, following Claude pid ${process.pid} (q in it to close)`,
+        ]);
+        expect(code).toBe(0);
+        expect(calls.at(-1)).toEqual(
+            expect.arrayContaining(['-t', '%1', '-c', dir, 'tui', '--file', file]),
+        );
+        expect(calls.at(-1)?.slice(-7, -4)).toEqual(['/usr/bin/node', '/opt/tsk/tsk.mjs', 'tui']);
     });
 });

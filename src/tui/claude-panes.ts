@@ -7,23 +7,23 @@ import { shortSessionId } from '../lib/session-focus';
 import { tmuxSocket } from '../lib/tui-channel';
 
 /**
- * Which Claude is on a session now, and the tmux pane it runs in, for `s`.
- * Each running Claude keeps `<config>/sessions/<pid>.json` (`follow.ts`); its
- * pane is the one whose tty is the Claude's stdin, which holds however Claude
- * was started there.
+ * Which Claude is on a session now, and the tmux pane it runs in, for `s`
+ * and `tsk tmux-pane`. Each running Claude keeps `<config>/sessions/<pid>.json`
+ * (`follow.ts`); its pane is the one whose tty is the Claude's stdin, which
+ * holds however Claude was started there.
  */
 
-/** The running Claudes' pids, by the short session id each is on now. */
-export function runningSessions(configDir: string): Map<string, number> {
+/** The running Claudes: each one's pid and the short id of the session it's on now. */
+export function runningClaudes(configDir: string): { pid: number; session: string }[] {
     const dir = path.join(configDir, 'sessions');
     let names: string[];
     try {
         names = fs.readdirSync(dir);
     } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') console.warn(`tsk: ${dir}: ${e}`);
-        return new Map();
+        return [];
     }
-    const running = new Map<string, number>();
+    const running: { pid: number; session: string }[] = [];
     for (const name of names) {
         const pid = /^(\d+)\.json$/.exec(name)?.[1];
         // Most files are of Claudes that have exited: /proc is asked first (a failed read costs
@@ -34,20 +34,32 @@ export function runningSessions(configDir: string): Map<string, number> {
             const file = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
             // A pid can be reused: the file counts only if its process started when it says.
             if (file.sessionId && String(file.procStart) === start)
-                running.set(shortSessionId(file.sessionId), Number(pid));
+                running.push({ pid: Number(pid), session: shortSessionId(file.sessionId) });
         } catch {
-            // Read every poll, mid-write too: a file that doesn't parse is left out until it does.
+            // Claude rewrites it as its state changes: one caught mid-write is left out.
         }
     }
     return running;
 }
 
+/** The running Claudes' pids, by the short session id each is on now. */
+export function runningSessions(configDir: string): Map<string, number> {
+    return new Map(runningClaudes(configDir).map((c) => [c.session, c.pid]));
+}
+
 /** Runs tmux against the server the TUI is in; resolves to what it printed. */
 export type Tmux = (args: readonly string[]) => Promise<string>;
 
-/** tmux answers at once; one that doesn't isn't worth holding the key for. */
-const TMUX_TIMEOUT_MS = 1000;
+/** tmux answers at once; one that doesn't isn't worth holding the key or the click for. */
+export const TMUX_TIMEOUT_MS = 1000;
 const run = promisify(execFile);
+
+/** Why a tmux run failed: its own message, or that it didn't answer in time. */
+export function tmuxError(e: unknown): string {
+    const err = e as { stderr?: string; killed?: boolean; message?: string };
+    if (err.killed) return `tmux didn't answer within ${TMUX_TIMEOUT_MS / 1000} s`;
+    return `tmux: ${err.stderr?.trim() || err.message}`;
+}
 
 export interface SwitchIo {
     readonly env: Readonly<Record<string, string | undefined>>;
@@ -56,7 +68,8 @@ export interface SwitchIo {
     readonly ttyOf?: (pid: number) => string | undefined;
 }
 
-const ttyOfPid = (pid: number) => {
+/** The terminal process `pid` reads its keys from (its stdin); undefined when it's gone. */
+export const ttyOfPid = (pid: number) => {
     try {
         return fs.readlinkSync(`/proc/${pid}/fd/0`);
     } catch {
@@ -90,7 +103,6 @@ export async function switchToClaude(pid: number, io: SwitchIo): Promise<string 
         await tmux(['switch-client', '-t', pane]);
         return undefined;
     } catch (e) {
-        const why = (e as { stderr?: string }).stderr?.trim() || (e as Error).message;
-        return `tmux: ${why}`;
+        return tmuxError(e);
     }
 }
