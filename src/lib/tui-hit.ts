@@ -5,7 +5,7 @@ import type { ListWindow } from './tui-layout';
  * What a mouse click lands on in the `tsk` TUI, pure: the screen as the app
  * lays it out — the tab strip on the first line, a rule, the breadcrumb when
  * there is one, the list windowed by the same row heights the app draws
- * with, the detail pane's edge, and the footer bar on the last line.
+ * with, the detail pane's edge, and the footer bar's rows at the bottom.
  */
 
 export type HitTarget =
@@ -21,8 +21,8 @@ export type HitTarget =
     | { readonly kind: 'list' }
     /** The detail pane's edge, which a drag moves. */
     | { readonly kind: 'divider' }
-    /** The footer bar, by column: the keys step's hints become clickable here. */
-    | { readonly kind: 'footer'; readonly x: number };
+    /** The footer bar, by its row (from its top) and column: its hints are clickable. */
+    | { readonly kind: 'footer'; readonly row: number; readonly x: number };
 
 /** Columns `from` (inclusive) to `to` (exclusive) of a line, and what they are. */
 export interface Zone {
@@ -42,6 +42,7 @@ export interface ScreenMap {
     readonly window?: ListWindow;
     /** Each list line's height in screen lines. */
     readonly heights: readonly number[];
+    /** The footer's first line; it runs to the last. */
     readonly footerY: number;
     /**
      * The detail pane's edge, when it shows: beside the list, its border on
@@ -66,7 +67,7 @@ export function zones(pieces: readonly { text: string; target?: HitTarget }[]): 
 export function hitTest(map: ScreenMap, x: number, y: number): HitTarget | undefined {
     const zoneAt = (zs: readonly Zone[]) => zs.find((z) => x >= z.from && x < z.to)?.target;
     if (y === 0) return zoneAt(map.strip);
-    if (y === map.footerY) return { kind: 'footer', x };
+    if (y >= map.footerY) return { kind: 'footer', row: y - map.footerY, x };
     const d = map.divider;
     if (d && (d.side ? x === d.at && y >= 2 && y < map.footerY : y === d.at)) {
         return { kind: 'divider' };

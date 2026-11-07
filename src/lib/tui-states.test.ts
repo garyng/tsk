@@ -4,10 +4,10 @@ import {
     OPEN_STATES,
     PRESETS,
     presetOf,
-    presetRow,
+    presetRows,
     STATES,
     shownStates,
-    stateRow,
+    stateRows,
     statesGlyphs,
     TICKED,
     UNTICKED,
@@ -34,21 +34,36 @@ describe('the checkboxes', () => {
     });
 });
 
-describe('stateRow', () => {
+describe('stateRows', () => {
     it('names each state with its checkbox and glyph, the cursor picked out, the hint on the right', () => {
-        const row = stateRow(OPEN_STATES, 2, 120);
-        expect(text(row)).toMatch(
+        const rows = stateRows(OPEN_STATES, 2, 120);
+        expect(rows.map(text)).toHaveLength(1);
+        expect(text(rows[0] ?? [])).toMatch(
             /^ show {2}■ ○ todo {2}■ ◐ in progress {2}□ ✓ done {2}□ ✕ cancelled {2}□ → moved {2}□ • note +space tick · ⏎ keep · esc $/,
         );
-        expect(text(row).length).toBe(120);
-        expect(row.filter((p) => p.tone === 'current').map((p) => p.text)).toEqual(['□ ✓ done']);
+        expect(text(rows[0] ?? []).length).toBe(120);
+        expect(
+            rows
+                .flat()
+                .filter((p) => p.tone === 'current')
+                .map((p) => p.text),
+        ).toEqual(['□ ✓ done']);
     });
 
-    it("drops the names in a narrow pane, naming only the cursor's", () => {
-        const row = stateRow(OPEN_STATES, 1, 64);
-        expect(text(row)).toMatch(/^ show {2}■○ ■◐ □✓ □✕ □→ □• {2}in progress {2,}⏎ keep · esc $/);
-        expect(text(stateRow(OPEN_STATES, 1, 64)).length).toBe(64);
-        expect(text(stateRow(OPEN_STATES, 0, 40))).toBe(' show  ■○ ■◐ □✓ □✕ □→ □•  todo');
+    it('wraps whole states in a narrow pane, each row after the first under the first state', () => {
+        expect(stateRows(OPEN_STATES, 1, 64).map(text)).toEqual([
+            ' show  ■ ○ todo  ■ ◐ in progress  □ ✓ done  □ ✕ cancelled',
+            `       □ → moved  □ • note${' '.repeat(12)}space tick · ⏎ keep · esc `,
+        ]);
+    });
+
+    it('puts the hint on a row of its own when the last row has no room for it', () => {
+        expect(stateRows(OPEN_STATES, 0, 40).map(text)).toEqual([
+            ' show  ■ ○ todo  ■ ◐ in progress',
+            '       □ ✓ done  □ ✕ cancelled',
+            '       □ → moved  □ • note',
+            `${' '.repeat(14)}space tick · ⏎ keep · esc `,
+        ]);
     });
 });
 
@@ -67,27 +82,34 @@ describe('the presets', () => {
     });
 });
 
-describe('presetRow', () => {
+describe('presetRows', () => {
     it('names each preset, its first letter a key, the cursor picked out, the hint on the right', () => {
-        const row = presetRow(1, 80);
-        expect(text(row)).toMatch(
+        const rows = presetRows(1, 80);
+        expect(rows).toHaveLength(1);
+        expect(text(rows[0] ?? [])).toMatch(
             /^ show {2}open {2}in progress {2}closed {2}all {2}pick… +⏎ keep · esc $/,
         );
-        expect(text(row).length).toBe(80);
-        expect(row.filter((p) => p.tone === 'current').map((p) => p.text)).toEqual(['in progress']);
-        expect(row.filter((p) => p.tone === 'key').map((p) => p.text)).toEqual([
-            'o',
-            'c',
-            'a',
-            'p',
-        ]);
+        expect(text(rows[0] ?? []).length).toBe(80);
+        const tone = (t: string) =>
+            rows
+                .flat()
+                .filter((p) => p.tone === t)
+                .map((p) => p.text);
+        expect(tone('current')).toEqual(['in progress']);
+        expect(tone('key')).toEqual(['o', 'c', 'a', 'p']);
     });
 
-    it('takes the short hint, then drops it, then shows the letters alone', () => {
-        expect(text(presetRow(0, 54))).toMatch(/^ show {2}open .* pick… +⏎ · esc $/);
-        expect(text(presetRow(0, 44))).toBe(' show  open  in progress  closed  all  pick…');
-        expect(text(presetRow(3, 40))).toMatch(/^ show {2}o i c a p {2}all +⏎ keep · esc $/);
-        expect(text(presetRow(3, 32))).toMatch(/^ show {2}o i c a p {2}all +⏎ · esc $/);
-        expect(text(presetRow(3, 22))).toBe(' show  o i c a p  all');
+    it('takes the short hint, then wraps', () => {
+        expect(presetRows(0, 54).map(text)).toEqual([
+            ' show  open  in progress  closed  all  pick…  ⏎ · esc ',
+        ]);
+        expect(presetRows(3, 36).map(text)).toEqual([
+            ' show  open  in progress  closed',
+            '       all  pick…      ⏎ keep · esc ',
+        ]);
+        expect(presetRows(3, 44).map(text)).toEqual([
+            ' show  open  in progress  closed  all  pick…',
+            `${' '.repeat(31)}⏎ keep · esc `,
+        ]);
     });
 });

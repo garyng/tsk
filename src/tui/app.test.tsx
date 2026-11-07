@@ -173,7 +173,7 @@ describe('tsk TUI', () => {
         expect(ui.lastFrame()).toContain('phase one');
     });
 
-    it('keeps the session in a narrow pane, dropping key hints to make room', async () => {
+    it('wraps the hints onto another row in a narrow pane, the session on the first', async () => {
         const io: TuiIo = {
             ...fakeIo(
                 { session: '250bd3cc', note: 'busy' },
@@ -186,8 +186,47 @@ describe('tsk TUI', () => {
         Object.defineProperty(ui.stdout, 'columns', { value: 64 });
         ui.stdout.emit('resize');
         await tick();
-        expect(footer()).toMatch(/ 250bd3cc · busy$/);
-        expect(footer()).toMatch(/\? keys/);
+        const rows = (ui.lastFrame() ?? '').split('\n').slice(-2);
+        expect(rows[0]).toMatch(/ 250bd3cc · busy$/);
+        for (const hint of ['m message', 'd deps', '⏎ zoom', 'e open', 'v mark', '? keys'])
+            expect(rows.join(' ')).toContain(hint);
+    });
+
+    it('fits the footer to the rows of what it shows, the list taking the rest', async () => {
+        const start = [
+            '- [ ] root <!-- @id:r @session:s -->',
+            '  - [ ] parent <!-- @id:p0 @session:s -->',
+            '    - [ ] kid <!-- @id:k0 @session:s -->',
+            ...many(30).slice(1),
+        ];
+        ui = render(<App io={fakeIo({ session: 's' }, start).io} />);
+        // At 66 columns the Tree's hints take one row with "space fold", two with "space unfold".
+        Object.defineProperty(ui.stdout, 'columns', { value: 66 });
+        ui.stdout.emit('resize');
+        ui.stdin.write('2');
+        await tick();
+        const last = (n: number) => (ui?.lastFrame() ?? '').split('\n').slice(-n);
+        ui.stdin.write('j');
+        await tick();
+        expect(last(1)[0]).toMatch(/space fold .*\? keys/);
+        expect(last(2)[0]).toContain('↓ 13 more'); // the list's last row, right above it
+        ui.stdin.write(' ');
+        await until(() => footer() === '? keys');
+        expect(last(2)[0]).toContain('space unfold');
+        expect(last(3)[0]).toMatch(/↓ \d+ more/);
+        ui.stdin.write(click(2, 23)); // "? keys", on the footer's second row
+        await until(() => (ui?.lastFrame() ?? '').includes('which states the tree shows'));
+        ui.stdin.write('\x1b');
+        await until(() => !(ui?.lastFrame() ?? '').includes('which states the tree shows'));
+        // The presets fit on one row, so the list gets the other back.
+        ui.stdin.write('a');
+        await until(() => footer().startsWith('show'));
+        expect(last(2)[0]).toMatch(/↓ \d+ more/);
+        ui.stdin.write('\x1b');
+        await until(() => footer() === '? keys');
+        ui.stdin.write('j');
+        await until(() => /space fold /.test(last(1)[0] ?? ''));
+        expect(last(2)[0]).toMatch(/↓ \d+ more/);
     });
 
     it("badges what waits, opens a task's dependencies on d, goes back on u, and steps on tab", async () => {
@@ -647,6 +686,19 @@ describe('tsk TUI, the states the tree shows', () => {
         ui.stdin.write('\x1b');
         await until(() => !footer().startsWith('show'));
         expect(strip()).toContain('· ◐ ');
+    });
+
+    it('wraps the presets in a narrow pane', async () => {
+        ui = render(<App io={fakeIo({ session: 's' }, start).io} />);
+        Object.defineProperty(ui.stdout, 'columns', { value: 36 });
+        ui.stdout.emit('resize');
+        ui.stdin.write('a');
+        await until(() => (ui?.lastFrame() ?? '').includes('pick…'));
+        const rows = (ui.lastFrame() ?? '').split('\n').slice(-2);
+        expect(rows.map((l) => l.trimEnd())).toEqual([
+            ' show  open  in progress  closed',
+            '       all  pick…      ⏎ keep · esc',
+        ]);
     });
 
     it('pick… opens the tick list from the states in view: h and l move, space ticks, Enter keeps it', async () => {

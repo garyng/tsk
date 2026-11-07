@@ -83,28 +83,57 @@ function withHint(
 }
 
 /**
- * The list in `width` columns: each state as `■ ○ todo`, the cursor's
- * picked out, the longest hint that fits on the right. Too narrow for the
- * names, each is `■○` and the cursor's name follows the list.
+ * The lead, then `items` in rows of `width` columns: whole items, a row after
+ * the first starting under the first item, and the longest of `hints` that
+ * fits right-aligned on the last row, else on a row of its own.
  */
-export function stateRow(ticked: ReadonlySet<Marker>, at: number, width: number): StatePiece[] {
+function wrapItems(
+    items: readonly StatePiece[][],
+    width: number,
+    hints: readonly string[],
+): StatePiece[][] {
+    const indent = stringWidth(STATES_LEAD);
+    const rows: StatePiece[][] = [[{ text: STATES_LEAD, tone: 'lead' }]];
+    let used = indent;
+    for (const item of items) {
+        const row = rows[rows.length - 1] ?? [];
+        const w = widthOf(item);
+        if (used === indent) {
+            row.push(...item);
+            used += w;
+        } else if (used + 2 + w <= width) {
+            row.push({ text: '  ', tone: 'plain' }, ...item);
+            used += 2 + w;
+        } else {
+            rows.push([{ text: ' '.repeat(indent), tone: 'plain' }, ...item]);
+            used = indent + w;
+        }
+    }
+    const last = rows.length - 1;
+    const hinted = withHint(rows[last] ?? [], hints, width);
+    if (hinted) rows[last] = hinted;
+    else {
+        const own = withHint([], hints, width);
+        if (own) rows.push(own);
+    }
+    return rows;
+}
+
+/**
+ * The list as rows of `width` columns: each state as `■ ○ todo`, the
+ * cursor's picked out, the longest hint that fits on the right.
+ */
+export function stateRows(ticked: ReadonlySet<Marker>, at: number, width: number): StatePiece[][] {
     const box = (s: Marker) => (ticked.has(s) ? TICKED : UNTICKED);
-    const full = STATES.map((s) => `${box(s)} ${STATE_GLYPH[s]} ${STATE_LABEL[s]}`);
-    const short = STATES.map((s) => `${box(s)}${STATE_GLYPH[s]}`);
-    const current = STATES[at] ?? 'todo';
-    const pieces = (items: readonly string[], sep: string, tail?: string): StatePiece[] => [
-        { text: STATES_LEAD, tone: 'lead' },
-        ...items.flatMap((text, i) => [
-            ...(i > 0 ? [{ text: sep, tone: 'plain' as const }] : []),
-            { text, tone: i === at ? ('current' as const) : ('plain' as const) },
+    return wrapItems(
+        STATES.map((s, i) => [
+            {
+                text: `${box(s)} ${STATE_GLYPH[s]} ${STATE_LABEL[s]}`,
+                tone: i === at ? 'current' : 'plain',
+            },
         ]),
-        ...(tail ? [{ text: tail, tone: 'plain' as const }] : []),
-    ];
-    const wide = pieces(full, '  ');
-    const narrow = pieces(short, ' ', `  ${STATE_LABEL[current]}`);
-    return (
-        withHint(wide, HINTS, width) ??
-        (widthOf(wide) <= width ? wide : (withHint(narrow, HINTS, width) ?? narrow))
+        width,
+        HINTS,
     );
 }
 
@@ -136,34 +165,20 @@ export function presetOf(states: ReadonlySet<Marker> | undefined): number {
 }
 
 /**
- * The presets in `width` columns: each by name, its first letter a key, the
- * cursor's picked out, the longest hint that fits on the right. Too narrow
- * for the names, each is its letter and the cursor's name follows the row.
+ * The presets as rows of `width` columns: each by name, its first letter a
+ * key, the cursor's picked out, the longest hint that fits on the right.
  */
-export function presetRow(at: number, width: number): StatePiece[] {
-    const lead: StatePiece = { text: STATES_LEAD, tone: 'lead' };
-    const wide: StatePiece[] = [
-        lead,
-        ...PRESETS.flatMap((p, i): StatePiece[] => [
-            ...(i > 0 ? [{ text: '  ', tone: 'plain' as const }] : []),
-            ...(i === at
-                ? [{ text: p.label, tone: 'current' as const }]
+export function presetRows(at: number, width: number): StatePiece[][] {
+    return wrapItems(
+        PRESETS.map((p, i): StatePiece[] =>
+            i === at
+                ? [{ text: p.label, tone: 'current' }]
                 : [
-                      { text: p.key, tone: 'key' as const },
-                      { text: p.label.slice(p.key.length), tone: 'plain' as const },
-                  ]),
-        ]),
-    ];
-    const narrow: StatePiece[] = [
-        lead,
-        ...PRESETS.flatMap((p, i): StatePiece[] => [
-            ...(i > 0 ? [{ text: ' ', tone: 'plain' as const }] : []),
-            { text: p.key, tone: i === at ? 'current' : 'key' },
-        ]),
-        { text: `  ${PRESETS[at]?.label ?? ''}`, tone: 'plain' },
-    ];
-    return (
-        withHint(wide, PRESET_HINTS, width) ??
-        (widthOf(wide) <= width ? wide : (withHint(narrow, PRESET_HINTS, width) ?? narrow))
+                      { text: p.key, tone: 'key' },
+                      { text: p.label.slice(p.key.length), tone: 'plain' },
+                  ],
+        ),
+        width,
+        PRESET_HINTS,
     );
 }

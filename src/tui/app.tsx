@@ -22,13 +22,13 @@ import {
 import { filterTerms, inputWindow, termMatcher } from '../lib/tui-filter';
 import { type HitTarget, hitTest, type ScreenMap, zones } from '../lib/tui-hit';
 import {
-    fitHints,
     helpLines,
     hintsFor,
     hintWidth,
     type KeyContext,
     keysToActions,
     type TuiAction,
+    wrapHints,
 } from '../lib/tui-keys';
 import {
     contentSpans,
@@ -49,10 +49,10 @@ import {
     OPEN_STATES,
     PRESETS,
     presetOf,
-    presetRow,
+    presetRows,
     STATES,
     shownStates,
-    stateRow,
+    stateRows,
     statesGlyphs,
 } from '../lib/tui-states';
 import {
@@ -390,8 +390,58 @@ export function App({ io }: { io: TuiIo }) {
         const to = verticalMove(noteLayout(s.lines), s.lines, s.row, s.cursor, dir, noteIndent);
         return to && { row: to.line, cursor: to.cursor };
     };
+    /** The file a task from beside this one is in, which the tree doesn't show. */
+    const elsewhere = (node: TreeNode) => outsideFileOf(tree, node);
+    /** The marked tasks still in a file, in the order they were marked. */
+    const marked = [...marks].filter((id) => lookupId(tree, id) !== undefined);
+    const who_ = session
+        ? `${session}${who.note ? ` · ${who.note}` : ''}`
+        : (who.note ?? 'no session');
+    const keyContext: KeyContext = {
+        view,
+        marker: selected?.node.task.marker,
+        zoomed: view === 'tree' && hoist !== undefined,
+        folded: view === 'tree' && selected?.node.id !== undefined && folded.has(selected.node.id),
+        filtered: view === 'tree' && filter !== undefined,
+        canTell: io.tell !== undefined,
+        outside: selected !== undefined && elsewhere(selected.node) !== undefined,
+        marked: selected?.node.id !== undefined && marks.has(selected.node.id),
+        marks: marked.length,
+        help,
+    };
+    // A message the session hasn't read yet shows on the right, before the session.
+    const askNote =
+        posted && posted.state !== 'read'
+            ? `→ ${posted.subjects[0]?.id}${posted.subjects.length > 1 ? ` +${posted.subjects.length - 1}` : ''} ${posted.state} ${elapsed(Date.now() - posted.at)}`
+            : undefined;
+    // The marks, then a message the session hasn't read, then the session.
+    const lead = [
+        ...(marked.length > 0 ? [`${MARKED_MARK} ${marked.length}`] : []),
+        ...(askNote ? [askNote] : []),
+    ].join(' · ');
+    const rights = lead ? [`${lead} · ${who_} `, `${lead} `] : [`${who_} `];
+    // The hints wrap onto more rows; the first leaves room for the shortest right, so a
+    // narrow pane still says which session it follows.
+    const hintRows = wrapHints(
+        hintsFor(keyContext),
+        width,
+        width - stringWidth(rights.at(-1) ?? ''),
+    );
+    /** The presets or the tick list, in place of the hints while it's open. */
+    const statesRows = picking
+        ? picking.kind === 'presets'
+            ? presetRows(picking.at, width)
+            : stateRows(picking.ticked, picking.at, width)
+        : undefined;
     const noteHeight = note ? Math.min(laidOut.length, NOTE_ROWS) : 1;
-    const bodyRows = height - 2 - noteHeight;
+    // The rows of what the footer shows: the note, the filter's prompt or a message take
+    // the hints' place, as `shownRows` picks.
+    const footerHeight = note
+        ? noteHeight
+        : filter?.editing || message
+          ? 1
+          : (statesRows?.length ?? hintRows.length);
+    const bodyRows = height - 2 - footerHeight;
     const splitAt = (s: number | undefined) =>
         splitPane(width, bodyRows, rows > 0 ? rows : 0, detailWanted, s);
     const split = splitAt(share);
@@ -551,8 +601,6 @@ export function App({ io }: { io: TuiIo }) {
             ),
         [io],
     );
-    /** The file a task from beside this one is in, which the tree doesn't show. */
-    const elsewhere = (node: TreeNode) => outsideFileOf(tree, node);
     /**
      * Post what was typed at `m` about these tasks; it takes the place of the
      * last message in the footer, and the marks go once it's sent.
@@ -591,8 +639,6 @@ export function App({ io }: { io: TuiIo }) {
             complain(`couldn't message ${to}: ${(e as Error).message}`);
         }
     };
-    /** The marked tasks still in a file, in the order they were marked. */
-    const marked = [...marks].filter((id) => lookupId(tree, id) !== undefined);
 
     const act = (action: TuiAction, at: number): number => {
         const node = tasks[at]?.node;
@@ -997,9 +1043,6 @@ export function App({ io }: { io: TuiIo }) {
         };
     }, [stdin]);
 
-    const who_ = session
-        ? `${session}${who.note ? ` · ${who.note}` : ''}`
-        : (who.note ?? 'no session');
     const position = tasks.length > 0 ? `${index + 1}/${tasks.length}` : '';
     const depsSubject = depsOf ? tree.byId.get(depsOf) : undefined;
     const flags = [
@@ -1035,35 +1078,6 @@ export function App({ io }: { io: TuiIo }) {
         })),
         width,
     );
-    const keyContext: KeyContext = {
-        view,
-        marker: selected?.node.task.marker,
-        zoomed: view === 'tree' && hoist !== undefined,
-        folded: view === 'tree' && selected?.node.id !== undefined && folded.has(selected.node.id),
-        filtered: view === 'tree' && filter !== undefined,
-        canTell: io.tell !== undefined,
-        outside: selected !== undefined && elsewhere(selected.node) !== undefined,
-        marked: selected?.node.id !== undefined && marks.has(selected.node.id),
-        marks: marked.length,
-        help,
-    };
-    // A message the session hasn't read yet shows on the right, before the session.
-    const askNote =
-        posted && posted.state !== 'read'
-            ? `→ ${posted.subjects[0]?.id}${posted.subjects.length > 1 ? ` +${posted.subjects.length - 1}` : ''} ${posted.state} ${elapsed(Date.now() - posted.at)}`
-            : undefined;
-    // The marks, then a message the session hasn't read, then the session.
-    const lead = [
-        ...(marked.length > 0 ? [`${MARKED_MARK} ${marked.length}`] : []),
-        ...(askNote ? [askNote] : []),
-    ].join(' · ');
-    const rights = lead ? [`${lead} · ${who_} `, `${lead} `] : [`${who_} `];
-    // Hints give way to the shortest right, so a narrow pane still says which session it follows.
-    const shownHints = fitHints(hintsFor(keyContext), width - stringWidth(rights.at(-1) ?? ''));
-    const hints = shownHints.flatMap((h) => [
-        { text: ` ${h.keys}`, style: theme.key },
-        { text: ` ${h.label} `, style: {} },
-    ]);
     /** The note's rows, and where its cursor is among them: the terminal's own cursor goes there. */
     let noteBar: Piece[][] | undefined;
     let noteCursor: { x: number; y: number } | undefined;
@@ -1117,35 +1131,41 @@ export function App({ io }: { io: TuiIo }) {
         const x = lead + stringWidth(filter.text.slice(shown.start, filter.cursor));
         filterCursor = { x, y: height - 1 };
     }
-    /** The presets or the tick list, in place of the hints while it's open. */
-    const statesBar: Piece[] | undefined = picking
-        ? (picking.kind === 'presets'
-              ? presetRow(picking.at, width)
-              : stateRow(picking.ticked, picking.at, width)
-          ).map((p) => ({
-              text: p.text,
-              style:
-                  p.tone === 'lead' || p.tone === 'key'
-                      ? theme.key
-                      : p.tone === 'current'
-                        ? theme.cursor
-                        : p.tone === 'hint'
-                          ? theme.dim
-                          : {},
-          }))
-        : undefined;
+    const statesBar: Piece[][] | undefined = statesRows?.map((row) =>
+        row.map((p) => ({
+            text: p.text,
+            style:
+                p.tone === 'lead' || p.tone === 'key'
+                    ? theme.key
+                    : p.tone === 'current'
+                      ? theme.cursor
+                      : p.tone === 'hint'
+                        ? theme.dim
+                        : {},
+        })),
+    );
     // The terminal's own cursor, in its own shape, while a note or a query is typed; hidden otherwise.
     const { setCursorPosition } = useCursor();
     setCursorPosition(noteCursor ?? filterCursor);
-    const footer: Piece[] = message
-        ? [{ text: ` ${message.text}`, style: message.tone === 'ok' ? theme.ok : theme.error }]
-        : spread(
-              hints,
-              rights.map((text) => ({ text, style: theme.dim })),
-              width,
-          );
+    const hintBar = hintRows.map((row, i) => {
+        const pieces = row.flatMap((h) => [
+            { text: ` ${h.keys}`, style: theme.key },
+            { text: ` ${h.label} `, style: {} },
+        ]);
+        return i === 0
+            ? spread(
+                  pieces,
+                  rights.map((text) => ({ text, style: theme.dim })),
+                  width,
+              )
+            : pieces;
+    });
+    const messageBar: Piece[] | undefined = message && [
+        { text: ` ${message.text}`, style: message.tone === 'ok' ? theme.ok : theme.error },
+    ];
     // A message shows over the list of states (why Enter was refused) until the next key.
-    const footerRows = noteBar ?? [filterBar ?? (message ? footer : (statesBar ?? footer))];
+    const footerRows =
+        noteBar ?? (filterBar ? [filterBar] : messageBar ? [messageBar] : (statesBar ?? hintBar));
     const crumbBits = crumbs
         ? crumbParts(
               crumbs.path.map((n) => shortTitle(n.task.content)),
@@ -1171,7 +1191,7 @@ export function App({ io }: { io: TuiIo }) {
         listHeight,
         window: help ? undefined : win,
         heights,
-        footerY: height - 1,
+        footerY: height - footerHeight,
         divider: split.shown
             ? { side: split.side, at: split.side ? listWidth : 2 + split.listRows }
             : undefined,
@@ -1217,7 +1237,7 @@ export function App({ io }: { io: TuiIo }) {
             case 'footer': {
                 if (message) break;
                 let x = 0;
-                for (const h of shownHints) {
+                for (const h of hintRows[target.row] ?? []) {
                     x += hintWidth(h);
                     if (target.x < x) {
                         const to = act(h.action, index);

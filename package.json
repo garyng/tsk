@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.11.0",
+    "version": "0.11.1",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {

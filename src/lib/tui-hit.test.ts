@@ -34,12 +34,13 @@ describe('hitTest', () => {
         footerY: 10,
     });
 
-    it('finds the tab, the crumb and the footer by column', () => {
+    it('finds the tab, the crumb, and the footer by its row and column', () => {
         expect(hitTest(map(), 6, 0)).toEqual({ kind: 'tab', index: 0 });
         expect(hitTest(map(), 2, 0)).toBeUndefined();
         expect(hitTest(map(), 8, 2)).toEqual({ kind: 'crumb', index: 1 });
         expect(hitTest(map(), 5, 2)).toBeUndefined(); // the separator
-        expect(hitTest(map(), 4, 10)).toEqual({ kind: 'footer', x: 4 });
+        expect(hitTest(map(), 4, 10)).toEqual({ kind: 'footer', row: 0, x: 4 });
+        expect(hitTest({ ...map(), footerY: 9 }, 4, 10)).toEqual({ kind: 'footer', row: 1, x: 4 });
     });
 
     it('finds a row by its lines, a wrapped row on any of them', () => {
@@ -64,7 +65,7 @@ describe('hitTest', () => {
         expect(hitTest(beside, 40, 2)).toEqual({ kind: 'divider' });
         expect(hitTest(beside, 40, 9)).toEqual({ kind: 'divider' });
         expect(hitTest(beside, 40, 0)).toBeUndefined(); // the strip has nothing there
-        expect(hitTest(beside, 40, 10)).toEqual({ kind: 'footer', x: 40 });
+        expect(hitTest(beside, 40, 10)).toEqual({ kind: 'footer', row: 0, x: 40 });
     });
 
     it('is the list itself under the overlay, and nothing outside the screen parts', () => {

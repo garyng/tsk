@@ -373,18 +373,25 @@ export function hintsFor(ctx: KeyContext): Hint[] {
 /** A hint's columns in the footer: ` keys label `. */
 export const hintWidth = (h: Hint): number => stringWidth(` ${h.keys} ${h.label} `);
 
-/** As many hints as fit in `width` columns, whole hints dropped from the end; pinned ones stay. */
-export function fitHints(hints: readonly Hint[], width: number): Hint[] {
-    const pinned = hints.filter((h) => h.pinned);
-    const rest = hints.filter((h) => !h.pinned);
-    let used = pinned.reduce((w, h) => w + hintWidth(h), 0);
-    const kept: Hint[] = [];
-    for (const h of rest) {
-        if (used + hintWidth(h) > width) break;
-        kept.push(h);
-        used += hintWidth(h);
+/**
+ * The hints as the footer's rows, whole hints in their order (`hintsFor`
+ * puts the pinned last): the first row `first` columns wide, leaving room
+ * for what sits on its right, the others `width`.
+ */
+export function wrapHints(hints: readonly Hint[], width: number, first = width): Hint[][] {
+    const rows: Hint[][] = [[]];
+    let used = 0;
+    for (const h of hints) {
+        const row = rows[rows.length - 1] ?? [];
+        if (row.length > 0 && used + hintWidth(h) > (rows.length === 1 ? first : width)) {
+            rows.push([h]);
+            used = hintWidth(h);
+        } else {
+            row.push(h);
+            used += hintWidth(h);
+        }
     }
-    return [...kept, ...pinned];
+    return rows;
 }
 
 /** A line of the `?` overlay: a group's heading, or a row of keys and what they do. */

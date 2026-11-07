@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-    fitHints,
     HELP_KEYS_WIDTH,
     type Hint,
     helpLines,
     hintsFor,
-    hintWidth,
     KEY_GROUPS,
     KEY_TABLE,
     keysToActions,
     type TuiAction,
+    wrapHints,
 } from './tui-keys';
 
 describe('keysToActions', () => {
@@ -212,24 +211,29 @@ describe('hintsFor', () => {
     });
 });
 
-describe('fitHints', () => {
+describe('wrapHints', () => {
     const hints = hintsFor({ view: 'session', marker: 'todo', canTell: true });
-    const width = (hs: Hint[]) => hs.reduce((w, h) => w + hintWidth(h), 0);
+    const keys = (rows: Hint[][]) => rows.map((r) => r.map((h) => h.keys));
 
-    it('keeps them all when they fit', () => {
-        expect(fitHints(hints, 200)).toEqual(hints);
+    it('keeps them on one row when they fit', () => {
+        expect(wrapHints(hints, 200)).toEqual([hints]);
     });
 
-    it('drops whole hints from the end, keeping ? keys', () => {
-        // ' m message ' 11, ' d deps ' 8, ' ⏎ zoom ' 8, ' ? keys ' 8
-        const fitted = fitHints(hints, 27);
-        expect(fitted.map((h) => h.keys)).toEqual(['m', 'd', '?']);
-        expect(width(fitted)).toBe(27);
-        expect(fitHints(hints, 26).map((h) => h.keys)).toEqual(['m', '?']);
+    it('wraps whole hints, in order, ? keys last', () => {
+        // ' m message ' 11, ' d deps ' 8, ' ⏎ zoom ' 8, ' e open ' 8, ' v mark ' 8, ' ? keys ' 8
+        expect(keys(wrapHints(hints, 27))).toEqual([
+            ['m', 'd', '⏎'],
+            ['e', 'v', '?'],
+        ]);
+        expect(keys(wrapHints(hints, 26))).toEqual([['m', 'd'], ['⏎', 'e', 'v'], ['?']]);
     });
 
-    it('keeps ? keys even when nothing else fits', () => {
-        expect(fitHints(hints, 3).map((h) => h.keys)).toEqual(['?']);
+    it('leaves room on the first row for what sits on its right', () => {
+        expect(keys(wrapHints(hints, 27, 19))).toEqual([['m', 'd'], ['⏎', 'e', 'v'], ['?']]);
+    });
+
+    it('puts a hint wider than the row on a row of its own', () => {
+        expect(keys(wrapHints(hints, 3))).toEqual(hints.map((h) => [h.keys]));
     });
 });
 
