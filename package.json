@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.13.0",
+    "version": "0.13.1",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -327,6 +327,11 @@
             {
                 "command": "tsk.signInToGitHub",
                 "title": "Sign In to GitHub for Link Status",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.clearLinkStatusCache",
+                "title": "Clear Link Status Cache",
                 "category": "Tsk"
             }
         ],

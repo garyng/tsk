@@ -27,6 +27,11 @@ import {
  * status is drawn, and why it floats over an inlay hint: `link-status-chip.ts`.
  */
 
+/**
+ * Per workspace, as the connectors are (a repo's settings can name them): the statuses no
+ * connector here takes are dropped when the connectors change, which a cache shared by every
+ * window would do to another workspace's.
+ */
 const CACHE_KEY = 'tsk.linkStatus.cache';
 /** The hover's Open: internal, so not contributed (COMMANDS mirrors what is). */
 const OPEN_LINK = 'tsk.openLink';
@@ -70,8 +75,11 @@ export class LinkStatusController implements vscode.Disposable {
         private readonly context: vscode.ExtensionContext,
         private readonly logger: Logger,
     ) {
-        this.cache = StatusCache.from(context.globalState.get(CACHE_KEY));
+        this.cache = StatusCache.from(context.workspaceState.get(CACHE_KEY));
+        // 0.12 and 0.13.0 kept one cache for every window.
+        void context.globalState.update(CACHE_KEY, undefined);
         this.queue = this.configure();
+        this.prune();
         this.subscriptions.push(
             this.floatingType,
             this.inlineType,
@@ -131,6 +139,7 @@ export class LinkStatusController implements vscode.Disposable {
                 vscode.env.openExternal(vscode.Uri.parse(url)),
             ),
             vscode.commands.registerCommand(COMMANDS.signInToGitHub, () => this.signInToGitHub()),
+            vscode.commands.registerCommand(COMMANDS.clearLinkStatusCache, () => this.clearCache()),
             // Signed in, out, or as someone else: what's on screen may read differently now.
             vscode.authentication.onDidChangeSessions(({ provider }) => {
                 if (provider.id === 'github') this.refresh();
@@ -153,7 +162,7 @@ export class LinkStatusController implements vscode.Disposable {
         this.queue.dispose();
         for (const timer of this.timers.values()) clearTimeout(timer);
         this.timers.clear();
-        void this.context.globalState.update(CACHE_KEY, this.cache.toJSON());
+        this.persist();
         for (const s of this.subscriptions) s.dispose();
     }
 
@@ -224,15 +233,33 @@ export class LinkStatusController implements vscode.Disposable {
     private reconfigure(): void {
         this.queue.dispose();
         this.queue = this.configure();
+        this.prune();
         this.docLinks.clear();
         for (const editor of vscode.window.visibleTextEditors) this.update(editor);
     }
 
+    /** Forget the statuses no connector takes now: one removed from settings takes its own along. */
+    private prune(): void {
+        const dropped = this.cache.prune((url) => this.queue.knows(url));
+        if (dropped === 0) return;
+        this.logger.info(`link status: dropped ${dropped} cached status(es) no connector takes`);
+        this.persist();
+    }
+
+    /** Empty the cache, and fetch what's on screen again. */
+    clearCache(): void {
+        this.cache.clear();
+        this.persist();
+        for (const editor of vscode.window.visibleTextEditors) this.update(editor);
+    }
+
+    private persist(): void {
+        void this.context.workspaceState.update(CACHE_KEY, this.cache.toJSON());
+    }
+
     private record(url: string, entry: Entry): void {
         this.cache.set(url, entry);
-        scheduleDebounced(this.timers, 'persist', PERSIST_DEBOUNCE_MS, () => {
-            void this.context.globalState.update(CACHE_KEY, this.cache.toJSON());
-        });
+        scheduleDebounced(this.timers, 'persist', PERSIST_DEBOUNCE_MS, () => this.persist());
         scheduleDebounced(this.timers, 'render', RENDER_DEBOUNCE_MS, () => {
             for (const editor of vscode.window.visibleTextEditors) this.render(editor);
         });
@@ -270,7 +297,8 @@ export class LinkStatusController implements vscode.Disposable {
         const marks: LinkStatusMark[] = [];
         for (const { line, span } of this.links(editor.document)) {
             const entry = this.cache.get(span.url);
-            if (!entry || !('status' in entry)) continue;
+            // Only a link a connector takes now: one removed from settings leaves its links bare.
+            if (!entry || !('status' in entry) || !this.queue.knows(span.url)) continue;
             chips.push({
                 range: new vscode.Range(line, span.endCol, line, span.endCol),
                 renderOptions: floats ? floatingOptions(entry.status) : inlineOptions(entry.status),
@@ -293,7 +321,7 @@ export class LinkStatusController implements vscode.Disposable {
         for (const { line, span } of this.links(document)) {
             if (line < range.start.line || line > range.end.line) continue;
             const entry = this.cache.get(span.url);
-            if (!entry || !('status' in entry)) continue;
+            if (!entry || !('status' in entry) || !this.queue.knows(span.url)) continue;
             const part = new vscode.InlayHintLabelPart(reserve(entry.status));
             part.tooltip = this.details(entry, span.url);
             part.command = { title: 'Open', command: OPEN_LINK, arguments: [span.url] };
@@ -338,7 +366,7 @@ export class LinkStatusController implements vscode.Disposable {
                 // At the end too: the status is drawn there, and hovering it reports that position.
                 position.character <= span.endCol,
         );
-        const entry = link && this.cache.get(link.span.url);
+        const entry = link && this.queue.knows(link.span.url) && this.cache.get(link.span.url);
         if (!link || !entry) return undefined;
         const { line, span } = link;
         return new vscode.Hover(

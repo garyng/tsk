@@ -193,7 +193,7 @@ A link in a `.tsk` editor can show its status after it: a ticket's or a PR's sta
 
 The chip takes its room in the line as a blank inlay hint as wide as it, and is drawn over that: VS Code counts an inlay hint when it wraps a line, and not text an extension draws. That needs inlay hints shown all the time (`editor.inlayHints.enabled` set to `on`, the default), without padding, and in the editor's own font and size. Otherwise the chip sits in the line itself, and a line that wraps can overflow by its chips.
 
-Only the links on screen are fetched, and a screen above and below, as you scroll; a file with hundreds of links costs a request or two per screen. Statuses are kept across reloads, so a file you reopen shows them at once and only the stale ones are fetched again: an open item after 5 minutes, a finished one after a day, a failed lookup after a minute. **Tsk: Refresh Link Status** fetches the ones on screen again.
+Only the links on screen are fetched, and a screen above and below, as you scroll; a file with hundreds of links costs a request or two per screen. Statuses are kept across reloads, per workspace, so a file you reopen shows them at once and only the stale ones are fetched again: an open item after 5 minutes, a finished one after a day, a failed lookup after a minute. Only a link some connector takes shows one: when the connectors change, the statuses none of them takes are dropped. **Tsk: Refresh Link Status** fetches the ones on screen again; **Tsk: Clear Link Status Cache** forgets every status, then fetches the ones on screen.
 
 A **connector** fetches the status. Yours are programs, in `tsk.linkStatus.connectors`:
 

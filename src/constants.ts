@@ -202,6 +202,7 @@ export const COMMANDS = {
     rebuildCache: 'tsk.rebuildCache',
     refreshLinkStatus: 'tsk.refreshLinkStatus',
     signInToGitHub: 'tsk.signInToGitHub',
+    clearLinkStatusCache: 'tsk.clearLinkStatusCache',
     findAllTasksByTag: 'tsk.findAllTasksByTag',
     findAllTasksByStatus: 'tsk.findAllTasksByStatus',
     toggleTodo: 'tsk.toggleTodo',

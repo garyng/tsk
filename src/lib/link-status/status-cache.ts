@@ -2,7 +2,7 @@ import { type Entry, readStatus } from './status';
 
 /**
  * Every URL's last known {@link Entry}, kept across reloads (the editor layer
- * stores {@link StatusCache.toJSON} in `globalState`). At most `max` URLs:
+ * stores {@link StatusCache.toJSON} in `workspaceState`). At most `max` URLs:
  * the one written longest ago goes first.
  */
 export class StatusCache {
@@ -22,6 +22,21 @@ export class StatusCache {
             if (this.entries.size <= this.max) break;
             this.entries.delete(oldest);
         }
+    }
+
+    /** Drop every URL `keep` says no to; how many went. */
+    prune(keep: (url: string) => boolean): number {
+        let dropped = 0;
+        for (const url of [...this.entries.keys()]) {
+            if (keep(url)) continue;
+            this.entries.delete(url);
+            dropped++;
+        }
+        return dropped;
+    }
+
+    clear(): void {
+        this.entries.clear();
     }
 
     get size(): number {

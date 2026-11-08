@@ -56,6 +56,16 @@ describe('StatusCache', () => {
         expect(cache.toJSON().map(([url]) => url)).toEqual(['a', 'c']);
     });
 
+    it('drops what it is told to, or everything', () => {
+        const cache = new StatusCache();
+        for (const url of ['https://a/1', 'https://b/1', 'https://a/2'])
+            cache.set(url, { error: 'x', fetchedAt: 0 });
+        expect(cache.prune((url) => url.startsWith('https://a/'))).toBe(1);
+        expect(cache.toJSON().map(([url]) => url)).toEqual(['https://a/1', 'https://a/2']);
+        cache.clear();
+        expect(cache.size).toBe(0);
+    });
+
     it('comes back from what it stored, leaving out anything malformed', () => {
         const cache = new StatusCache();
         cache.set('a', { status: { label: 'open', category: 'open' }, fetchedAt: 5 });
