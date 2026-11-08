@@ -94,6 +94,23 @@ describe('scriptConnector', () => {
         expect(logged).toEqual(['t: hi']);
     });
 
+    it('runs the program in the folder it is given, so a relative path is from there', async () => {
+        const config = {
+            name: 'here',
+            match: /x/,
+            command: [
+                'sh',
+                '-c',
+                'read -r url; printf \'{"url":"%s","label":"%s"}\\n\' "$url" "$(pwd)"',
+            ],
+            batchSize: 1,
+        };
+        const c = scriptConnector(config, { cwd: dir, log: () => {} });
+        expect(await c.fetch(['x'], new AbortController().signal)).toEqual(
+            new Map([['x', { label: fs.realpathSync(dir), category: 'unknown' }]]),
+        );
+    });
+
     it("fails the batch with the program's last stderr line when it exits non-zero", async () => {
         await expect(
             run('echo one >&2; echo "no token" >&2; exit 3').fetch(['https://t/1']),

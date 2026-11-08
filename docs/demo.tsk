@@ -54,13 +54,7 @@ Tagged something that isn't in `tags.yml` yet? **Tsk: Add Discovered Tags to tag
 
 `JIRAID-123` above is also a **link** — this folder's `.vscode/settings.json` has an autolink rule (regex → URL), so Ctrl/Cmd+Click opens the ticket.
 
-A link can show its status after it: a PR's or a ticket's state, fetched for the lines on screen. Try it with the sample connector: add this to your **user** settings, or in a dev container or over SSH your **Remote** settings (a connector runs a program, so a folder's settings can't name one), with the full path to this folder:
-
-```jsonc
-"tsk.linkStatus.connectors": [
-  { "name": "sample", "match": "^https://example\\.(com|atlassian\\.net)/", "command": ["node", "<this folder>/link-status-sample.mjs"] }
-]
-```
+A link can show its status after it: a PR's or a ticket's state, fetched for the lines on screen. This folder's `.vscode/settings.json` names a sample connector, `link-status-sample.mjs`, which makes the statuses up:
 
 - [ ] review https://example.com/ticket/1 and [the fix](https://example.com/ticket/2) <!-- @id:link-status -->
 

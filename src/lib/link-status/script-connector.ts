@@ -80,6 +80,8 @@ export function parseScriptConnectors(raw: unknown): {
 export interface ScriptIo {
     /** Each line the program writes to stderr, and each line of its stdout that isn't an answer. */
     readonly log: (line: string) => void;
+    /** Where the program runs, so a relative path in `command` is from there: the workspace folder. */
+    readonly cwd?: string;
     readonly timeoutMs?: number;
 }
 
@@ -106,7 +108,11 @@ function runScript(
     return new Promise((resolve, reject) => {
         // Its own process group, so stopping it stops what it started too: a child left
         // holding its stdout would keep the batch waiting.
-        const child = spawn(expandHome(program), args, { stdio: 'pipe', detached: true });
+        const child = spawn(expandHome(program), args, {
+            cwd: io.cwd,
+            stdio: 'pipe',
+            detached: true,
+        });
         let out = '';
         let err = '';
         let settled = false;

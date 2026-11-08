@@ -5,5 +5,12 @@
             "pattern": "([A-Z]+)-([0-9]+)",
             "target": "https://example.atlassian.net/browse/$1-$2"
         }
+    ],
+    "tsk.linkStatus.connectors": [
+        {
+            "name": "sample",
+            "match": "^https://example\\.(com|atlassian\\.net)/",
+            "command": ["node", "link-status-sample.mjs"]
+        }
     ]
 }

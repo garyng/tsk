@@ -132,20 +132,31 @@ export class LinkStatusController implements vscode.Disposable {
         const config = vscode.workspace.getConfiguration('tsk');
         this.autolinks = parseAutoLinkRules(config.get<unknown>(AUTOLINKS_KEY)).rules;
         const connectors: Connector[] = [];
-        // A connector runs a program: the setting is machine-scoped (no workspace value), and is
-        // read only once the folder is trusted, so a cloned repo can't name one.
+        // A connector runs a program, so only in a trusted folder: a repo's own settings may name
+        // one, as its tasks may run one. tsk declares no untrusted support, so VS Code doesn't run
+        // it in one at all; the check says the rule here too.
+        let from = '';
         if (vscode.workspace.isTrusted) {
+            const raw = config.inspect<unknown>('linkStatus.connectors');
+            from =
+                raw?.workspaceFolderValue !== undefined || raw?.workspaceValue !== undefined
+                    ? ' (workspace settings)'
+                    : '';
             const { configs, warnings } = parseScriptConnectors(
                 config.get<unknown>('linkStatus.connectors'),
             );
             for (const w of warnings) this.logger.warn(w);
+            const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             for (const c of configs)
                 connectors.push(
-                    scriptConnector(c, { log: (line) => this.logger.info(`link status: ${line}`) }),
+                    scriptConnector(c, {
+                        cwd,
+                        log: (line) => this.logger.info(`link status: ${line}`),
+                    }),
                 );
         }
         this.logger.info(
-            `link status: ${connectors.length} connector(s): ${connectors.map((c) => c.name).join(', ') || 'none'}`,
+            `link status: ${connectors.length} connector(s)${from}: ${connectors.map((c) => c.name).join(', ') || 'none'}`,
         );
         return new FetchQueue(connectors, {
             now: Date.now,

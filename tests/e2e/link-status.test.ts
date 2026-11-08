@@ -4,7 +4,7 @@ import type { TskExtensionApi } from '../../src/extension';
 
 /**
  * Link status e2e: a connector
- * of the user's, in user settings as a real one must be, answering for an
+ * in the workspace's settings, as a repo can name its own, answering for an
  * untitled `.tsk` doc's links: a bare URL, a Markdown link, and an autolink.
  * The drawn text comes from the extension API, since VS Code doesn't hand
  * back what decorations show; the hover from `vscode.executeHoverProvider`.
@@ -55,9 +55,9 @@ suite('link status', () => {
             .replaceAll('&nbsp;', ' '); // appendText keeps the service's spaces as &nbsp;
     }
 
-    test("draws each link's status from the user's connector, and the hover says why one has none", async function () {
+    test("draws each link's status from the workspace's connector, and the hover says why one has none", async function () {
         this.timeout(60000);
-        const connectors = config().inspect('linkStatus.connectors')?.globalValue;
+        const connectors = config().inspect('linkStatus.connectors')?.workspaceValue;
         const autolinks = config().inspect('autolinks')?.workspaceValue;
         try {
             await config().update(
@@ -74,7 +74,7 @@ suite('link status', () => {
                         command: ['sh', '-c', CONNECTOR],
                     },
                 ],
-                vscode.ConfigurationTarget.Global,
+                vscode.ConfigurationTarget.Workspace,
             );
             const doc = await vscode.workspace.openTextDocument({
                 language: 'tsk',
@@ -111,16 +111,9 @@ suite('link status', () => {
             await config().update(
                 'linkStatus.connectors',
                 connectors,
-                vscode.ConfigurationTarget.Global,
+                vscode.ConfigurationTarget.Workspace,
             );
             await config().update('autolinks', autolinks, vscode.ConfigurationTarget.Workspace);
         }
-    });
-
-    test('contributes the setting as machine-scoped, so no workspace can name a program', () => {
-        const ext = vscode.extensions.getExtension('garyng.tsk');
-        const prop =
-            ext?.packageJSON.contributes.configuration.properties['tsk.linkStatus.connectors'];
-        assert.strictEqual(prop?.scope, 'machine');
     });
 });

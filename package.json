@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.12.0",
+    "version": "0.12.1",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -785,8 +785,7 @@
                 "tsk.linkStatus.connectors": {
                     "type": "array",
                     "default": [],
-                    "scope": "machine",
-                    "markdownDescription": "Programs that fetch the status of links in `.tsk` editors, shown after each link. Each entry's `match` is a regular expression tested against a link's URL; the first that matches takes it. tsk writes a batch of URLs to `command`'s stdin, one per line, and reads one JSON object per line from its stdout: `{\"url\": …, \"label\": \"In review\", \"category\": \"inProgress\", \"title\": …}`, or `{\"url\": …, \"error\": …}`. `category` is one of `open`, `inProgress`, `done`, `closed`, `unknown`; `checks` may be `passing`, `failing` or `pending`; `lines` is an array of strings for the hover. User or remote settings only, and only in a trusted workspace.",
+                    "markdownDescription": "Programs that fetch the status of links in `.tsk` editors, shown after each link. Each entry's `match` is a regular expression tested against a link's URL; the first that matches takes it. tsk writes a batch of URLs to `command`'s stdin, one per line, and reads one JSON object per line from its stdout: `{\"url\": …, \"label\": \"In review\", \"category\": \"inProgress\", \"title\": …}`, or `{\"url\": …, \"error\": …}`. `category` is one of `open`, `inProgress`, `done`, `closed`, `unknown`; `checks` may be `passing`, `failing` or `pending`; `lines` is an array of strings for the hover. Read only in a trusted workspace. The program runs in the workspace folder, so a relative path in `command` is from there.",
                     "items": {
                         "type": "object",
                         "required": [
@@ -810,7 +809,7 @@
                                 "items": {
                                     "type": "string"
                                 },
-                                "markdownDescription": "The program and its arguments, run without a shell. A leading `~/` is the home folder."
+                                "markdownDescription": "The program and its arguments, run without a shell, in the workspace folder. A leading `~/` is the home folder."
                             },
                             "batchSize": {
                                 "type": "integer",
