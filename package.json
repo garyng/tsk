@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.12.1",
+    "version": "0.12.2",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -569,30 +569,6 @@
                 "defaults": {
                     "light": "#8c959f",
                     "dark": "#6e7681"
-                }
-            },
-            {
-                "id": "tsk.linkStatus.checks.passing",
-                "description": "Glyph after a link whose CI checks pass.",
-                "defaults": {
-                    "light": "#1a7f37",
-                    "dark": "#3fb950"
-                }
-            },
-            {
-                "id": "tsk.linkStatus.checks.failing",
-                "description": "Glyph after a link whose CI checks fail.",
-                "defaults": {
-                    "light": "#cf222e",
-                    "dark": "#f85149"
-                }
-            },
-            {
-                "id": "tsk.linkStatus.checks.pending",
-                "description": "Glyph after a link whose CI checks are still running.",
-                "defaults": {
-                    "light": "#9a6700",
-                    "dark": "#d29922"
                 }
             }
         ],

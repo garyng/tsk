@@ -58,7 +58,7 @@ A link can show its status after it: a PR's or a ticket's state, fetched for the
 
 - [ ] review https://example.com/ticket/1 and [the fix](https://example.com/ticket/2) <!-- @id:link-status -->
 
-Each link shows a made-up status, and so does `JIRAID-123` above, through its autolink. Hover one for its details; **Tsk: Refresh Link Status** fetches the ones on screen again.
+Each link shows a made-up status, and so does `JIRAID-123` above, through its autolink. Hover a status for its details; Ctrl/Cmd+Click on it opens the link, and **Tsk: Refresh Link Status** fetches the ones on screen again.
 
 Ctrl+click a tag to jump to its entry in `tags.yml` (`F12` and `Alt+F12` work too). Not declared yet? VS Code says so, and `Ctrl+.` offers **Define #tag in tags.yml…** — it asks for a description and writes the entry for you.
 ## 4. Links

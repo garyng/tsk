@@ -10,24 +10,29 @@ import { parseScriptConnectors, scriptConnector } from './lib/link-status/script
 import { type Entry, isFresh } from './lib/link-status/status';
 import { StatusCache } from './lib/link-status/status-cache';
 import type { Logger } from './lib/logger';
+import {
+    chipText,
+    FLOATING,
+    floatingOptions,
+    INLINE,
+    inlayHintsReserve,
+    inlineOptions,
+    reserve,
+} from './link-status-chip';
 
 /**
  * The status of the links in `.tsk` editors: drawn after each link whose status
- * is known, fetched for the links on screen and a screen either side.
- *
- * Two decorations per link, both at its end: the status as `before` text on
- * the empty range there, the checks glyph as `after` text on the link. VS Code
- * draws injected text at one column `before` first (its `fromDecorations`
- * sorts on line, column, then before/after), so the order holds whatever the
- * decorations' history.
+ * is known, fetched for the links on screen and a screen either side. How a
+ * status is drawn, and why it floats over an inlay hint: `link-status-chip.ts`.
  */
 
 const CACHE_KEY = 'tsk.linkStatus.cache';
+/** The hover's Open: internal, so not contributed (COMMANDS mirrors what is). */
+const OPEN_LINK = 'tsk.openLink';
 const SCROLL_DEBOUNCE_MS = 150;
 const EDIT_DEBOUNCE_MS = 300;
 const RENDER_DEBOUNCE_MS = 50;
 const PERSIST_DEBOUNCE_MS = 2000;
-const CHECKS_GLYPH = { passing: '✓', failing: '✗', pending: '○' } as const;
 
 /** A drawn status, for the e2e API: VS Code doesn't hand back what decorations show. */
 export interface LinkStatusMark {
@@ -35,7 +40,7 @@ export interface LinkStatusMark {
     readonly startCol: number;
     readonly endCol: number;
     readonly url: string;
-    /** What's drawn after the link, e.g. `● open ✓`. */
+    /** The chip drawn after the link, e.g. `In review ✗`. */
     readonly text: string;
 }
 
@@ -53,12 +58,9 @@ export class LinkStatusController implements vscode.Disposable {
     private readonly docLinks = new Map<string, DocLinks>();
     private readonly marks = new Map<string, LinkStatusMark[]>();
     private readonly timers = new Map<string, NodeJS.Timeout>();
-    private readonly statusType = vscode.window.createTextEditorDecorationType({
-        before: { margin: '0 0 0 0.6em' },
-    });
-    private readonly checksType = vscode.window.createTextEditorDecorationType({
-        after: { margin: '0 0 0 0.3em' },
-    });
+    private readonly floatingType = vscode.window.createTextEditorDecorationType(FLOATING);
+    private readonly inlineType = vscode.window.createTextEditorDecorationType(INLINE);
+    private readonly inlayChanged = new vscode.EventEmitter<void>();
     private readonly subscriptions: vscode.Disposable[] = [];
 
     constructor(
@@ -68,14 +70,29 @@ export class LinkStatusController implements vscode.Disposable {
         this.cache = StatusCache.from(context.globalState.get(CACHE_KEY));
         this.queue = this.configure();
         this.subscriptions.push(
-            this.statusType,
-            this.checksType,
+            this.floatingType,
+            this.inlineType,
+            this.inlayChanged,
+            vscode.languages.registerInlayHintsProvider(
+                { language: TSK_LANGUAGE_ID },
+                {
+                    onDidChangeInlayHints: this.inlayChanged.event,
+                    provideInlayHints: (document, range) => this.inlayHints(document, range),
+                },
+            ),
             vscode.workspace.onDidChangeConfiguration((e) => {
                 if (
                     e.affectsConfiguration(LINK_STATUS_SETTING) ||
                     e.affectsConfiguration('tsk.autolinks')
                 )
                     this.reconfigure();
+                // Whether a chip can float over an inlay hint (`inlayHintsReserve`).
+                else if (
+                    e.affectsConfiguration('editor.inlayHints') ||
+                    e.affectsConfiguration('editor.fontSize') ||
+                    e.affectsConfiguration('editor.fontFamily')
+                )
+                    for (const editor of vscode.window.visibleTextEditors) this.render(editor);
             }),
             vscode.workspace.onDidGrantWorkspaceTrust(() => this.reconfigure()),
             vscode.window.onDidChangeVisibleTextEditors((editors) => {
@@ -104,7 +121,12 @@ export class LinkStatusController implements vscode.Disposable {
                 { language: TSK_LANGUAGE_ID },
                 { provideHover: (document, position) => this.hover(document, position) },
             ),
-            vscode.commands.registerCommand(COMMANDS.refreshLinkStatus, () => this.refresh()),
+            vscode.commands.registerCommand(COMMANDS.refreshLinkStatus, (url?: string) =>
+                typeof url === 'string' ? this.queue.want([url]) : this.refresh(),
+            ),
+            vscode.commands.registerCommand(OPEN_LINK, (url: string) =>
+                vscode.env.openExternal(vscode.Uri.parse(url)),
+            ),
         );
         for (const editor of vscode.window.visibleTextEditors) this.update(editor);
     }
@@ -209,38 +231,41 @@ export class LinkStatusController implements vscode.Disposable {
     /** Draw every link whose status is known, on screen or not. */
     private render(editor: vscode.TextEditor): void {
         if (!isTskDocument(editor.document)) return;
-        const statuses: vscode.DecorationOptions[] = [];
-        const checks: vscode.DecorationOptions[] = [];
+        const floats = inlayHintsReserve(editor.document);
+        const chips: vscode.DecorationOptions[] = [];
         const marks: LinkStatusMark[] = [];
         for (const { line, span } of this.links(editor.document)) {
             const entry = this.cache.get(span.url);
             if (!entry || !('status' in entry)) continue;
-            const { label, category, checks: state } = entry.status;
-            const text = `● ${label}`;
-            statuses.push({
+            chips.push({
                 range: new vscode.Range(line, span.endCol, line, span.endCol),
-                renderOptions: {
-                    before: {
-                        contentText: text,
-                        color: new vscode.ThemeColor(`tsk.linkStatus.${category.toLowerCase()}`),
-                    },
-                },
+                renderOptions: floats ? floatingOptions(entry.status) : inlineOptions(entry.status),
             });
-            if (state)
-                checks.push({
-                    range: new vscode.Range(line, span.startCol, line, span.endCol),
-                    renderOptions: {
-                        after: {
-                            contentText: CHECKS_GLYPH[state],
-                            color: new vscode.ThemeColor(`tsk.linkStatus.checks.${state}`),
-                        },
-                    },
-                });
-            marks.push({ line, ...span, text: state ? `${text} ${CHECKS_GLYPH[state]}` : text });
+            marks.push({ line, ...span, text: chipText(entry.status).trim() });
         }
-        editor.setDecorations(this.statusType, statuses);
-        editor.setDecorations(this.checksType, checks);
+        editor.setDecorations(floats ? this.floatingType : this.inlineType, chips);
+        editor.setDecorations(floats ? this.inlineType : this.floatingType, []);
         this.marks.set(editor.document.uri.toString(), marks);
+        this.inlayChanged.fire();
+    }
+
+    /**
+     * The blank hint each floating chip covers: it takes the chip's room when the line wraps,
+     * and the clicks the chip lets through: Ctrl+Click opens the link, hovering shows the details.
+     */
+    private inlayHints(document: vscode.TextDocument, range: vscode.Range): vscode.InlayHint[] {
+        if (!inlayHintsReserve(document)) return [];
+        const hints: vscode.InlayHint[] = [];
+        for (const { line, span } of this.links(document)) {
+            if (line < range.start.line || line > range.end.line) continue;
+            const entry = this.cache.get(span.url);
+            if (!entry || !('status' in entry)) continue;
+            const part = new vscode.InlayHintLabelPart(reserve(entry.status));
+            part.tooltip = this.details(entry, span.url);
+            part.command = { title: 'Open', command: OPEN_LINK, arguments: [span.url] };
+            hints.push(new vscode.InlayHint(new vscode.Position(line, span.endCol), [part]));
+        }
+        return hints;
     }
 
     /** Ask for the links on screen and a screen either side, those not known or not fresh: on screen first. */
@@ -276,10 +301,19 @@ export class LinkStatusController implements vscode.Disposable {
             ({ line, span }) =>
                 line === position.line &&
                 position.character >= span.startCol &&
-                position.character < span.endCol,
+                // At the end too: the status is drawn there, and hovering it reports that position.
+                position.character <= span.endCol,
         );
         const entry = link && this.cache.get(link.span.url);
         if (!link || !entry) return undefined;
+        const { line, span } = link;
+        return new vscode.Hover(
+            this.details(entry, span.url),
+            new vscode.Range(line, span.startCol, line, span.endCol),
+        );
+    }
+
+    private details(entry: Entry, url: string): vscode.MarkdownString {
         // What a connector says is the service's text: appendText escapes it, and the string isn't trusted.
         const md = new vscode.MarkdownString();
         if ('status' in entry) {
@@ -299,8 +333,13 @@ export class LinkStatusController implements vscode.Disposable {
         md.appendText(
             `fetched ${formatDistance(entry.fetchedAt, Date.now(), { addSuffix: true })}`,
         );
-        const { line, span } = link;
-        return new vscode.Hover(md, new vscode.Range(line, span.startCol, line, span.endCol));
+        // Only these two commands run from it, whatever the service's text holds.
+        const arg = encodeURIComponent(JSON.stringify([url]));
+        md.appendMarkdown(
+            `\n\n[Open](command:${OPEN_LINK}?${arg}) · [Refresh](command:${COMMANDS.refreshLinkStatus}?${arg})`,
+        );
+        md.isTrusted = { enabledCommands: [OPEN_LINK, COMMANDS.refreshLinkStatus] };
+        return md;
     }
 }
 

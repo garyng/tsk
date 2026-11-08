@@ -55,6 +55,18 @@ suite('link status', () => {
             .replaceAll('&nbsp;', ' '); // appendText keeps the service's spaces as &nbsp;
     }
 
+    async function inlayHints(uri: vscode.Uri, range: vscode.Range): Promise<vscode.InlayHint[]> {
+        return (
+            (await vscode.commands.executeCommand<vscode.InlayHint[]>(
+                'vscode.executeInlayHintProvider',
+                uri,
+                range,
+            )) ?? []
+        );
+    }
+    const labelOf = (h: vscode.InlayHint) =>
+        typeof h.label === 'string' ? h.label : h.label.map((p) => p.value).join('');
+
     test("draws each link's status from the workspace's connector, and the hover says why one has none", async function () {
         this.timeout(60000);
         const connectors = config().inspect('linkStatus.connectors')?.workspaceValue;
@@ -97,8 +109,8 @@ suite('link status', () => {
                     m.text,
                 ]),
                 [
-                    [0, 'https://tickets.example/1', '● In review ✗'],
-                    [1, '[the fix](https://tickets.example/2)', '● Done'],
+                    [0, 'https://tickets.example/1', 'In review ✗'],
+                    [1, '[the fix](https://tickets.example/2)', 'Done'],
                 ],
             );
 
@@ -107,7 +119,35 @@ suite('link status', () => {
             assert.match(first, /In review · checks failing/);
             // TCK-3 was in the same batch as the two drawn.
             assert.match(await hover(doc.uri, 2, 5), /No status: no ticket/);
+
+            // Each chip floats over a blank inlay hint as wide as it, a space before it; the hint
+            // takes the room when the line wraps, and Ctrl+Click on it opens the link.
+            const all = new vscode.Range(0, 0, doc.lineCount, 0);
+            const hints = await inlayHints(doc.uri, all);
+            assert.deepStrictEqual(
+                hints.map((h) => [h.position.line, h.position.character, labelOf(h)]),
+                [
+                    [0, 38, '\u00a0'.repeat(' In review ✗ '.length + 1)],
+                    [1, 40, '\u00a0'.repeat(' Done '.length + 1)],
+                ],
+            );
+            const [part] = hints[0]?.label as vscode.InlayHintLabelPart[];
+            assert.deepStrictEqual(part?.command?.arguments, ['https://tickets.example/1']);
+
+            // Hints not always shown can't hold the room: the chip goes in the line, no hint.
+            await vscode.workspace
+                .getConfiguration('editor')
+                .update(
+                    'inlayHints.enabled',
+                    'offUnlessPressed',
+                    vscode.ConfigurationTarget.Workspace,
+                );
+            assert.deepStrictEqual(await inlayHints(doc.uri, all), []);
+            assert.strictEqual(api.getLinkStatus(doc.uri.toString())?.length, 2);
         } finally {
+            await vscode.workspace
+                .getConfiguration('editor')
+                .update('inlayHints.enabled', undefined, vscode.ConfigurationTarget.Workspace);
             await config().update(
                 'linkStatus.connectors',
                 connectors,
