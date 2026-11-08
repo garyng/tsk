@@ -5,7 +5,13 @@ import { isTskDocument } from './editor-guards';
 import { type CompiledAutoLink, parseAutoLinkRules } from './lib/autolinks';
 import { scheduleDebounced } from './lib/debounce';
 import { githubConnector, NOT_SIGNED_IN } from './lib/link-status/github';
-import { jiraConnector, NO_TOKEN, REFUSED } from './lib/link-status/jira';
+import {
+    type JiraCredentials,
+    jiraConnector,
+    jiraIssue,
+    NO_TOKEN,
+    REFUSED,
+} from './lib/link-status/jira';
 import { findLinks, type LinkSpan } from './lib/link-status/links';
 import { type Connector, FetchQueue } from './lib/link-status/queue';
 import { parseScriptConnectors, scriptConnector } from './lib/link-status/script-connector';
@@ -38,8 +44,10 @@ const CACHE_KEY = 'tsk.linkStatus.cache';
 const OPEN_LINK = 'tsk.openLink';
 /** A PR's or issue's state in a private repo needs `repo`; GitHub's OAuth has no read-only form of it. */
 const GITHUB_SCOPES = ['repo'];
-/** The Jira API token's key in secret storage, per site. */
+/** A Jira site's email and API token in secret storage, as JSON: one entry per site. */
 const jiraSecret = (site: string) => `tsk.linkStatus.jira.token:${site}`;
+/** The email last given for a site, to offer for the next one (not secret). */
+const JIRA_LAST_EMAIL = 'tsk.linkStatus.jira.lastEmail';
 const SCROLL_DEBOUNCE_MS = 150;
 const EDIT_DEBOUNCE_MS = 300;
 const RENDER_DEBOUNCE_MS = 50;
@@ -143,7 +151,9 @@ export class LinkStatusController implements vscode.Disposable {
             ),
             vscode.commands.registerCommand(COMMANDS.signInToGitHub, () => this.signInToGitHub()),
             vscode.commands.registerCommand(COMMANDS.clearLinkStatusCache, () => this.clearCache()),
-            vscode.commands.registerCommand(COMMANDS.setJiraApiToken, () => this.setJiraToken()),
+            vscode.commands.registerCommand(COMMANDS.setJiraApiToken, (site?: string) =>
+                this.setJiraToken(site),
+            ),
             context.secrets.onDidChange(({ key }) => {
                 if (key.startsWith('tsk.linkStatus.jira.token:')) this.refresh();
             }),
@@ -201,13 +211,8 @@ export class LinkStatusController implements vscode.Disposable {
                     }),
                 );
         }
-        const jira = this.jiraSite();
-        if (jira)
-            connectors.push(
-                jiraConnector(jira, {
-                    token: () => Promise.resolve(this.context.secrets.get(jiraSecret(jira.site))),
-                }),
-            );
+        // Any Atlassian Cloud site the links point to; one with no token kept is never asked.
+        connectors.push(jiraConnector({ credentials: (site) => this.jiraCredentials(site) }));
         // After yours, so one of yours can take github.com over.
         if (config.get<boolean>('linkStatus.github.enabled'))
             connectors.push(githubConnector({ token: () => this.githubToken() }));
@@ -221,38 +226,75 @@ export class LinkStatusController implements vscode.Disposable {
         });
     }
 
-    /** The Jira site and email from settings: the site as its origin, whatever page was pasted. */
-    private jiraSite(): { site: string; email: string } | undefined {
-        const config = vscode.workspace.getConfiguration('tsk');
-        const raw = config.get<string>('linkStatus.jira.site')?.trim();
-        const email = config.get<string>('linkStatus.jira.email')?.trim();
-        if (!raw || !email) return undefined;
+    /** A site's email and token from secret storage; undefined when there are none. */
+    private async jiraCredentials(site: string): Promise<JiraCredentials | undefined> {
+        const raw = await this.context.secrets.get(jiraSecret(site));
+        if (!raw) return undefined;
         try {
-            return { site: new URL(raw).origin, email };
+            const { email, token } = JSON.parse(raw) as Partial<JiraCredentials>;
+            if (typeof email === 'string' && typeof token === 'string') return { email, token };
         } catch {
-            this.logger.warn(`tsk.linkStatus.jira.site: "${raw}" isn't a URL`);
-            return undefined;
+            // 0.14.0 kept the token alone, with the email in settings: asked for again.
         }
+        this.logger.warn(
+            `link status: the Jira credentials kept for ${site} aren't readable; set them again`,
+        );
+        return undefined;
     }
 
-    /** Ask for the Jira API token and keep it in secret storage; an empty answer removes it. */
-    private async setJiraToken(): Promise<void> {
-        const jira = this.jiraSite();
-        if (!jira) {
-            void vscode.window.showWarningMessage(
-                'Set tsk.linkStatus.jira.site and tsk.linkStatus.jira.email first.',
-            );
-            return;
-        }
+    /**
+     * Ask for a Jira site's email and API token, and keep them in secret storage: the site
+     * given (a link's hover gives its own), else asked for. An empty token removes them.
+     */
+    private async setJiraToken(given?: string): Promise<void> {
+        const site = typeof given === 'string' ? given : await this.askJiraSite();
+        if (!site) return;
+        const host = new URL(site).host;
+        const kept = await this.jiraCredentials(site);
+        const email = await vscode.window.showInputBox({
+            title: `Jira at ${host}: your Atlassian account's email`,
+            value: kept?.email ?? this.context.globalState.get<string>(JIRA_LAST_EMAIL) ?? '',
+            ignoreFocusOut: true,
+            validateInput: (v) => (/^\S+@\S+$/.test(v.trim()) ? undefined : 'An email address'),
+        });
+        if (email === undefined) return;
         const token = await vscode.window.showInputBox({
-            title: `Jira API token for ${jira.email} at ${jira.site}`,
+            title: `Jira at ${host}: the API token for ${email.trim()}`,
             prompt: 'From id.atlassian.com, Security, API tokens. Empty removes the one kept.',
             password: true,
             ignoreFocusOut: true,
         });
         if (token === undefined) return;
-        if (token.trim() === '') await this.context.secrets.delete(jiraSecret(jira.site));
-        else await this.context.secrets.store(jiraSecret(jira.site), token.trim());
+        if (token.trim() === '') {
+            await this.context.secrets.delete(jiraSecret(site));
+            return;
+        }
+        await this.context.globalState.update(JIRA_LAST_EMAIL, email.trim());
+        await this.context.secrets.store(
+            jiraSecret(site),
+            JSON.stringify({ email: email.trim(), token: token.trim() }),
+        );
+    }
+
+    private async askJiraSite(): Promise<string | undefined> {
+        const site = await vscode.window.showInputBox({
+            title: 'Jira site',
+            placeHolder: 'https://example.atlassian.net',
+            ignoreFocusOut: true,
+            validateInput: (v) =>
+                jiraIssue(`${this.originOf(v)}/browse/A-1`)
+                    ? undefined
+                    : 'An Atlassian Cloud site: https://<name>.atlassian.net',
+        });
+        return site === undefined ? undefined : this.originOf(site);
+    }
+
+    private originOf(text: string): string {
+        try {
+            return new URL(text.trim()).origin.toLowerCase();
+        } catch {
+            return '';
+        }
     }
 
     /** The editor's GitHub session's token, without asking: undefined when there's none. */
@@ -450,8 +492,17 @@ export class LinkStatusController implements vscode.Disposable {
         );
         if ('error' in entry && entry.error === NOT_SIGNED_IN)
             md.appendMarkdown(` · [Sign in to GitHub](command:${COMMANDS.signInToGitHub})`);
-        if ('error' in entry && (entry.error === NO_TOKEN || entry.error === REFUSED))
-            md.appendMarkdown(` · [Set Jira API Token](command:${COMMANDS.setJiraApiToken})`);
+        const jira = jiraIssue(url);
+        if (
+            jira &&
+            'error' in entry &&
+            (entry.error.startsWith(NO_TOKEN) || entry.error.startsWith(REFUSED))
+        ) {
+            const site = encodeURIComponent(JSON.stringify([jira.site]));
+            md.appendMarkdown(
+                ` · [Set Jira API Token](command:${COMMANDS.setJiraApiToken}?${site})`,
+            );
+        }
         md.isTrusted = {
             enabledCommands: [
                 OPEN_LINK,

@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.14.0",
+    "version": "0.14.1",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -816,16 +816,6 @@
                     "type": "boolean",
                     "default": false,
                     "markdownDescription": "Show the status of GitHub PR and issue links in `.tsk` editors: a PR's state and its CI checks, an issue's state. Uses VS Code's own GitHub sign-in (`repo` scope, for private repos); a link's hover offers to sign in when there's no session. A connector in `#tsk.linkStatus.connectors#` that matches a GitHub URL takes it first."
-                },
-                "tsk.linkStatus.jira.site": {
-                    "type": "string",
-                    "default": "",
-                    "markdownDescription": "Your Jira Cloud site, e.g. `https://example.atlassian.net`: with `#tsk.linkStatus.jira.email#`, links to its issues (`/browse/KEY`, a board's `selectedIssue=KEY`) in `.tsk` editors show their status. The API token goes in secret storage: *Tsk: Set Jira API Token*."
-                },
-                "tsk.linkStatus.jira.email": {
-                    "type": "string",
-                    "default": "",
-                    "markdownDescription": "The email of the Atlassian account whose API token *Tsk: Set Jira API Token* keeps, for `#tsk.linkStatus.jira.site#`."
                 }
             }
         }

@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { jiraConnector, jiraKey, NO_TOKEN, REFUSED, statusOf } from './jira';
+import { jiraConnector, jiraIssue, NO_TOKEN, REFUSED, statusOf } from './jira';
 import { RateLimited } from './queue';
 
 const SITE = 'https://acme.atlassian.net';
 const GATEWAY = 'https://api.atlassian.com/ex/jira/cloud-1';
 
-describe('jiraKey', () => {
-    it("takes an issue link on the site, by /browse/ or a board's selectedIssue", () => {
-        expect(jiraKey(`${SITE}/browse/ABC-12`, SITE)).toBe('ABC-12');
-        expect(jiraKey(`${SITE}/browse/abc-12?focusedCommentId=1`, SITE)).toBe('ABC-12');
+describe('jiraIssue', () => {
+    it("takes an issue link on any Atlassian Cloud site, by /browse/ or a board's selectedIssue", () => {
+        expect(jiraIssue(`${SITE}/browse/ABC-12`)).toEqual({ site: SITE, key: 'ABC-12' });
         expect(
-            jiraKey(`${SITE}/jira/software/projects/ABC/boards/1?selectedIssue=ABC-7`, SITE),
+            jiraIssue('https://Other-Co.atlassian.net/browse/abc-12?focusedCommentId=1'),
+        ).toEqual({
+            site: 'https://other-co.atlassian.net',
+            key: 'ABC-12',
+        });
+        expect(
+            jiraIssue(`${SITE}/jira/software/projects/ABC/boards/1?selectedIssue=ABC-7`)?.key,
         ).toBe('ABC-7');
-        expect(jiraKey('https://other.atlassian.net/browse/ABC-12', SITE)).toBeUndefined();
-        expect(jiraKey(`${SITE}/jira/projects`, SITE)).toBeUndefined();
+        expect(jiraIssue(`${SITE}/jira/projects`)).toBeUndefined();
+        expect(jiraIssue('https://atlassian.net.evil.example/browse/ABC-1')).toBeUndefined();
+        expect(jiraIssue('https://jira.example.com/browse/ABC-1')).toBeUndefined();
     });
 });
 
@@ -69,15 +75,14 @@ describe('jiraConnector', () => {
 
     /** A connector over a stand-in fetch answering by URL; it records each request. */
     function connector(answer: (url: string) => Response, token = 'tok') {
+        const credentials = async (site: string) =>
+            token && site === SITE ? { email: 'me@acme.com', token } : undefined;
         const asked: { url: string; init?: RequestInit }[] = [];
         const http = (async (url: string, init?: RequestInit) => {
             asked.push({ url, init });
             return answer(url);
         }) as typeof fetch;
-        const c = jiraConnector(
-            { site: SITE, email: 'me@acme.com' },
-            { token: async () => token || undefined, fetch: http, now: () => 0 },
-        );
+        const c = jiraConnector({ credentials, fetch: http, now: () => 0 });
         return { c, asked };
     }
 
@@ -130,13 +135,22 @@ describe('jiraConnector', () => {
                   : anonymous(),
         );
         expect([...(await refusing.c.fetch([`${SITE}/browse/ABC-1`], signal)).values()]).toEqual([
-            { error: REFUSED },
+            { error: `${REFUSED} for acme.atlassian.net` },
         ]);
         const none = connector(() => found(), '');
         expect([...(await none.c.fetch([`${SITE}/browse/ABC-1`], signal)).values()]).toEqual([
-            { error: NO_TOKEN },
+            { error: `${NO_TOKEN} for acme.atlassian.net` },
         ]);
         expect(none.asked).toEqual([]);
+    });
+
+    it('asks each site with its own credentials, and a site with none not at all', async () => {
+        const { c, asked } = connector(() => found('ABC-1'));
+        const other = 'https://other.atlassian.net/browse/XYZ-1';
+        const answers = await c.fetch([`${SITE}/browse/ABC-1`, other], signal);
+        expect(asked.map((a) => a.url)).toEqual([`${SITE}/rest/api/3/issue/bulkfetch`]);
+        expect(answers.get(other)).toEqual({ error: `${NO_TOKEN} for other.atlassian.net` });
+        expect(answers.get(`${SITE}/browse/ABC-1`)).toMatchObject({ label: 'Done' });
     });
 
     it("waits when Jira says so, and fails the batch on Jira's other errors", async () => {
@@ -144,11 +158,11 @@ describe('jiraConnector', () => {
             () => new Response('', { status: 429, headers: { 'retry-after': '30' } }),
         );
         await expect(limited.c.fetch([`${SITE}/browse/ABC-1`], signal)).rejects.toEqual(
-            new RateLimited(30_000, 'Jira: HTTP 429'),
+            new RateLimited(30_000, 'Jira: HTTP 429 from acme.atlassian.net'),
         );
         const broken = connector(() => new Response('oops', { status: 500 }));
         await expect(broken.c.fetch([`${SITE}/browse/ABC-1`], signal)).rejects.toThrow(
-            'Jira: HTTP 500 oops',
+            'Jira: HTTP 500 from acme.atlassian.net oops',
         );
     });
 });

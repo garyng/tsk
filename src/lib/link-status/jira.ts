@@ -3,8 +3,11 @@ import type { Category } from './status';
 
 /**
  * The Jira Cloud connector: each issue's status by its key, up to 100 in one
- * `POST /rest/api/3/issue/bulkfetch`. Plain `fetch`: `jira.js` is 20 MB
- * unpacked for this one call.
+ * `POST /rest/api/3/issue/bulkfetch` per site. Plain `fetch`: `jira.js` is
+ * 20 MB unpacked for this one call.
+ *
+ * Any Atlassian Cloud site the links point to, pasted or an autolink's target,
+ * with an email and a token per site: a site with none is never asked.
  *
  * Jira Cloud takes an API token with the account's email, as Basic auth (it
  * has no personal access tokens; those are Server / Data Center's). A token
@@ -23,19 +26,14 @@ const refused = (res: Response) =>
     res.status === 401 ||
     /AUTHENTICATED_FAILED/i.test(res.headers.get('x-seraph-loginreason') ?? '');
 
-export interface JiraSite {
-    /** `https://<site>.atlassian.net`, no trailing slash. */
-    readonly site: string;
-    readonly email: string;
-}
-
-/** A link to an issue on `site`: its key, from `/browse/KEY` or a board's `?selectedIssue=KEY`. */
-export function jiraKey(url: string, site: string): string | undefined {
-    if (!url.startsWith(`${site}/`)) return undefined;
+/** A link to an Atlassian Cloud issue: its site (the origin) and key, from `/browse/KEY` or a board's `?selectedIssue=KEY`. */
+export function jiraIssue(url: string): { site: string; key: string } | undefined {
+    const site = /^https:\/\/[a-z0-9][a-z0-9-]*\.atlassian\.net(?=[/?#]|$)/i.exec(url)?.[0];
+    if (!site) return undefined;
     const key =
         /\/browse\/([A-Z][A-Z0-9_]*-\d+)(?:[/?#]|$)/i.exec(url)?.[1] ??
         /[?&]selectedIssue=([A-Z][A-Z0-9_]*-\d+)(?:&|#|$)/i.exec(url)?.[1];
-    return key?.toUpperCase();
+    return key ? { site: site.toLowerCase(), key: key.toUpperCase() } : undefined;
 }
 
 interface Issue {
@@ -69,23 +67,33 @@ export function statusOf(issue: Issue | undefined, key: string): Answer {
     };
 }
 
-/** What the hover says with no token: the editor layer offers to set one. */
+/** The start of what the hover says with no token, or a refused one: the editor layer offers to set one. */
 export const NO_TOKEN = 'no Jira API token';
 export const REFUSED = 'Jira refused the API token';
 
+export interface JiraCredentials {
+    readonly email: string;
+    readonly token: string;
+}
+
 export interface JiraIo {
-    /** The API token from secret storage, or undefined when there's none. */
-    readonly token: () => Promise<string | undefined>;
+    /** A site's email and API token, from secret storage; undefined when there are none. */
+    readonly credentials: (site: string) => Promise<JiraCredentials | undefined>;
     readonly fetch?: typeof fetch;
     readonly now?: () => number;
 }
 
-export function jiraConnector({ site, email }: JiraSite, io: JiraIo): Connector {
+export function jiraConnector(io: JiraIo): Connector {
     const http = io.fetch ?? fetch;
     const now = io.now ?? Date.now;
-    /** Where the last request was answered: the site, or the gateway for a scoped token. */
-    let base = site;
-    const post = (at: string, token: string, keys: readonly string[], signal: AbortSignal) =>
+    /** Where each site's last request was answered: the site, or the gateway for a scoped token. */
+    const bases = new Map<string, string>();
+    const post = (
+        at: string,
+        { email, token }: JiraCredentials,
+        keys: readonly string[],
+        signal: AbortSignal,
+    ) =>
         http(`${at}/rest/api/3/issue/bulkfetch`, {
             method: 'POST',
             headers: {
@@ -99,59 +107,81 @@ export function jiraConnector({ site, email }: JiraSite, io: JiraIo): Connector 
             }),
             signal,
         });
-    const gateway = async (signal: AbortSignal) => {
+    const gateway = async (site: string, signal: AbortSignal) => {
         const res = await http(`${site}/_edge/tenant_info`, { signal });
         const cloudId = res.ok ? ((await res.json()) as { cloudId?: string }).cloudId : undefined;
         return cloudId ? `https://api.atlassian.com/ex/jira/${cloudId}` : undefined;
     };
+    /** One site's links: their answers, or a throw for the queue (a rate limit, a failure). */
+    async function fromSite(
+        site: string,
+        links: readonly { url: string; key: string }[],
+        signal: AbortSignal,
+    ) {
+        const host = new URL(site).host;
+        const all = (answer: Answer) => links.map(({ url }) => [url, answer] as const);
+        const creds = await io.credentials(site);
+        if (!creds) return all({ error: `${NO_TOKEN} for ${host}` });
+        const keys = [...new Set(links.map((l) => l.key))];
+        const base = bases.get(site) ?? site;
+        let res = await post(base, creds, keys, signal);
+        if (refused(res) && base === site) {
+            // A token with scopes is refused at the site, and taken at the gateway.
+            const other = await gateway(site, signal);
+            if (other) {
+                const retry = await post(other, creds, keys, signal);
+                if (!refused(retry)) {
+                    bases.set(site, other);
+                    res = retry;
+                }
+            }
+        }
+        if (refused(res)) return all({ error: `${REFUSED} for ${host}` });
+        if (res.status === 429 || res.status === 503) {
+            const after = Number(res.headers.get('retry-after'));
+            throw new RateLimited(
+                now() + (Number.isFinite(after) && after > 0 ? after : 60) * 1000,
+                `Jira: HTTP ${res.status} from ${host}`,
+            );
+        }
+        if (!res.ok)
+            throw new Error(
+                `Jira: HTTP ${res.status} from ${host} ${(await res.text()).slice(0, 200)}`,
+            );
+        const body = (await res.json()) as {
+            issues?: Issue[];
+            issueErrors?: { errorMessage?: string }[];
+        };
+        const byKey = new Map((body.issues ?? []).map((i) => [i.key?.toUpperCase(), i]));
+        // Jira leaves out an issue it can't find or show; an error it lists names an issue id.
+        const failed = body.issueErrors?.[0]?.errorMessage;
+        return links.map(({ url, key }) => {
+            const issue = byKey.get(key);
+            return [
+                url,
+                !issue && failed ? { error: `Jira: ${failed}` } : statusOf(issue, key),
+            ] as const;
+        });
+    }
+
     return {
         name: 'jira',
         batchSize: 100,
-        matches: (url) => jiraKey(url, site) !== undefined,
+        matches: (url) => jiraIssue(url) !== undefined,
         async fetch(urls, signal) {
-            const token = await io.token();
-            if (!token) return new Map(urls.map((u) => [u, { error: NO_TOKEN }]));
-            const keyOf = new Map(urls.map((u) => [u, jiraKey(u, site) ?? u]));
-            const keys = [...new Set(keyOf.values())];
-            let res = await post(base, token, keys, signal);
-            if (refused(res) && base === site) {
-                // A token with scopes is refused at the site, and taken at the gateway.
-                const other = await gateway(signal);
-                if (other) {
-                    const retry = await post(other, token, keys, signal);
-                    if (!refused(retry)) {
-                        base = other;
-                        res = retry;
-                    }
-                }
+            const bySite = new Map<string, { url: string; key: string }[]>();
+            for (const url of urls) {
+                const issue = jiraIssue(url);
+                if (!issue) continue;
+                const links = bySite.get(issue.site) ?? [];
+                links.push({ url, key: issue.key });
+                bySite.set(issue.site, links);
             }
-            if (refused(res)) return new Map(urls.map((u) => [u, { error: REFUSED }]));
-            if (res.status === 429 || res.status === 503) {
-                const after = Number(res.headers.get('retry-after'));
-                throw new RateLimited(
-                    now() + (Number.isFinite(after) && after > 0 ? after : 60) * 1000,
-                    `Jira: HTTP ${res.status}`,
-                );
-            }
-            if (!res.ok)
-                throw new Error(`Jira: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
-            const body = (await res.json()) as {
-                issues?: Issue[];
-                issueErrors?: { errorMessage?: string }[];
-            };
-            const byKey = new Map((body.issues ?? []).map((i) => [i.key?.toUpperCase(), i]));
-            // Jira leaves out an issue it can't find or show; an error it lists names an issue id.
-            const failed = body.issueErrors?.[0]?.errorMessage;
-            return new Map(
-                urls.map((u) => {
-                    const key = keyOf.get(u) as string;
-                    const issue = byKey.get(key);
-                    return [
-                        u,
-                        !issue && failed ? { error: `Jira: ${failed}` } : statusOf(issue, key),
-                    ];
-                }),
+            // A site at a time would wait on each; together, one site's rate limit fails the batch.
+            const answers = await Promise.all(
+                [...bySite].map(([site, links]) => fromSite(site, links, signal)),
             );
+            return new Map(answers.flat());
         },
     };
 }
