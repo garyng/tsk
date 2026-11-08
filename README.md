@@ -187,6 +187,26 @@ Every line is scanned (not only task lines), so a tagged `#JIRAID-123` and a bar
 
 Earlier rules win where matches overlap. Substitution is **raw** — the captured text drops into the URL as-is, so anchor your pattern to capture exactly what the URL needs. A pattern relying on **look-behind/look-ahead** positions the link correctly but won't substitute (the URL falls back to the raw match, and is skipped when that isn't a valid URI).
 
+## Link status
+
+A link in a `.tsk` editor can show its status after it: a ticket's or a PR's state, coloured by kind (open, in progress, done, closed), with a `✓` / `✗` / `○` for its CI checks when the connector reports them. Hover the link for the title and the rest of what the connector said, and when it was fetched. Three kinds of link count: bare `http(s)` URLs, Markdown `[text](url)`, and *Autolinks* matches, by the URL they point to.
+
+Only the links on screen are fetched, and a screen above and below, as you scroll; a file with hundreds of links costs a request or two per screen. Statuses are kept across reloads, so a file you reopen shows them at once and only the stale ones are fetched again: an open item after 5 minutes, a finished one after a day, a failed lookup after a minute. **Tsk: Refresh Link Status** fetches the ones on screen again.
+
+A **connector** fetches the status. Yours are programs, in `tsk.linkStatus.connectors`:
+
+```jsonc
+"tsk.linkStatus.connectors": [
+  { "name": "tickets", "match": "^https://tickets\\.example\\.com/", "command": ["/home/me/bin/ticket-status", "--json"] }
+]
+```
+
+- **`match`**: a regular expression tested against each link's URL. The first connector that matches takes the link.
+- **`command`**: the program and its arguments, run without a shell (a leading `~/` is the home folder). tsk writes a batch of URLs to its stdin, one per line, then closes it, and reads one JSON object per line from its stdout: `{"url": …, "label": "In review", "category": "inProgress"}`, with `checks` (`passing`, `failing`, `pending`), `title` and `lines` (an array of strings) for the hover if it has them, or `{"url": …, "error": "why"}`. `category` is one of `open`, `inProgress`, `done`, `closed`, `unknown`. A URL left out of the answer has no status, and its hover says so.
+- **`batchSize`**: at most this many URLs per run (default 20, at most 100). A run has 30 seconds; its stderr goes to the *Tsk* Output channel, and a non-zero exit fails the batch with stderr's last line.
+
+A connector runs a program, so the setting is read from user settings only, never a folder's, and only in a trusted workspace. In a dev container or over SSH, that's the **Remote** settings (*Preferences: Open Remote Settings*), where the program runs. `docs/link-status-sample.mjs` is a sample connector that makes statuses up; `docs/demo.tsk` shows how to try it. The colours are themable: `tsk.linkStatus.{open,inprogress,done,closed,unknown}` and `tsk.linkStatus.checks.{passing,failing,pending}`.
+
 ## Relationships, code lenses & navigation
 
 Every task with relationship metadata grows code lenses showing forward edges (`parent: <id>` / `dependsOn: <id>` / `relatedTo: <id>` / `movedTo: <id>`; a task that waits on several — `@dependsOn:a,b` — gets a `dependsOn:` lens per id) and inverse edges (`children: N` / `dependents: N` / `related: N` / `movedHereFrom: N`). `@movedTo` (a `[>]` task's "moved to" pointer) is a first-class graph edge: it shows the forward `movedTo: <id>` lens, the move target gains an inverse `movedHereFrom: N` lens, and a dangling `@movedTo` squiggles like any other broken reference. Each title is prefixed with a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) hinting the relationship type.
@@ -339,6 +359,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.state.path` | `${workspaceFolder}/.vscode/tsk/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
 | `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]` and stamp `@started` (like `Alt+S`). Turn off to leave the marker unchanged. |
 | `tsk.autolinks` | `[]` | Regex→URL rules; text matching a rule becomes a `Ctrl`/`Cmd`+clickable link in `.tsk` editors. See *Autolinks*. |
+| `tsk.linkStatus.connectors` | `[]` | Programs that fetch the status shown after links in `.tsk` editors, by URL pattern. User settings only. See *Link status*. |
 | `tsk.migrate.markers` | `[/]`=done, `[x]`=cancelled, … | Markdown glyph → tsk status map used by the migration commands (multi-char glyphs like `>>` allowed). See *Migrating from Markdown*. |
 | `tsk.doubleClickSelectsBlock` | `true` | Double-click a task's marker / bullet / indentation in a `.tsk` editor to select its whole block; double-clicking the task's text still selects a word. Off ⇒ default word-select everywhere. See *List editing*. |
 | `tsk.blockTrailingNewline` | `true` | Include the trailing line break when operating on a whole task block — `Ctrl+C` / `Ctrl+X` copy/cut (nothing selected) and double-click / `Tsk: Select Task Block` selection all extend through it, so a block is a self-contained unit on its own line. Off ⇒ block operations end at the block's last character. See *List editing*. |
@@ -347,7 +368,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.panel.taskList.openDirection` | `active` | Same, for the Task List panel. |
 | `tsk.divider.width` | `100` | Column width *Tsk: Insert Divider…* pads a divider to. Existing dividers of any width keep working. See *Sections*. |
 
-Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`. The marker and metadata colors drive the **Search Editor result rows** (which can't carry semantic tokens); `tsk.navigation.highlight` and `tsk.now.highlight` are in-editor line decorations (the navigation highlight and the now-task border). In `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
+Themable colors are also contributed (override via `workbench.colorCustomizations`): `tsk.marker.{todo,inprogress,completed,moved,cancelled,notes}`, `tsk.metadata.foreground`, `tsk.navigation.highlight`, `tsk.now.highlight`, and the link status colours (see *Link status*). The marker and metadata colors drive the **Search Editor result rows** (which can't carry semantic tokens); `tsk.navigation.highlight` and `tsk.now.highlight` are in-editor line decorations (the navigation highlight and the now-task border). In `.tsk` editors, markers and metadata recolor via `editor.semanticTokenColorCustomizations` instead (see *Marker, priority & metadata coloring*).
 
 ## Limitations
 

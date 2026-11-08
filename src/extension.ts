@@ -38,6 +38,7 @@ import { NowStore } from './lib/now-store';
 import type { NowTreeState } from './lib/now-tree';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
+import { type LinkStatusMark, registerLinkStatus } from './link-status-controller';
 import { registerListEditCommands } from './list-edit-commands';
 import { type MarkdownPreviewRefs, registerMarkdownPreviewRefs } from './markdown-preview';
 import { registerMdMigrateCommands } from './md-migrate-commands';
@@ -123,6 +124,8 @@ export interface TskExtensionApi {
      * without waiting on the `onDidChangeConfiguration` round-trip.
      */
     refreshAutolinks(): void;
+    /** The link statuses drawn in `uri`'s editors, or `undefined` before the first draw. */
+    getLinkStatus(uri: string): readonly LinkStatusMark[] | undefined;
     /**
      * Hand `uri` to the `vscode://garyng.tsk/…` URI handler. Exposed for e2e:
      * the test host can't be relied on to route an outside URI back to itself.
@@ -279,6 +282,7 @@ async function activateFeatures(
     registerPasteImageProvider(context, logger);
     registerSemanticTokens(context);
     const autolinks = registerAutoLinksProvider(context, logger);
+    const linkStatus = registerLinkStatus(context, logger);
     registerWikiLinks(context, diagnosticsManager, workspaceFiles, logger);
     registerDividerFolding(context);
     registerDividerCommands(context, logger);
@@ -297,6 +301,7 @@ async function activateFeatures(
         getNowTaskId: () => nowStore.getCurrentNowId() ?? undefined,
         getNowDecoration: () => nowDecoration.getCurrent(),
         refreshAutolinks: () => autolinks.refresh(),
+        getLinkStatus: (uri) => linkStatus.getMarks(uri),
         openTaskUri: (uri) => revealTask.handleUri(vscode.Uri.parse(uri)),
         getTaskRefDecorations: (uri) => taskRefs?.getMarks(uri),
         getTerminalLinkProvider: () => terminalLinks,

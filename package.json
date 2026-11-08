@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.11.3",
+    "version": "0.12.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -318,6 +318,11 @@
                 "command": "tsk.sendAllMarkdownTasks",
                 "title": "Send All Markdown Tasks to Tsk File…",
                 "category": "Tsk"
+            },
+            {
+                "command": "tsk.refreshLinkStatus",
+                "title": "Refresh Link Status",
+                "category": "Tsk"
             }
         ],
         "menus": {
@@ -525,6 +530,70 @@
                     "light": "#3794ffcc",
                     "dark": "#3794ffcc"
                 }
+            },
+            {
+                "id": "tsk.linkStatus.open",
+                "description": "Status after a link to an open item (an open PR or ticket).",
+                "defaults": {
+                    "light": "#1a7f37",
+                    "dark": "#3fb950"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.inprogress",
+                "description": "Status after a link to an item in progress.",
+                "defaults": {
+                    "light": "#0969da",
+                    "dark": "#58a6ff"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.done",
+                "description": "Status after a link to a finished item (a merged PR, a done ticket).",
+                "defaults": {
+                    "light": "#8250df",
+                    "dark": "#a371f7"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.closed",
+                "description": "Status after a link to an item closed without finishing.",
+                "defaults": {
+                    "light": "#6e7781",
+                    "dark": "#8b949e"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.unknown",
+                "description": "Status after a link whose state the connector doesn't classify.",
+                "defaults": {
+                    "light": "#8c959f",
+                    "dark": "#6e7681"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.checks.passing",
+                "description": "Glyph after a link whose CI checks pass.",
+                "defaults": {
+                    "light": "#1a7f37",
+                    "dark": "#3fb950"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.checks.failing",
+                "description": "Glyph after a link whose CI checks fail.",
+                "defaults": {
+                    "light": "#cf222e",
+                    "dark": "#f85149"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.checks.pending",
+                "description": "Glyph after a link whose CI checks are still running.",
+                "defaults": {
+                    "light": "#9a6700",
+                    "dark": "#d29922"
+                }
             }
         ],
         "configuration": {
@@ -712,6 +781,46 @@
                             }
                         }
                     }
+                },
+                "tsk.linkStatus.connectors": {
+                    "type": "array",
+                    "default": [],
+                    "scope": "machine",
+                    "markdownDescription": "Programs that fetch the status of links in `.tsk` editors, shown after each link. Each entry's `match` is a regular expression tested against a link's URL; the first that matches takes it. tsk writes a batch of URLs to `command`'s stdin, one per line, and reads one JSON object per line from its stdout: `{\"url\": …, \"label\": \"In review\", \"category\": \"inProgress\", \"title\": …}`, or `{\"url\": …, \"error\": …}`. `category` is one of `open`, `inProgress`, `done`, `closed`, `unknown`; `checks` may be `passing`, `failing` or `pending`; `lines` is an array of strings for the hover. User or remote settings only, and only in a trusted workspace.",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "match",
+                            "command"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "markdownDescription": "The connector's name, in the Output channel's lines."
+                            },
+                            "match": {
+                                "type": "string",
+                                "markdownDescription": "JavaScript regular expression tested against each link's URL."
+                            },
+                            "command": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "string"
+                                },
+                                "markdownDescription": "The program and its arguments, run without a shell. A leading `~/` is the home folder."
+                            },
+                            "batchSize": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 100,
+                                "default": 20,
+                                "markdownDescription": "At most this many URLs per run."
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -773,6 +882,7 @@
         "escape-string-regexp": "^5.0.0",
         "github-slugger": "^2.0.0",
         "ink": "^8.0.0",
+        "linkify-it-6": "npm:linkify-it@^6.1.0",
         "marked": "^18.1.0",
         "nanoid": "^5.1.11",
         "pathe": "^2.0.3",

@@ -131,6 +131,9 @@ export const DIVIDER_WIDTH_KEY = 'divider.width';
 export const AUTOLINKS_SETTING = 'tsk.autolinks';
 export const AUTOLINKS_KEY = 'autolinks';
 
+/** `tsk.linkStatus.*`: the connectors that fetch a link's status (`link-status-controller.ts`). */
+export const LINK_STATUS_SETTING = 'tsk.linkStatus';
+
 export const MIGRATE_MARKERS_SETTING = 'tsk.migrate.markers';
 export const MIGRATE_MARKERS_KEY = 'migrate.markers';
 
@@ -197,6 +200,7 @@ export const CLIPBOARD_BRIDGE_POLL_INTERVAL_MS = 300;
  */
 export const COMMANDS = {
     rebuildCache: 'tsk.rebuildCache',
+    refreshLinkStatus: 'tsk.refreshLinkStatus',
     findAllTasksByTag: 'tsk.findAllTasksByTag',
     findAllTasksByStatus: 'tsk.findAllTasksByStatus',
     toggleTodo: 'tsk.toggleTodo',
