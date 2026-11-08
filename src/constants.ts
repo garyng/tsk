@@ -203,6 +203,7 @@ export const COMMANDS = {
     refreshLinkStatus: 'tsk.refreshLinkStatus',
     signInToGitHub: 'tsk.signInToGitHub',
     clearLinkStatusCache: 'tsk.clearLinkStatusCache',
+    setJiraApiToken: 'tsk.setJiraApiToken',
     findAllTasksByTag: 'tsk.findAllTasksByTag',
     findAllTasksByStatus: 'tsk.findAllTasksByStatus',
     toggleTodo: 'tsk.toggleTodo',

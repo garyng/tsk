@@ -218,4 +218,34 @@ suite('link status', () => {
             );
         }
     });
+    test('offers to set a Jira API token on a Jira link, with a site and an email and no token', async function () {
+        this.timeout(60000);
+        const keys = ['linkStatus.jira.site', 'linkStatus.jira.email'] as const;
+        const before = keys.map((k) => config().inspect(k)?.workspaceValue);
+        try {
+            await config().update(
+                keys[0],
+                'https://acme.atlassian.net/jira/projects',
+                vscode.ConfigurationTarget.Workspace,
+            );
+            await config().update(keys[1], 'me@acme.com', vscode.ConfigurationTarget.Workspace);
+            const doc = await vscode.workspace.openTextDocument({
+                language: 'tsk',
+                content: '- [ ] fix https://acme.atlassian.net/browse/ABC-12',
+            });
+            await vscode.window.showTextDocument(doc);
+            // No token in secret storage: the connector answers without asking Jira.
+            let text = '';
+            const end = Date.now() + 20_000;
+            while (!/no Jira API token/.test(text) && Date.now() < end) {
+                await new Promise((r) => setTimeout(r, 200));
+                text = await hover(doc.uri, 0, 20);
+            }
+            assert.match(text, /No status: no Jira API token/);
+            assert.match(text, /\[Set Jira API Token\]\(command:tsk\.setJiraApiToken\)/);
+        } finally {
+            for (const [i, k] of keys.entries())
+                await config().update(k, before[i], vscode.ConfigurationTarget.Workspace);
+        }
+    });
 });

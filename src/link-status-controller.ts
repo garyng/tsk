@@ -5,6 +5,7 @@ import { isTskDocument } from './editor-guards';
 import { type CompiledAutoLink, parseAutoLinkRules } from './lib/autolinks';
 import { scheduleDebounced } from './lib/debounce';
 import { githubConnector, NOT_SIGNED_IN } from './lib/link-status/github';
+import { jiraConnector, NO_TOKEN, REFUSED } from './lib/link-status/jira';
 import { findLinks, type LinkSpan } from './lib/link-status/links';
 import { type Connector, FetchQueue } from './lib/link-status/queue';
 import { parseScriptConnectors, scriptConnector } from './lib/link-status/script-connector';
@@ -37,6 +38,8 @@ const CACHE_KEY = 'tsk.linkStatus.cache';
 const OPEN_LINK = 'tsk.openLink';
 /** A PR's or issue's state in a private repo needs `repo`; GitHub's OAuth has no read-only form of it. */
 const GITHUB_SCOPES = ['repo'];
+/** The Jira API token's key in secret storage, per site. */
+const jiraSecret = (site: string) => `tsk.linkStatus.jira.token:${site}`;
 const SCROLL_DEBOUNCE_MS = 150;
 const EDIT_DEBOUNCE_MS = 300;
 const RENDER_DEBOUNCE_MS = 50;
@@ -140,6 +143,10 @@ export class LinkStatusController implements vscode.Disposable {
             ),
             vscode.commands.registerCommand(COMMANDS.signInToGitHub, () => this.signInToGitHub()),
             vscode.commands.registerCommand(COMMANDS.clearLinkStatusCache, () => this.clearCache()),
+            vscode.commands.registerCommand(COMMANDS.setJiraApiToken, () => this.setJiraToken()),
+            context.secrets.onDidChange(({ key }) => {
+                if (key.startsWith('tsk.linkStatus.jira.token:')) this.refresh();
+            }),
             // Signed in, out, or as someone else: what's on screen may read differently now.
             vscode.authentication.onDidChangeSessions(({ provider }) => {
                 if (provider.id === 'github') this.refresh();
@@ -194,6 +201,13 @@ export class LinkStatusController implements vscode.Disposable {
                     }),
                 );
         }
+        const jira = this.jiraSite();
+        if (jira)
+            connectors.push(
+                jiraConnector(jira, {
+                    token: () => Promise.resolve(this.context.secrets.get(jiraSecret(jira.site))),
+                }),
+            );
         // After yours, so one of yours can take github.com over.
         if (config.get<boolean>('linkStatus.github.enabled'))
             connectors.push(githubConnector({ token: () => this.githubToken() }));
@@ -205,6 +219,40 @@ export class LinkStatusController implements vscode.Disposable {
             log: this.logger,
             onEntry: (url, entry) => this.record(url, entry),
         });
+    }
+
+    /** The Jira site and email from settings: the site as its origin, whatever page was pasted. */
+    private jiraSite(): { site: string; email: string } | undefined {
+        const config = vscode.workspace.getConfiguration('tsk');
+        const raw = config.get<string>('linkStatus.jira.site')?.trim();
+        const email = config.get<string>('linkStatus.jira.email')?.trim();
+        if (!raw || !email) return undefined;
+        try {
+            return { site: new URL(raw).origin, email };
+        } catch {
+            this.logger.warn(`tsk.linkStatus.jira.site: "${raw}" isn't a URL`);
+            return undefined;
+        }
+    }
+
+    /** Ask for the Jira API token and keep it in secret storage; an empty answer removes it. */
+    private async setJiraToken(): Promise<void> {
+        const jira = this.jiraSite();
+        if (!jira) {
+            void vscode.window.showWarningMessage(
+                'Set tsk.linkStatus.jira.site and tsk.linkStatus.jira.email first.',
+            );
+            return;
+        }
+        const token = await vscode.window.showInputBox({
+            title: `Jira API token for ${jira.email} at ${jira.site}`,
+            prompt: 'From id.atlassian.com, Security, API tokens. Empty removes the one kept.',
+            password: true,
+            ignoreFocusOut: true,
+        });
+        if (token === undefined) return;
+        if (token.trim() === '') await this.context.secrets.delete(jiraSecret(jira.site));
+        else await this.context.secrets.store(jiraSecret(jira.site), token.trim());
     }
 
     /** The editor's GitHub session's token, without asking: undefined when there's none. */
@@ -402,8 +450,15 @@ export class LinkStatusController implements vscode.Disposable {
         );
         if ('error' in entry && entry.error === NOT_SIGNED_IN)
             md.appendMarkdown(` · [Sign in to GitHub](command:${COMMANDS.signInToGitHub})`);
+        if ('error' in entry && (entry.error === NO_TOKEN || entry.error === REFUSED))
+            md.appendMarkdown(` · [Set Jira API Token](command:${COMMANDS.setJiraApiToken})`);
         md.isTrusted = {
-            enabledCommands: [OPEN_LINK, COMMANDS.refreshLinkStatus, COMMANDS.signInToGitHub],
+            enabledCommands: [
+                OPEN_LINK,
+                COMMANDS.refreshLinkStatus,
+                COMMANDS.signInToGitHub,
+                COMMANDS.setJiraApiToken,
+            ],
         };
         return md;
     }
