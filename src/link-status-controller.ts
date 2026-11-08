@@ -4,6 +4,7 @@ import { AUTOLINKS_KEY, COMMANDS, LINK_STATUS_SETTING, TSK_LANGUAGE_ID } from '.
 import { isTskDocument } from './editor-guards';
 import { type CompiledAutoLink, parseAutoLinkRules } from './lib/autolinks';
 import { scheduleDebounced } from './lib/debounce';
+import { githubConnector, NOT_SIGNED_IN } from './lib/link-status/github';
 import { findLinks, type LinkSpan } from './lib/link-status/links';
 import { type Connector, FetchQueue } from './lib/link-status/queue';
 import { parseScriptConnectors, scriptConnector } from './lib/link-status/script-connector';
@@ -29,6 +30,8 @@ import {
 const CACHE_KEY = 'tsk.linkStatus.cache';
 /** The hover's Open: internal, so not contributed (COMMANDS mirrors what is). */
 const OPEN_LINK = 'tsk.openLink';
+/** A PR's or issue's state in a private repo needs `repo`; GitHub's OAuth has no read-only form of it. */
+const GITHUB_SCOPES = ['repo'];
 const SCROLL_DEBOUNCE_MS = 150;
 const EDIT_DEBOUNCE_MS = 300;
 const RENDER_DEBOUNCE_MS = 50;
@@ -127,6 +130,11 @@ export class LinkStatusController implements vscode.Disposable {
             vscode.commands.registerCommand(OPEN_LINK, (url: string) =>
                 vscode.env.openExternal(vscode.Uri.parse(url)),
             ),
+            vscode.commands.registerCommand(COMMANDS.signInToGitHub, () => this.signInToGitHub()),
+            // Signed in, out, or as someone else: what's on screen may read differently now.
+            vscode.authentication.onDidChangeSessions(({ provider }) => {
+                if (provider.id === 'github') this.refresh();
+            }),
         );
         for (const editor of vscode.window.visibleTextEditors) this.update(editor);
     }
@@ -177,6 +185,9 @@ export class LinkStatusController implements vscode.Disposable {
                     }),
                 );
         }
+        // After yours, so one of yours can take github.com over.
+        if (config.get<boolean>('linkStatus.github.enabled'))
+            connectors.push(githubConnector({ token: () => this.githubToken() }));
         this.logger.info(
             `link status: ${connectors.length} connector(s)${from}: ${connectors.map((c) => c.name).join(', ') || 'none'}`,
         );
@@ -185,6 +196,29 @@ export class LinkStatusController implements vscode.Disposable {
             log: this.logger,
             onEntry: (url, entry) => this.record(url, entry),
         });
+    }
+
+    /** The editor's GitHub session's token, without asking: undefined when there's none. */
+    private async githubToken(): Promise<string | undefined> {
+        try {
+            const session = await vscode.authentication.getSession('github', GITHUB_SCOPES, {
+                silent: true,
+            });
+            return session?.accessToken;
+        } catch (e) {
+            this.logger.warn(`link status: no GitHub session: ${(e as Error).message}`);
+            return undefined;
+        }
+    }
+
+    /** VS Code's own GitHub sign-in, then the links on screen again. */
+    private async signInToGitHub(): Promise<void> {
+        try {
+            await vscode.authentication.getSession('github', GITHUB_SCOPES, { createIfNone: true });
+            this.refresh();
+        } catch (e) {
+            this.logger.warn(`link status: GitHub sign-in: ${(e as Error).message}`);
+        }
     }
 
     private reconfigure(): void {
@@ -333,12 +367,16 @@ export class LinkStatusController implements vscode.Disposable {
         md.appendText(
             `fetched ${formatDistance(entry.fetchedAt, Date.now(), { addSuffix: true })}`,
         );
-        // Only these two commands run from it, whatever the service's text holds.
+        // Only these commands run from it, whatever the service's text holds.
         const arg = encodeURIComponent(JSON.stringify([url]));
         md.appendMarkdown(
             `\n\n[Open](command:${OPEN_LINK}?${arg}) · [Refresh](command:${COMMANDS.refreshLinkStatus}?${arg})`,
         );
-        md.isTrusted = { enabledCommands: [OPEN_LINK, COMMANDS.refreshLinkStatus] };
+        if ('error' in entry && entry.error === NOT_SIGNED_IN)
+            md.appendMarkdown(` · [Sign in to GitHub](command:${COMMANDS.signInToGitHub})`);
+        md.isTrusted = {
+            enabledCommands: [OPEN_LINK, COMMANDS.refreshLinkStatus, COMMANDS.signInToGitHub],
+        };
         return md;
     }
 }

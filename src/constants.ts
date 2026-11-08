@@ -201,6 +201,7 @@ export const CLIPBOARD_BRIDGE_POLL_INTERVAL_MS = 300;
 export const COMMANDS = {
     rebuildCache: 'tsk.rebuildCache',
     refreshLinkStatus: 'tsk.refreshLinkStatus',
+    signInToGitHub: 'tsk.signInToGitHub',
     findAllTasksByTag: 'tsk.findAllTasksByTag',
     findAllTasksByStatus: 'tsk.findAllTasksByStatus',
     toggleTodo: 'tsk.toggleTodo',

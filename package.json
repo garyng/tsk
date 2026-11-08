@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.12.2",
+    "version": "0.13.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -322,6 +322,11 @@
             {
                 "command": "tsk.refreshLinkStatus",
                 "title": "Refresh Link Status",
+                "category": "Tsk"
+            },
+            {
+                "command": "tsk.signInToGitHub",
+                "title": "Sign In to GitHub for Link Status",
                 "category": "Tsk"
             }
         ],
@@ -796,6 +801,11 @@
                             }
                         }
                     }
+                },
+                "tsk.linkStatus.github.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "Show the status of GitHub PR and issue links in `.tsk` editors: a PR's state and its CI checks, an issue's state. Uses VS Code's own GitHub sign-in (`repo` scope, for private repos); a link's hover offers to sign in when there's no session. A connector in `#tsk.linkStatus.connectors#` that matches a GitHub URL takes it first."
                 }
             }
         }
@@ -850,6 +860,7 @@
         "vscode-textmate": "^9.3.2"
     },
     "dependencies": {
+        "@octokit/graphql": "^9.0.5",
         "@tanstack/match-sorter-utils": "^8.19.4",
         "@tanstack/react-table": "^8.21.3",
         "@tanstack/react-virtual": "^3.14.2",

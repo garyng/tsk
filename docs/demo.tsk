@@ -60,6 +60,10 @@ A link can show its status after it: a PR's or a ticket's state, fetched for the
 
 Each link shows a made-up status, and so does `JIRAID-123` above, through its autolink. Hover a status for its details; Ctrl/Cmd+Click on it opens the link, and **Tsk: Refresh Link Status** fetches the ones on screen again.
 
+GitHub is built in: turn on `tsk.linkStatus.github.enabled`, sign in when a link's hover asks, and these show a PR's state and checks and an issue's:
+
+- [ ] read https://github.com/microsoft/vscode/pull/25 and https://github.com/microsoft/vscode/issues/1 <!-- @id:link-status-github -->
+
 Ctrl+click a tag to jump to its entry in `tags.yml` (`F12` and `Alt+F12` work too). Not declared yet? VS Code says so, and `Ctrl+.` offers **Define #tag in tags.yml…** — it asks for a description and writes the entry for you.
 ## 4. Links
 

@@ -156,4 +156,35 @@ suite('link status', () => {
             await config().update('autolinks', autolinks, vscode.ConfigurationTarget.Workspace);
         }
     });
+    test('offers to sign in to GitHub on a GitHub link, with GitHub on and no session', async function () {
+        this.timeout(60000);
+        const enabled = config().inspect('linkStatus.github.enabled')?.workspaceValue;
+        try {
+            await config().update(
+                'linkStatus.github.enabled',
+                true,
+                vscode.ConfigurationTarget.Workspace,
+            );
+            const doc = await vscode.workspace.openTextDocument({
+                language: 'tsk',
+                content: '- [ ] review https://github.com/octo-org/octo-repo/pull/1',
+            });
+            await vscode.window.showTextDocument(doc);
+            // No session in the test host: the connector answers without asking GitHub.
+            let text = '';
+            const end = Date.now() + 20_000;
+            while (!/not signed in to GitHub/.test(text) && Date.now() < end) {
+                await new Promise((r) => setTimeout(r, 200));
+                text = await hover(doc.uri, 0, 20);
+            }
+            assert.match(text, /No status: not signed in to GitHub/);
+            assert.match(text, /\[Sign in to GitHub\]\(command:tsk\.signInToGitHub\)/);
+        } finally {
+            await config().update(
+                'linkStatus.github.enabled',
+                enabled,
+                vscode.ConfigurationTarget.Workspace,
+            );
+        }
+    });
 });
