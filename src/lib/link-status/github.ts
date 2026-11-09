@@ -100,6 +100,7 @@ export function statusOf(node: Node | null | undefined, ref: string): Answer {
 
 /** What the hover says when there's no session: the editor layer offers to sign in. */
 export const NOT_SIGNED_IN = 'not signed in to GitHub';
+export const TOKEN_REFUSED = 'GitHub refused the session token';
 
 export interface GitHubIo {
     /** The editor's GitHub session token, or undefined when there's none. */
@@ -168,9 +169,7 @@ export function githubConnector(io: GitHubIo): Connector {
                     if ((status === 403 || status === 429) && until !== undefined)
                         throw new RateLimited(until, 'GitHub rate limit');
                     if (status === 401)
-                        return new Map(
-                            urls.map((u) => [u, { error: 'GitHub refused the session token' }]),
-                        );
+                        return new Map(urls.map((u) => [u, { error: TOKEN_REFUSED }]));
                     throw e;
                 }
             }

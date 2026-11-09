@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.14.2",
+    "version": "0.15.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -568,6 +568,14 @@
                 "defaults": {
                     "light": "#8250df",
                     "dark": "#a371f7"
+                }
+            },
+            {
+                "id": "tsk.linkStatus.failed",
+                "description": "Status after a link to an item that failed (a failed CI run).",
+                "defaults": {
+                    "light": "#cf222e",
+                    "dark": "#f85149"
                 }
             },
             {

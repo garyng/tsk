@@ -3,7 +3,7 @@
  */
 
 /** What kind of state a status is: it picks the colour. */
-export const CATEGORIES = ['open', 'inProgress', 'done', 'closed', 'unknown'] as const;
+export const CATEGORIES = ['open', 'inProgress', 'done', 'failed', 'closed', 'unknown'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 /** A PR's CI checks, as one state. */
@@ -27,10 +27,14 @@ export type Entry =
     | { readonly error: string; readonly fetchedAt: number };
 
 const MINUTE = 60_000;
-/** An open item changes often, a finished one rarely; an error is worth trying again soon. */
+/**
+ * An open item changes often, a finished one rarely; a failed one (a CI run) is the one that
+ * gets re-run, and an error is worth trying again soon.
+ */
 export const FRESH_FOR_MS: Readonly<Record<Category | 'error', number>> = {
     open: 5 * MINUTE,
     inProgress: 5 * MINUTE,
+    failed: 5 * MINUTE,
     unknown: 5 * MINUTE,
     done: 24 * 60 * MINUTE,
     closed: 24 * 60 * MINUTE,

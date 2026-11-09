@@ -23,6 +23,10 @@ describe('readStatus', () => {
             label: 'x',
             category: 'unknown',
         });
+        expect(readStatus({ label: 'Rejected', category: 'failed' })).toEqual({
+            label: 'Rejected',
+            category: 'failed',
+        });
     });
 
     it('refuses an answer with no label', () => {

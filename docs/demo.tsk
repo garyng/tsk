@@ -64,6 +64,10 @@ GitHub is built in: turn on `tsk.linkStatus.github.enabled`, sign in when a link
 
 - [ ] read https://github.com/microsoft/vscode/pull/25 and https://github.com/microsoft/vscode/issues/1 <!-- @id:link-status-github -->
 
+A GitHub Actions run, an attempt of one or one of its jobs shows how it went:
+
+- [ ] check https://github.com/actions/checkout/actions/runs/42467571339 <!-- @id:link-status-actions -->
+
 Jira Cloud too, any site: point an autolink at `https://<your site>.atlassian.net/browse/$1-$2`, hover a key it links, and follow **Set Jira API Token**: then that site's keys show their issue's status.
 
 Ctrl+click a tag to jump to its entry in `tags.yml` (`F12` and `Alt+F12` work too). Not declared yet? VS Code says so, and `Ctrl+.` offers **Define #tag in tags.yml…** — it asks for a description and writes the entry for you.

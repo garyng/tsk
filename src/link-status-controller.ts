@@ -5,6 +5,7 @@ import { isTskDocument } from './editor-guards';
 import { type CompiledAutoLink, parseAutoLinkRules } from './lib/autolinks';
 import { scheduleDebounced } from './lib/debounce';
 import { githubConnector, NOT_SIGNED_IN } from './lib/link-status/github';
+import { githubActionsConnector } from './lib/link-status/github-actions';
 import {
     type JiraCredentials,
     jiraConnector,
@@ -214,8 +215,10 @@ export class LinkStatusController implements vscode.Disposable {
         // Any Atlassian Cloud site the links point to; one with no token kept is never asked.
         connectors.push(jiraConnector({ credentials: (site) => this.jiraCredentials(site) }));
         // After yours, so one of yours can take github.com over.
-        if (config.get<boolean>('linkStatus.github.enabled'))
-            connectors.push(githubConnector({ token: () => this.githubToken() }));
+        if (config.get<boolean>('linkStatus.github.enabled')) {
+            const token = () => this.githubToken();
+            connectors.push(githubConnector({ token }), githubActionsConnector({ token }));
+        }
         this.logger.info(
             `link status: ${connectors.length} connector(s)${from}: ${connectors.map((c) => c.name).join(', ') || 'none'}`,
         );

@@ -9,6 +9,7 @@ const STATES = [
     { label: 'Open', category: 'open' },
     { label: 'In review', category: 'inProgress', checks: 'pending' },
     { label: 'Done', category: 'done', checks: 'passing' },
+    { label: 'Rejected', category: 'failed' },
 ];
 
 for await (const url of createInterface({ input: process.stdin })) {

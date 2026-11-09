@@ -187,7 +187,7 @@ suite('link status', () => {
             await config().update('autolinks', autolinks, vscode.ConfigurationTarget.Workspace);
         }
     });
-    test('offers to sign in to GitHub on a GitHub link, with GitHub on and no session', async function () {
+    test('offers to sign in to GitHub on a PR link and an Actions run link, with GitHub on and no session', async function () {
         this.timeout(60000);
         const enabled = config().inspect('linkStatus.github.enabled')?.workspaceValue;
         try {
@@ -198,18 +198,23 @@ suite('link status', () => {
             );
             const doc = await vscode.workspace.openTextDocument({
                 language: 'tsk',
-                content: '- [ ] review https://github.com/octo-org/octo-repo/pull/1',
+                content: [
+                    '- [ ] review https://github.com/octo-org/octo-repo/pull/1',
+                    '- [ ] watch https://github.com/octo-org/octo-repo/actions/runs/1/job/2',
+                ].join('\n'),
             });
             await vscode.window.showTextDocument(doc);
-            // No session in the test host: the connector answers without asking GitHub.
-            let text = '';
-            const end = Date.now() + 20_000;
-            while (!/not signed in to GitHub/.test(text) && Date.now() < end) {
-                await new Promise((r) => setTimeout(r, 200));
-                text = await hover(doc.uri, 0, 20);
+            // No session in the test host: each connector answers without asking GitHub.
+            for (const line of [0, 1]) {
+                let text = '';
+                const end = Date.now() + 20_000;
+                while (!/not signed in to GitHub/.test(text) && Date.now() < end) {
+                    await new Promise((r) => setTimeout(r, 200));
+                    text = await hover(doc.uri, line, 20);
+                }
+                assert.match(text, /No status: not signed in to GitHub/);
+                assert.match(text, /\[Sign in to GitHub\]\(command:tsk\.signInToGitHub\)/);
             }
-            assert.match(text, /No status: not signed in to GitHub/);
-            assert.match(text, /\[Sign in to GitHub\]\(command:tsk\.signInToGitHub\)/);
         } finally {
             await config().update(
                 'linkStatus.github.enabled',
