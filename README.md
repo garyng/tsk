@@ -257,7 +257,7 @@ The tree uses **linear-compaction**: the path from root to the current now rende
 | **Prune off-path** (toolbar) | Drop every branch not on the path to the current now (linearize). |
 | **Clear** (toolbar, or **Tsk: Clear Now History**) | Wipe the whole tree — confirm via a notification toast (not a blocking modal); your tasks are untouched. |
 
-**Persistence.** The now-tree lives in its own SQLite `state.db` (default `${workspaceFolder}/.vscode/tsk/state.db`, set via `tsk.state.path`) — **separate from `cache.db`**, so **Tsk: Rebuild Cache** leaves it intact. With no workspace folder it's session-only (in-memory). Like the cache, it's single-root today.
+**Persistence.** The now-tree lives in its own SQLite `state.db` (default `${workspaceStorage}/state.db`, set via `tsk.state.path`; see *Where tsk keeps its databases*) — **separate from `cache.db`**, so **Tsk: Rebuild Cache** leaves it intact. With no workspace folder it's session-only (in-memory). Like the cache, it's single-root today.
 
 **Recurrence.** The same task can appear at several nodes (mark it, move on, come back later) — a node's identity is its position in the tree, not the `@id`, so one task can sit at multiple points in your history.
 
@@ -314,9 +314,15 @@ The command **Tsk: Install Clipboard Bridge Skill** writes a ready-made [Claude 
 
 On activation, tsk scans every `.tsk` file git doesn't ignore (a workspace without git falls back to a search that skips `node_modules` and `.git`) and indexes tasks into a SQLite cache that powers tag search and the relationship graph:
 
-- Default location `${workspaceFolder}/.vscode/tsk/cache.db`, configurable via `tsk.cache.path`. Falls back to in-memory when no workspace folder is open.
+- Default location `${workspaceStorage}/cache.db`, configurable via `tsk.cache.path`. Falls back to in-memory when no workspace folder is open.
 - File events (watcher, save, debounced edit) trigger per-file rescans; reopening preserves data. A new file comes in only if the scan would list it, so a nested repository's files stay out (an agent's git worktree, a copy of the same tasks), as git leaves them out. A deleted folder takes its files out of the cache, and the next activation drops any file that went while VS Code was away.
 - Run **Tsk: Rebuild Cache** to purge and rerun the initial scan if anything looks stale.
+
+### Where tsk keeps its databases
+
+`cache.db` and the now-tree's `state.db` (each with its `-wal` and `-shm`) go in `${workspaceStorage}`: tsk's folder in VS Code's own storage for the workspace, outside the folder, so a folder tsk opens in stays as it was. On a remote (a container, SSH) that's on the remote. To keep them in the folder instead, say for a container rebuilt without VS Code's server data, set `tsk.cache.path` and `tsk.state.path` to `${workspaceFolder}/.vscode/tsk/cache.db` and `${workspaceFolder}/.vscode/tsk/state.db`, or any other path.
+
+Up to 0.15 both defaulted to `.vscode/tsk`. A database still there, whose setting is at its default, moves on the first open: the now-tree is copied to `${workspaceStorage}`, the cache is removed (it's rebuilt), and `.vscode/tsk` goes when that empties it.
 
 ## Command line (`tsk`)
 
@@ -354,7 +360,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `tsk.cache.path` | `${workspaceFolder}/.vscode/tsk/cache.db` | On-disk SQLite cache (`${workspaceFolder}` expanded at runtime; in-memory when no workspace folder is open). |
+| `tsk.cache.path` | `${workspaceStorage}/cache.db` | On-disk SQLite cache (`${workspaceStorage}` and `${workspaceFolder}` expanded at runtime; in-memory when no workspace folder is open). See *Where tsk keeps its databases*. |
 | `tsk.tags.path` | `${workspaceFolder}/.vscode/tsk/tags.yml` | Workspace `tags.yml` for tag descriptions + completion. Blank ⇒ no file loaded (tags discovered in `.tsk` files still complete). |
 | `tsk.log.level` | `info` | `tsk` Output-channel verbosity: `debug` / `info` / `warn` / `error`. |
 | `tsk.editor.changeDebounceMs` | `300` | Debounce (ms) before re-applying priority decorations / rescanning a `.tsk` document after a text change (range 0–5000). Marker + metadata colors are semantic tokens and update independently of this. |
@@ -362,7 +368,7 @@ Every user-facing setting lives in `package.json#contributes.configuration`; the
 | `tsk.clipboard.bridgeEnabled` | `false` | Master switch for the clipboard bridge (watch a file → host clipboard). |
 | `tsk.clipboard.bridgePath` | `${workspaceFolder}/.vscode/tsk/clipboard-bridge.txt` | The watched bridge file; only used when the bridge is enabled. |
 | `tsk.pasteImage.baseDirectory` | `./images` | Base directory (under the document) for pasted images. Blank ⇒ beside the document. |
-| `tsk.state.path` | `${workspaceFolder}/.vscode/tsk/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
+| `tsk.state.path` | `${workspaceStorage}/state.db` | On-disk SQLite store for the now-tree, separate from the cache (survives **Rebuild Cache**). In-memory when no workspace folder is open. |
 | `tsk.now.autoInProgress` | `true` | When marking a task as "now" (`Alt+W`), also flip its marker to `[/]` and stamp `@started` (like `Alt+S`). Turn off to leave the marker unchanged. |
 | `tsk.autolinks` | `[]` | Regex→URL rules; text matching a rule becomes a `Ctrl`/`Cmd`+clickable link in `.tsk` editors. See *Autolinks*. |
 | `tsk.linkStatus.github.enabled` | `false` | The status of GitHub PR, issue and Actions links, through VS Code's GitHub sign-in. See *Link status*. |

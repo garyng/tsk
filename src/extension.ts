@@ -29,13 +29,19 @@ import { registerFindAllTasksByTagCommand } from './find-tasks-by-tag';
 import { registerHoverProvider } from './hover';
 import { registerInstallClipboardBridgeSkillCommand } from './install-clipboard-bridge-skill';
 import { CacheService } from './lib/cache';
-import { ensureCacheParentDir, IN_MEMORY, resolveCachePath } from './lib/cache-path';
+import {
+    ensureCacheParentDir,
+    IN_MEMORY,
+    type PathPlaces,
+    resolveCachePath,
+} from './lib/cache-path';
 import { type CacheCounts, Db, type TaskRecord } from './lib/db';
 import type { GraphNode } from './lib/graph';
 import { GraphService } from './lib/graph-service';
 import { Logger, type LogLevel } from './lib/logger';
 import { NowStore } from './lib/now-store';
 import type { NowTreeState } from './lib/now-tree';
+import { isAtDefault, moveOldDefaults } from './lib/old-default-move';
 import { clampPriorityOpacity, parseChangeDebounceMs, parseLogLevel } from './lib/settings';
 import type { TagDef } from './lib/tags-config';
 import { type LinkStatusMark, registerLinkStatus } from './link-status-controller';
@@ -208,8 +214,9 @@ async function activateFeatures(
     logger: Logger,
 ): Promise<TskExtensionApi> {
     const workspaceFiles = createWorkspaceFiles(logger);
-    const { cache } = openCache(context, logger);
-    const nowStore = openNowStore(context, logger);
+    const paths = databasePaths(context, logger);
+    const { cache } = openCache(context, logger, paths.cache);
+    const nowStore = openNowStore(context, logger, paths.state);
     const decorations = new DecorationsController(context, readPriorityOpacity());
 
     const diagnostics = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
@@ -321,18 +328,47 @@ export function deactivate(): void {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/** What `${workspaceFolder}` and `${workspaceStorage}` stand for in the database paths. */
+function pathPlaces(context: vscode.ExtensionContext): PathPlaces {
+    return {
+        workspaceFolder: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        workspaceStorage: context.storageUri?.fsPath,
+    };
+}
+
 /**
- * Resolve the configured cache path, open the SQLite cache, and register
- * the close hook on `context.subscriptions`. Logs the resolved path (or
- * `IN_MEMORY` fallback) to the Output channel.
+ * Where the two databases open: their settings, resolved, after moving what
+ * the old defaults left in the folder for a setting still at its default.
+ */
+function databasePaths(
+    context: vscode.ExtensionContext,
+    logger: Logger,
+): { cache: string; state: string } {
+    const config = vscode.workspace.getConfiguration('tsk');
+    const places = pathPlaces(context);
+    const cache = resolveCachePath(config.get<string>(CACHE_PATH_KEY, ''), places);
+    const state = resolveCachePath(config.get<string>(STATE_PATH_KEY, ''), places);
+    if (!places.workspaceFolder) return { cache, state };
+    const moving = (key: string, path: string) =>
+        isAtDefault(config.inspect(key)) && path !== IN_MEMORY ? path : undefined;
+    const openOld = moveOldDefaults(
+        places.workspaceFolder,
+        { cache: moving(CACHE_PATH_KEY, cache), state: moving(STATE_PATH_KEY, state) },
+        logger,
+    );
+    return { cache, state: openOld ?? state };
+}
+
+/**
+ * Open the SQLite cache at `cachePath`, and register the close hook on
+ * `context.subscriptions`. Logs the path (or `IN_MEMORY` fallback) to the
+ * Output channel.
  */
 function openCache(
     context: vscode.ExtensionContext,
     logger: Logger,
+    cachePath: string,
 ): { db: Db; cache: CacheService } {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const rawSetting = vscode.workspace.getConfiguration('tsk').get<string>(CACHE_PATH_KEY, '');
-    const cachePath = resolveCachePath(rawSetting, workspaceFolder);
     ensureCacheParentDir(cachePath);
 
     const db = new Db(cachePath, { warn: (message) => logger.warn(message) });
@@ -349,15 +385,16 @@ function openCache(
 }
 
 /**
- * Resolve `tsk.state.path`, open the now-tree's `state.db`, and register its
- * close hook on `context.subscriptions`. Mirrors {@link openCache} — a separate
- * file + connection, so `Tsk: Rebuild Cache` (which only touches the cache DB)
+ * Open the now-tree's `state.db` at `statePath`, and register its close hook on
+ * `context.subscriptions`. Mirrors {@link openCache} — a separate file +
+ * connection, so `Tsk: Rebuild Cache` (which only touches the cache DB)
  * structurally can't reach it.
  */
-function openNowStore(context: vscode.ExtensionContext, logger: Logger): NowStore {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const rawSetting = vscode.workspace.getConfiguration('tsk').get<string>(STATE_PATH_KEY, '');
-    const statePath = resolveCachePath(rawSetting, workspaceFolder);
+function openNowStore(
+    context: vscode.ExtensionContext,
+    logger: Logger,
+    statePath: string,
+): NowStore {
     ensureCacheParentDir(statePath);
 
     const store = new NowStore(statePath, { warn: (message) => logger.warn(message) });

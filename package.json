@@ -2,7 +2,7 @@
     "name": "tsk",
     "displayName": "tsk",
     "description": "A Markdown-based task manager for .tsk files.",
-    "version": "0.15.1",
+    "version": "0.16.0",
     "publisher": "garyng",
     "license": "MIT",
     "repository": {
@@ -600,8 +600,8 @@
             "properties": {
                 "tsk.cache.path": {
                     "type": "string",
-                    "default": "${workspaceFolder}/.vscode/tsk/cache.db",
-                    "description": "Path to the on-disk SQLite cache. Supports ${workspaceFolder} substitution. When no workspace folder is open, falls back to in-memory."
+                    "default": "${workspaceStorage}/cache.db",
+                    "description": "Path to the on-disk SQLite cache. ${workspaceStorage} is tsk's folder in VS Code's storage for this workspace, outside the folder; ${workspaceFolder} is the folder, so ${workspaceFolder}/.vscode/tsk/cache.db keeps it in the folder. When no workspace folder is open, the cache is in-memory."
                 },
                 "tsk.migrate.markers": {
                     "type": "object",
@@ -672,8 +672,8 @@
                 },
                 "tsk.state.path": {
                     "type": "string",
-                    "default": "${workspaceFolder}/.vscode/tsk/state.db",
-                    "description": "Path to the on-disk SQLite state database holding the \"now\" undo-tree. Supports ${workspaceFolder} substitution. When no workspace folder is open, the now-tree is in-memory and lost when the window closes."
+                    "default": "${workspaceStorage}/state.db",
+                    "description": "Path to the on-disk SQLite state database holding the \"now\" undo-tree. ${workspaceStorage} is tsk's folder in VS Code's storage for this workspace, outside the folder; ${workspaceFolder} is the folder, so ${workspaceFolder}/.vscode/tsk/state.db keeps it in the folder. When no workspace folder is open, the now-tree is in-memory and lost when the window closes."
                 },
                 "tsk.now.autoInProgress": {
                     "type": "boolean",

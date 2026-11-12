@@ -84,8 +84,7 @@ class ClipboardBridge {
     private start(path: string): void {
         try {
             // The default path lives under `.vscode/tsk/`, which may not
-            // exist yet (cache.db is the usual creator). Make the parent
-            // dir before touching the file.
+            // exist yet. Make the parent dir before touching the file.
             mkdirSync(dirname(path), { recursive: true });
             // Touch the file so `watchFile` has a baseline to poll. Append
             // mode creates-if-missing without truncating existing content
